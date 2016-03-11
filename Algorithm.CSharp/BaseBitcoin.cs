@@ -36,11 +36,18 @@ namespace QuantConnect.Algorithm.CSharp
 
         protected string BitcoinSymbol { get { return _bitcoinSymbol; } }
 
+
+        /// <summary>
+        /// Constructor sets up some custom providers and handlers for Bitfinex
+        /// </summary>
         public BaseBitcoin()
         {
+            //This is needed for margin call warning behaviour
             Portfolio = new BitfinexSecurityPortfolioManager(Securities, Transactions);
+            //Non default brokerage for Forex. Cash or Margin accounts are supported
             SetBrokerageModel(BrokerageName.BitfinexBrokerage, AccountType.Margin);
             SetTimeZone(DateTimeZone.Utc);
+            //Can be slow to fill. 20 second timeout should be adequate in most conditions
             Transactions.MarketOrderFillTimeout = new TimeSpan(0, 0, 20);
         }
 
@@ -48,8 +55,8 @@ namespace QuantConnect.Algorithm.CSharp
         {
             SetStartDate(2015, 11, 10);
             SetEndDate(2016, 2, 20);
-            AddSecurity(SecurityType.Forex, BitcoinSymbol, Resolution.Tick, Market.Bitcoin, false, 3.3m, false);
             SetCash("USD", 1000, 1m);
+            AddSecurity(SecurityType.Forex, BitcoinSymbol, Resolution.Tick, Market.Bitcoin, false, 3.3m, false);
         }
 
         public void OnData(Ticks data)
