@@ -116,16 +116,16 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 ticks.Add(new Tick
                 {
-                    AskPrice = msg.ASK / divisor,
-                    BidPrice = msg.BID / divisor,
-                    AskSize = (long)Math.Round(msg.ASK_SIZE * divisor, 0),
-                    BidSize = (long)Math.Round(msg.BID_SIZE * divisor, 0),
+                    AskPrice = msg.ASK / scaleFactor,
+                    BidPrice = msg.BID / scaleFactor,
+                    AskSize = (long)Math.Round(msg.ASK_SIZE * scaleFactor, 0),
+                    BidSize = (long)Math.Round(msg.BID_SIZE * scaleFactor, 0),
                     Time = DateTime.UtcNow,
-                    Value = msg.LAST_PRICE / divisor,
+                    Value = msg.LAST_PRICE / scaleFactor,
                     TickType = TickType.Quote,
                     Symbol = symbol,
                     DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(msg.VOLUME, 2) * divisor)
+                    Quantity = (int)(Math.Round(msg.VOLUME, 2) * scaleFactor)
                 });
             }
         }
@@ -159,14 +159,14 @@ namespace QuantConnect.Brokerages.Bitfinex
                 (
                     cached.First().Key, symbol, msg.TRD_TIMESTAMP, MapOrderStatus(msg),
                     msg.TRD_AMOUNT_EXECUTED > 0 ? OrderDirection.Buy : OrderDirection.Sell,
-                    msg.TRD_PRICE_EXECUTED / divisor, (int)(msg.TRD_AMOUNT_EXECUTED * divisor),
-                    msg.FEE / divisor, "Bitfinex Fill Event"
+                    msg.TRD_PRICE_EXECUTED / scaleFactor, (int)(msg.TRD_AMOUNT_EXECUTED * scaleFactor),
+                    msg.FEE / scaleFactor, "Bitfinex Fill Event"
                 );
-                fill.FillPrice = msg.TRD_PRICE_EXECUTED / divisor;
+                fill.FillPrice = msg.TRD_PRICE_EXECUTED / scaleFactor;
 
                 if (msg.FEE_CURRENCY == "BTC")
                 {
-                    msg.FEE = (msg.FEE * msg.TRD_PRICE_EXECUTED) / divisor;
+                    msg.FEE = (msg.FEE * msg.TRD_PRICE_EXECUTED) / scaleFactor;
                 }
 
                 filledOrderIDs.Add(cached.First().Key);
