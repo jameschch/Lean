@@ -105,6 +105,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             catch (Exception ex)
             {
                 Log.Error(ex, string.Format("Parsing wss message failed. Data: {0}", e.Data));
+                throw;
             }
         }
         

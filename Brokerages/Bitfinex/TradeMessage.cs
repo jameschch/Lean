@@ -56,7 +56,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             TRD_AMOUNT_EXECUTED = GetDecimal("TRD_AMOUNT_EXECUTED");
             TRD_PRICE_EXECUTED = GetDecimal("TRD_PRICE_EXECUTED");
             ORD_TYPE = allValues[Array.IndexOf(allKeys, "ORD_TYPE")];
-            ORD_PRICE = GetDecimal("ORD_PRICE");
+            ORD_PRICE = TryGetDecimal("ORD_PRICE");
             if (allValues.Length == 11)
             {
                 TRD_ID = TryGetInt("TRD_ID");

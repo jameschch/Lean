@@ -87,7 +87,23 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             };
 
             unit.OnMessage(unit, GetArgs(json));
+        }
 
+        [Test()]
+        public void OnMessageTradePartialFillTest2()
+        {
+            string brokerId = "2";
+            string json = "[0,\"te\",[\"abc123\",\"BTCUSD\",1457729043," + brokerId + ",0.00543202,420.95,\"MARKET\",null]]";
+
+            unit.CachedOrderIDs.TryAdd(1, new BitfinexOrder { BrokerId = new List<string> { brokerId } });
+
+            unit.OrderStatusChanged += (s, e) =>
+            {
+                Assert.AreEqual("BTCUSD", e.Symbol.Value);
+                Assert.AreEqual(Orders.OrderStatus.PartiallyFilled, e.Status);
+            };
+
+            unit.OnMessage(unit, GetArgs(json));
         }
 
         [Test()]
@@ -108,7 +124,6 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             };
 
             unit.OnMessage(unit, GetArgs(json));
-
         }
 
         [Test()]
@@ -161,7 +176,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         [Test()]
         public void OnMessageInfoResubscribeTest()
         {
-            string json = "{\"event\":\"info\",\"code\":\"20061\"}";
+            string json = "{\"event\":\"info\",\"code\":20061,\"msg\":\"Resync from the Trading Engine ended\"}";
 
             mock.Setup(m => m.Connect()).Verifiable();
 
@@ -180,9 +195,9 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
             System.Globalization.CultureInfo culture = null;
-            MessageEventArgs args = (MessageEventArgs)Activator.CreateInstance(typeof(MessageEventArgs), flags, null, new object[] 
+            MessageEventArgs args = (MessageEventArgs)Activator.CreateInstance(typeof(MessageEventArgs), flags, null, new object[]
             {
-                Opcode.Text, System.Text.Encoding.UTF8.GetBytes(json) 
+                Opcode.Text, System.Text.Encoding.UTF8.GetBytes(json)
             }, culture);
 
             return args;
