@@ -48,9 +48,9 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2016, 1, 1);
             SetEndDate(2016, 2, 1);
 
-            rsi = RSI(BitcoinSymbol, period, MovingAverageType.Exponential, Resolution.Hour);
+            rsi = RSI(BTCUSD, period, MovingAverageType.Exponential, Resolution.Hour);
 
-            var history = History<Tick>(BitcoinSymbol, this.StartDate.AddHours(-period), this.StartDate, Resolution.Tick);
+            var history = History<Tick>(BTCUSD, this.StartDate.AddHours(-period), this.StartDate, Resolution.Tick);
 
             foreach (var item in history)
             {
@@ -61,7 +61,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void Analyse()
         {
-            if (rsi.IsReady && !this.IsWarmingUp)
+            if (rsi.IsReady)
             {
                 Long();
                 Short();
@@ -80,10 +80,10 @@ namespace QuantConnect.Algorithm.CSharp
 
         protected override void Long()
         {
-            if (!Portfolio[BitcoinSymbol].IsLong && rsi.Current.Value > 5 && rsi.Current.Value < 30)
+            if (!Portfolio[BTCUSD].IsLong && rsi.Current.Value > 5 && rsi.Current.Value < 30)
             {
                 Liquidate();
-                SetHoldings(BitcoinSymbol, 3.0m, false);
+                SetHoldings(BTCUSD, 3.0m, false);
                 //maker fee
                 //LimitOrder(BitcoinSymbol, quantity, Portfolio[BitcoinSymbol].Price - 0.1m);
                 Output("Long");
@@ -93,10 +93,10 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void Short()
         {
-            if (!Portfolio[BitcoinSymbol].IsShort && rsi.Current.Value > 70)
+            if (!Portfolio[BTCUSD].IsShort && rsi.Current.Value > 70)
             {
                 Liquidate();
-                SetHoldings(BitcoinSymbol, -3.0m, false);
+                SetHoldings(BTCUSD, -3.0m, false);
                 Output("Short");
             }
         }

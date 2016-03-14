@@ -64,10 +64,10 @@ namespace QuantConnect.Brokerages.Bitfinex
                         var data = raw[2].ToObject(typeof(string[][]));
                         PopulateWallet(data);
                     }
-                    else if (_channelId.ContainsKey(id) && _channelId[id] == "ticker")
+                    else if (_channelId.ContainsKey(id) && _channelId[id].Name == "ticker")
                     {
                         //ticker
-                        PopulateTicker(e.Data);
+                        PopulateTicker(e.Data, _channelId[id].Symbol);
                         return;
                     }
                 }
@@ -75,7 +75,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     if (!this._channelId.ContainsKey((int)raw.chanId))
                     {
-                        this._channelId[(int)raw.chanId] = "ticker";
+                        this._channelId.Add((int)raw.chanId, new Channel { Name = "ticker", Symbol = raw.pair });
                     }
                 }
                 else if (raw.chanId == 0)
@@ -109,7 +109,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
         
-        private void PopulateTicker(string response)
+        private void PopulateTicker(string response, string symbol)
         {
             var data = JsonConvert.DeserializeObject<string[]>(response);
             var msg = new TickerMessage(data);
@@ -124,7 +124,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Time = DateTime.UtcNow,
                     Value = msg.LAST_PRICE / scaleFactor,
                     TickType = TickType.Quote,
-                    Symbol = symbol,
+                    Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick,
                     Quantity = (int)(Math.Round(msg.VOLUME, 2) * scaleFactor)
                 });
@@ -158,7 +158,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 var fill = new OrderEvent
                 (
-                    cached.First().Key, symbol, msg.TRD_TIMESTAMP, MapOrderStatus(msg),
+                    cached.First().Key, Symbol.Create(msg.TRD_PAIR, SecurityType.Forex, Market.Bitfinex), msg.TRD_TIMESTAMP, MapOrderStatus(msg),
                     msg.TRD_AMOUNT_EXECUTED > 0 ? OrderDirection.Buy : OrderDirection.Sell,
                     msg.TRD_PRICE_EXECUTED / scaleFactor, (int)(msg.TRD_AMOUNT_EXECUTED * scaleFactor),
                     msg.FEE / scaleFactor, "Bitfinex Fill Event"

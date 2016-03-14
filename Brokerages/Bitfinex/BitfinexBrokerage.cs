@@ -53,10 +53,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         const string buy = "buy";
         const string sell = "sell";
         /// <summary>
-        /// Currently limited to BTCUSD
-        /// </summary>
-        protected Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitcoin);
-        /// <summary>
         /// List of known orders
         /// </summary>
         public ConcurrentDictionary<int, Order> CachedOrderIDs = new ConcurrentDictionary<int, Order>();
@@ -81,6 +77,8 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Api Secret
         /// </summary>
         protected string apiSecret;
+
+        protected ISecurityProvider securities;
         #endregion
 
         public TradingApi.Bitfinex.BitfinexApi RestClient { get; set; }
@@ -89,9 +87,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Create bitfinex brokerage
         /// </summary>
-        public BitfinexBrokerage()
+        public BitfinexBrokerage(ISecurityProvider securityProvider)
             : base("bitfinex")
         {
+            securities = securityProvider;
             this.Initialize();
         }
 
@@ -298,7 +297,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                         {
                             Quantity = Convert.ToInt32(decimal.Parse(item.OriginalAmount) * scaleFactor),
                             BrokerId = new List<string> { item.Id.ToString() },
-                            Symbol = symbol,
+                            Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                             Time = Time.UnixTimeStampToDateTime(double.Parse(item.Timestamp)),
                             Price = decimal.Parse(item.Price) / scaleFactor,
                             Status = MapOrderStatus(item),
@@ -351,10 +350,12 @@ namespace QuantConnect.Brokerages.Bitfinex
             var response = RestClient.GetActivePositions();
             foreach (var item in response)
             {
+                var symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex);
                 var ticker = RestClient.GetPublicTicker(TradingApi.ModelObjects.BtcInfo.PairTypeEnum.btcusd, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+
                 list.Add(new Holding
                 {
-                    Symbol = Symbol.Create(item.Symbol, SecurityType.Forex, Market.Bitcoin.ToString()),
+                    Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex.ToString()),
                     Quantity = decimal.Parse(item.Amount) * scaleFactor,
                     Type = SecurityType.Forex,
                     CurrencySymbol = "B",
@@ -380,14 +381,17 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 if (item.Type == wallet)
                 {
-                    if (item.Currency == "usd")
+                    const string usd = "usd";
+                    if (item.Currency == usd)
                     {
                         list.Add(new Securities.Cash(item.Currency, item.Amount, 1));
                     }
                     else
                     {
-                        var ticker = RestClient.GetPublicTicker(TradingApi.ModelObjects.BtcInfo.PairTypeEnum.btcusd, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
-                        list.Add(new Securities.Cash("BTC", item.Amount * scaleFactor, decimal.Parse(ticker.Mid) / scaleFactor));
+                        //todo: refactor to string symbol. merge to main repo
+                        var symbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Currency + usd);
+                        var ticker = RestClient.GetPublicTicker(symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+                        list.Add(new Securities.Cash(item.Currency.ToUpper(), item.Amount * scaleFactor, decimal.Parse(ticker.Mid) / scaleFactor));
                     }
                 }
             }
@@ -418,6 +422,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             var task = Task.Run(() => { this.RequestTicker(); }, _tickerToken.Token);
         }
 
+        //todo: support other currencies
         private void RequestTicker()
         {
             var response = RestClient.GetPublicTicker(TradingApi.ModelObjects.BtcInfo.PairTypeEnum.btcusd, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
@@ -430,7 +435,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Time = Time.UnixTimeStampToDateTime(double.Parse(response.Timestamp)),
                     Value = decimal.Parse(response.LastPrice) / scaleFactor,
                     TickType = TickType.Quote,
-                    Symbol = symbol,
+                    Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick,
                     Quantity = (int)(Math.Round(decimal.Parse(response.Volume), 2) * scaleFactor)
                 });

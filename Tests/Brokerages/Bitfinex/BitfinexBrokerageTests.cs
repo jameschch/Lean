@@ -16,17 +16,14 @@ using Moq;
 
 namespace QuantConnect.Tests.Brokerages.Bitfinex
 {
-    [TestFixture, Ignore("This test requires a configured and active account")]
+    [TestFixture/*, Ignore("This test requires a configured and active account")*/]
     public class BitfinexBrokerageTests : BrokerageTests
     {
-
-
-        BitfinexBrokerage unit;
 
         #region Properties
         protected override Symbol Symbol
         {
-            get { return Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitcoin); }
+            get { return Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex); }
         }
 
         /// <summary>
@@ -58,12 +55,11 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         public override void Setup()
         {
             base.Setup();
-            unit = new BitfinexWebsocketsBrokerage();
         }
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
-            return new BitfinexWebsocketsBrokerage();
+            return new BitfinexWebsocketsBrokerage(SecurityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
@@ -77,7 +73,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             get
             {
                 return new[]
-                {                    
+                {
                     new TestCaseData(new MarketOrderTestParameters(Symbol)).SetName("MarketOrder"),
                     new TestCaseData(new LimitOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("LimitOrder"),
                     new TestCaseData(new StopMarketOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("StopMarketOrder"),

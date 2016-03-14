@@ -78,7 +78,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public override Interfaces.IBrokerage CreateBrokerage(Packets.LiveNodePacket job, Interfaces.IAlgorithm algorithm)
         {
-            var brokerage = new BitfinexWebsocketsBrokerage();
+            var brokerage = new BitfinexWebsocketsBrokerage(algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);
 
             return brokerage;

@@ -32,9 +32,9 @@ namespace QuantConnect.Algorithm.CSharp
     public abstract class BaseBitcoin : QCAlgorithm
     {
 
-        const string _bitcoinSymbol = "BTCUSD";
+        const string btcusd = "BTCUSD";
 
-        protected string BitcoinSymbol { get { return _bitcoinSymbol; } }
+        protected string BTCUSD { get { return btcusd; } }
 
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2015, 11, 10);
             SetEndDate(2016, 2, 20);
             SetCash("USD", 1000, 1m);
-            AddSecurity(SecurityType.Forex, BitcoinSymbol, Resolution.Tick, Market.Bitcoin, false, 3.3m, false);
+            AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
         }
 
         public void OnData(Ticks data)
@@ -74,7 +74,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         protected virtual void Output(string title)
         {
-            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BitcoinSymbol].Price.ToString() + " Trade:" + Portfolio[BitcoinSymbol].LastTradeProfit
+            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Portfolio[BTCUSD].LastTradeProfit
                 + " Total:" + Portfolio.TotalPortfolioValue);
         }
 
@@ -84,11 +84,11 @@ namespace QuantConnect.Algorithm.CSharp
         //todo: implement transaction limits in brokerage model
         protected virtual void Long()
         {
-            if (Portfolio[BitcoinSymbol].IsShort)
+            if (Portfolio[BTCUSD].IsShort)
             {
                 Liquidate();
             }
-            SetHoldings(BitcoinSymbol, 3.0m);
+            SetHoldings(BTCUSD, 3.0m);
         }
 
         /// <summary>
@@ -97,11 +97,11 @@ namespace QuantConnect.Algorithm.CSharp
         //todo: implement transaction limits in brokerage model
         protected virtual void Short()
         {
-            if (Portfolio[BitcoinSymbol].IsLong)
+            if (Portfolio[BTCUSD].IsLong)
             {
                 Liquidate();
             }
-            SetHoldings(BitcoinSymbol, -3.0m);
+            SetHoldings(BTCUSD, -3.0m);
         }
 
     }

@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using System.Reflection;
 using Moq;
 using QuantConnect.Configuration;
+using QuantConnect.Securities;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -20,13 +21,15 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         BitfinexWebsocketsBrokerage unit;
         Mock<IWebSocket> mock = new Mock<IWebSocket>();
+        Mock<ISecurityProvider> mockSecurities;
 
         [SetUp()]
         public void Setup()
         {
             Config.Set("bitfinex-api-secret", "abc");
             Config.Set("bitfinex-api-key", "123");
-            unit = new BitfinexWebsocketsBrokerage();
+            mockSecurities = new Mock<ISecurityProvider>();
+            unit = new BitfinexWebsocketsBrokerage(mockSecurities.Object);
             //DI would be preferable here
             unit.WebSocket = mock.Object;
         }

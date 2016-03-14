@@ -17,6 +17,7 @@ using QuantConnect.Configuration;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
+using QuantConnect.Securities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -39,7 +40,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         #region Declarations
         List<Securities.Cash> _cash = new List<Securities.Cash>();
-        Dictionary<int, string> _channelId = new Dictionary<int, string>();
+        Dictionary<int, Channel> _channelId = new Dictionary<int, Channel>();
         Task _checkConnectionTask = null;
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
@@ -54,8 +55,8 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public BitfinexWebsocketsBrokerage()
-            : base()
+        public BitfinexWebsocketsBrokerage(ISecurityProvider securityProvider)
+            : base(securityProvider)
         {
             WebSocket = new WebSocketWrapper();
             WebSocket.Initialize((Config.Get("bitfinex-wss", "wss://api2.bitfinex.com:3000/ws")));
@@ -74,13 +75,15 @@ namespace QuantConnect.Brokerages.Bitfinex
                 this.Connect();
             }
 
-            WebSocket.Send(JsonConvert.SerializeObject(new
+            foreach (var item in symbols)
             {
-                @event = "subscribe",
-                channel = "ticker",
-                pair = this.symbol.Value
-            }));
-
+                WebSocket.Send(JsonConvert.SerializeObject(new
+                {
+                    @event = "subscribe",
+                    channel = "ticker",
+                    pair = item.ToString()
+                }));
+            }
         }
 
         /// <summary>
