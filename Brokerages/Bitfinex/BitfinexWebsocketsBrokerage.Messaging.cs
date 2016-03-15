@@ -77,6 +77,10 @@ namespace QuantConnect.Brokerages.Bitfinex
                     {
                         this._channelId.Add((int)raw.chanId, new Channel { Name = "ticker", Symbol = raw.pair });
                     }
+                    else
+                    {
+                        this._channelId[(int)raw.chanId] = new Channel { Name = "ticker", Symbol = raw.pair };
+                    }
                 }
                 else if (raw.chanId == 0)
                 {
@@ -95,8 +99,10 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     //soft reset
                     UnAuthenticate();
-                    Unsubscribe(null, null);
-                    Subscribe(null, null);
+
+                    var subscribed = GetSubscribed();
+                    Unsubscribe();
+                    Subscribe(null, subscribed);
                     Authenticate();
                 }
 
@@ -108,7 +114,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 throw;
             }
         }
-        
+
         private void PopulateTicker(string response, string symbol)
         {
             var data = JsonConvert.DeserializeObject<string[]>(response);

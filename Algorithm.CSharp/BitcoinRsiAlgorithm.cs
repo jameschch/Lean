@@ -85,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
                 Liquidate();
                 SetHoldings(BTCUSD, 3.0m, false);
                 //maker fee
-                //LimitOrder(BitcoinSymbol, quantity, Portfolio[BitcoinSymbol].Price - 0.1m);
+                //LimitOrder(BTCUSD, quantity, Portfolio[BTCUSD].Price - 0.1m);
                 Output("Long");
             }
 

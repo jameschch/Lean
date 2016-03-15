@@ -133,7 +133,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         public void OnMessageTickerTest()
         {
 
-            string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"0\"}";
+            string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"0\",\"pair\":\"btcusd\"}";
 
             unit.OnMessage(unit, GetArgs(json));
 
@@ -150,7 +150,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         public void OnMessageTickerTest2()
         {
 
-            string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\"}";
+            string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"btcusd\"}";
 
             unit.OnMessage(unit, GetArgs(json));
 
@@ -165,11 +165,14 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
 
         [Test()]
-        public void OnMessageInfoRestartTest()
+        public void OnMessageInfoHardResetTest()
         {
+
             string json = "{\"event\":\"info\",\"code\":\"20051\"}";
 
             mock.Setup(m => m.Connect()).Verifiable();
+            mock.Setup(m => m.Send(It.IsAny<string>())).Verifiable();
+            unit.Connect();
 
             unit.OnMessage(unit, GetArgs(json));
 
@@ -177,19 +180,63 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         }
 
         [Test()]
-        public void OnMessageInfoResubscribeTest()
-        {
-            string json = "{\"event\":\"info\",\"code\":20061,\"msg\":\"Resync from the Trading Engine ended\"}";
+        public void OnMessageInfoSoftResetTest()
+        {       
 
             mock.Setup(m => m.Connect()).Verifiable();
 
-            var brokerageMock = new Mock<BitfinexWebsocketsBrokerage>();
+            var brokerageMock = new Mock<BitfinexWebsocketsBrokerage>(It.IsAny<ISecurityProvider>());
 
-            brokerageMock.Setup(m => m.Unsubscribe(null, null)).Verifiable();
-            brokerageMock.Setup(m => m.Subscribe(null, null)).Verifiable();
+            brokerageMock.Setup(m => m.Unsubscribe(null, It.IsAny<List<Symbol>>())).Verifiable();
+            brokerageMock.Setup(m => m.Subscribe(null, It.IsAny<List<Symbol>>())).Verifiable();
             mock.Setup(m => m.Send(It.IsAny<string>())).Verifiable();
 
+            //create subs
+            string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"btcusd\"}";
+            unit.OnMessage(unit, GetArgs(json));
+            json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"ethbtc\"}";
+            unit.OnMessage(unit, GetArgs(json));
+
+            //return ticks for subs.
+            json = "[\"1\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
             unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            json = "[\"2\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"2\",\"0.02\",\"0.02\",\"0.02\"]";
+            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+
+            //ensure ticks for subs
+            var actual = unit.GetNextTicks();
+
+            var tick = actual.Where(a => a.Symbol.Value == "ETHBTC").Single();
+            Assert.AreEqual(0.02m, tick.Price);
+
+            tick = actual.Where(a => a.Symbol.Value == "BTCUSD").Single();
+            Assert.AreEqual(0.01m, tick.Price);
+
+
+            //trigger reset event
+            json = "{\"event\":\"info\",\"code\":20061,\"msg\":\"Resync from the Trading Engine ended\"}";
+            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+
+            //return new subs
+            json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"btcusd\"}";
+            unit.OnMessage(unit, GetArgs(json));
+            json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"ethbtc\"}";
+            unit.OnMessage(unit, GetArgs(json));
+
+            //return ticks for new subs. eth is now 1 and btc is 2
+            json = "[\"1\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
+            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            json = "[\"2\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"2\",\"0.02\",\"0.02\",\"0.02\"]";
+            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+
+            //ensure ticks for new subs
+            actual = unit.GetNextTicks();
+
+            tick = actual.Where(a => a.Symbol.Value == "ETHBTC").Single();
+            Assert.AreEqual(0.01m, tick.Price);
+
+            tick = actual.Where(a => a.Symbol.Value == "BTCUSD").Single();
+            Assert.AreEqual(0.02m, tick.Price);
 
             mock.Verify();
         }

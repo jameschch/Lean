@@ -93,11 +93,11 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <param name="symbols"></param>
         public override void Unsubscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
         {
-            foreach (var id in _channelId)
+            foreach (var item in symbols)
             {
-                Unsubscribe(id.Key);
+                var channel = _channelId.Where(c => c.Value.Symbol == item.ToString()).SingleOrDefault();
+                Unsubscribe(channel.Key);
             }
-            this._channelId.Clear();
         }
 
         private void Unsubscribe(int id)
@@ -136,7 +136,6 @@ namespace QuantConnect.Brokerages.Bitfinex
                 this._checkConnectionTask = Task.Run(() => CheckConnection());
                 this._checkConnectionToken = new CancellationTokenSource();
             }
-            this._channelId.Clear();
             WebSocket.OnMessage(OnMessage);
             this.Authenticate();
         }
@@ -159,10 +158,6 @@ namespace QuantConnect.Brokerages.Bitfinex
             this.Disconnect();
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
         private async Task CheckConnection()
         {
             while (!_checkConnectionToken.Token.IsCancellationRequested)
@@ -170,27 +165,48 @@ namespace QuantConnect.Brokerages.Bitfinex
                 if (!this.IsConnected || (DateTime.UtcNow - _heartbeatCounter).TotalSeconds > _heartBeatTimeout)
                 {
                     Log.Trace("Heartbeat timeout. Reconnecting");
-                    Reconnect();
+                    Reconnect(false);
                 }
                 await Task.Delay(TimeSpan.FromSeconds(10), _checkConnectionToken.Token);
             }
         }
 
-        private void Reconnect()
+        private void Reconnect(bool wait = true)
         {
+            if (wait)
+            {
+                this._checkConnectionTask.Wait(30);
+            }
+            var subscribed = GetSubscribed();
             //try to clean up state
             try
             {
                 this.UnAuthenticate();
-                this.Unsubscribe(null, null);
+                this.Unsubscribe();
                 WebSocket.Close();
             }
             catch (Exception)
             {
             }
             WebSocket.Connect();
-            this.Subscribe(null, null);
+            this.Subscribe(null, subscribed);
             this.Authenticate();
+        }
+
+        private void Unsubscribe()
+        {
+            this.Unsubscribe(null, GetSubscribed());
+        }
+
+        private IList<Symbol> GetSubscribed()
+        {
+            IList<Symbol> list = new List<Symbol>();
+
+            foreach (var item in _channelId)
+            {
+                list.Add(Symbol.Create(item.Value.Symbol, SecurityType.Forex, Market.Bitfinex));
+            }
+            return list;
         }
 
     }
