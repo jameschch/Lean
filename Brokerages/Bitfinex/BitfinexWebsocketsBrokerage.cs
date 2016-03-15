@@ -67,7 +67,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="job"></param>
         /// <param name="symbols"></param>
-        //todo: support other currency. Use symbol supplied here
         public override void Subscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
         {
             if (!this.IsConnected)

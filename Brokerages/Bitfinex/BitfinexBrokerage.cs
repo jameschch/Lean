@@ -372,7 +372,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Get Cash Balances from exchange
         /// </summary>
         /// <returns></returns>
-        //todo: handle other currencies
         public override List<Securities.Cash> GetCashBalance()
         {
             var list = new List<Securities.Cash>();

@@ -88,8 +88,6 @@ namespace QuantConnect.Brokerages
             return new BitfinexSlippageModel();
         }
 
-        //todo: support other currencies
-        //todo: Checks for decimals are superfluous until quantity is changed from int to decimal
         //todo: Implement maximum transaction size check
         /// <summary>
         /// Validates pending orders based on currency pair, order amount, security type
