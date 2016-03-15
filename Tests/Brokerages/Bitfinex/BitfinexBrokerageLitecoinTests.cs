@@ -30,7 +30,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal HighPrice
         {
-            get { return 200m; }
+            get { return 0.009m; }
         }
 
         /// <summary>

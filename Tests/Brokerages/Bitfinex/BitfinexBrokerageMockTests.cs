@@ -22,6 +22,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         Mock<TradingApi.Bitfinex.BitfinexApi> mock = new Mock<TradingApi.Bitfinex.BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
         Mock<ISecurityProvider> mockSecurities = new Mock<ISecurityProvider>();
         protected Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
+        decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
 
         [SetUp()]
         public void Setup()
@@ -126,6 +127,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                     RemainingAmount = "1",
                     ExecutedAmount = "0",
                     IsLive = true,
+                    Symbol = "ETHBTC",
                     IsCancelled = false
                 }
             };
@@ -135,7 +137,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             var actual = unit.GetOpenOrders();
 
             Assert.AreEqual(1, actual.Count());
-            Assert.AreEqual(expected / 100, unit.CachedOrderIDs.First().Value.Price);
+            Assert.AreEqual(expected / scaleFactor, unit.CachedOrderIDs.First().Value.Price);
 
             list.First().Id = 123;
             actual = unit.GetOpenOrders();
@@ -151,33 +153,36 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         [Test()]
         public void GetAccountHoldingsTest()
         {
+
             var expected = new List<BitfinexMarginPositionResponse>
             {
                 new BitfinexMarginPositionResponse
                 {
                     Symbol = "btcusd",
-                    Amount = "123.45"
+                    Amount = "123.45",
+                    Base = "456.78"
                 },
-                            new BitfinexMarginPositionResponse
+                new BitfinexMarginPositionResponse
                 {
-                    Symbol = "ETHBTC",
-                    Amount = "6789.10"
+                    Symbol = "ethbtc",
+                    Amount = "6789.10",
+                    Base = "987.65"
                 }
             };
 
             mock.Setup(m => m.GetActivePositions()).Returns(expected);
             var ticker = new BitfinexPublicTickerGet
             {
-                Mid = "654.32"
+                Mid = "654.32",
             };
             mock.Setup(m => m.GetPublicTicker(It.IsAny<BtcInfo.PairTypeEnum>(), It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ticker);
 
             var actual = unit.GetAccountHoldings();
 
-            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "btcusd").Single().Amount), actual.Where(e => e.Symbol.Value == "BTCUSD").Single().Quantity);
-            Assert.AreEqual(decimal.Parse(ticker.Mid), actual.Where(e => e.Symbol.Value == "BTCUSD").Single().MarketPrice);
-            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "ethbtc").Single().Amount), actual.Where(e => e.Symbol.Value == "ETHBTC").Single().Quantity);
-            Assert.AreEqual(decimal.Parse(ticker.Mid), actual.Where(e => e.Symbol.Value == "ETHBTC").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "btcusd").Single().Amount)*scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().Quantity);
+            Assert.AreEqual(decimal.Parse(ticker.Mid)/scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "ethbtc").Single().Amount)*scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().Quantity);
+            Assert.AreEqual(decimal.Parse(ticker.Mid)/scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().MarketPrice);
         }
 
         [Test()]
@@ -189,12 +194,15 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 new BitfinexBalanceResponse
                 {
                     Amount = 123.45m,
-                    Currency = "usd"
+                    Currency = "usd",
+                    Type = "trading"
                 },
                 new BitfinexBalanceResponse
                 {
                     Amount = 678.90m,
-                    Currency = "btc"
+                    Currency = "btc",
+                    Type = "trading"
+
                 }
             };
 
@@ -211,8 +219,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             Assert.AreEqual(expected.Where(e => e.Currency == "usd").Single().Amount, actual.Where(e => e.Symbol == "USD").Single().Amount);
             Assert.AreEqual(1, actual.Where(e => e.Symbol == "USD").Single().ConversionRate);
 
-            Assert.AreEqual(expected.Where(e => e.Currency == "btc").Single().Amount, actual.Where(e => e.Symbol == "BTC").Single().Amount);
-            Assert.AreEqual(decimal.Parse(ticker.Mid), actual.Where(e => e.Symbol == "BTC").Single().ConversionRate);
+            Assert.AreEqual(expected.Where(e => e.Currency == "btc").Single().Amount*scaleFactor, actual.Where(e => e.Symbol == "BTC").Single().Amount);
+            Assert.AreEqual(decimal.Parse(ticker.Mid)/scaleFactor, actual.Where(e => e.Symbol == "BTC").Single().ConversionRate);
 
         }
 
