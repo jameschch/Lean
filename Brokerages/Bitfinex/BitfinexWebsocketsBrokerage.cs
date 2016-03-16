@@ -45,6 +45,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
         const int _heartBeatTimeout = 30;
+        JsonSerializerSettings settings = new JsonSerializerSettings
+        {
+            FloatParseHandling = FloatParseHandling.Decimal
+        };
         #endregion
 
         /// <summary>

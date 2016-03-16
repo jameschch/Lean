@@ -60,7 +60,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             if (allValues.Length == 11)
             {
                 TRD_ID = TryGetInt("TRD_ID");
-                FEE = GetDecimalFromScientific("FEE");
+                FEE = TryGetDecimal("FEE");
                 FEE_CURRENCY = allValues[Array.IndexOf(allKeys, "FEE_CURRENCY")];
             }
         }

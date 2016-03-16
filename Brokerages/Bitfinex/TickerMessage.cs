@@ -42,8 +42,8 @@ namespace QuantConnect.Brokerages.Bitfinex
             BID_SIZE = TryGetDecimal("BID_SIZE");
             ASK = GetDecimal("ASK");
             ASK_SIZE = TryGetDecimal("ASK_SIZE");
-            DAILY_CHANGE = GetDecimal("DAILY_CHANGE");
-            DAILY_CHANGE_PERC = GetDecimal("DAILY_CHANGE_PERC");
+            DAILY_CHANGE = TryGetDecimal("DAILY_CHANGE");
+            DAILY_CHANGE_PERC = TryGetDecimal("DAILY_CHANGE_PERC");
             LAST_PRICE = GetDecimal("LAST_PRICE");
             VOLUME = GetDecimal("VOLUME");
             HIGH = GetDecimal("HIGH");

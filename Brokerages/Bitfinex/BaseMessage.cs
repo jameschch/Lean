@@ -72,14 +72,24 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public decimal GetDecimalFromScientific(string key)
+        public decimal TryGetDecimalFromScientific(string key)
         {
             if (allValues[Array.IndexOf(allKeys, key)] == null)
             {
                 return 0m;
             }
+
             string value = allValues[Array.IndexOf(allKeys, key)].Trim('-');
-            return Decimal.Parse(value, System.Globalization.NumberStyles.AllowExponent | System.Globalization.NumberStyles.AllowDecimalPoint);
+            decimal parsed;
+            try
+            {
+                parsed = Decimal.Parse(value, System.Globalization.NumberStyles.AllowExponent | System.Globalization.NumberStyles.AllowDecimalPoint);
+            }
+            catch (Exception)
+            {
+                return 0m;
+            }
+            return parsed;
         }
 
         /// <summary>
@@ -119,7 +129,9 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 return parsed;
             }
-            return 0m;
+
+            decimal scientific = this.TryGetDecimalFromScientific(key);
+            return scientific;
         }
 
         /// <summary>
