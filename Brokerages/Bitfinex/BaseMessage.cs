@@ -31,12 +31,12 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Stored Keys for message
         /// </summary>
-        protected string[] allKeys { get; set; }
+        protected string[] AllKeys { get; set; }
 
         /// <summary>
         /// Stores values of message
         /// </summary>
-        protected string[] allValues { get; set; }
+        protected string[] AllValues { get; set; }
 
         /// <summary>
         /// Creates base message instance
@@ -44,7 +44,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <param name="values"></param>
         public BaseMessage(string[] values)
         {
-            allValues = values;
+            AllValues = values;
         }
 
         /// <summary>
@@ -52,9 +52,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public string GetString(string key)
+        public string GetString(int key)
         {
-            return allValues[Array.IndexOf(allKeys, key)];
+            return AllValues[key];
         }
 
         /// <summary>
@@ -62,28 +62,28 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public decimal GetDecimal(string key)
+        public decimal GetDecimal(int key)
         {
-            return decimal.Parse(allValues[Array.IndexOf(allKeys, key)]);
+            return decimal.Parse(AllValues[key]);
         }
 
         /// <summary>
         /// Returns typed value from untyped json array
         /// </summary>
+        /// <remarks>This should not be necessary if Json serialization settings are used</remarks>
         /// <param name="key"></param>
         /// <returns></returns>
-        public decimal TryGetDecimalFromScientific(string key)
+        public decimal TryGetDecimalFromScientific(int key)
         {
-            if (allValues[Array.IndexOf(allKeys, key)] == null)
+            if (AllValues[key] == null)
             {
                 return 0m;
             }
 
-            string value = allValues[Array.IndexOf(allKeys, key)].Trim('-');
             decimal parsed;
             try
             {
-                parsed = Decimal.Parse(value, System.Globalization.NumberStyles.AllowExponent | System.Globalization.NumberStyles.AllowDecimalPoint);
+                parsed = Decimal.Parse(AllValues[key], System.Globalization.NumberStyles.AllowExponent | System.Globalization.NumberStyles.AllowDecimalPoint);
             }
             catch (Exception)
             {
@@ -97,9 +97,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public int GetInt(string key)
+        public int GetInt(int key)
         {
-            return int.Parse(allValues[Array.IndexOf(allKeys, key)]);
+            return int.Parse(AllValues[key]);
         }
 
         /// <summary>
@@ -107,10 +107,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public int TryGetInt(string key)
+        public int TryGetInt(int key)
         {
             int parsed;
-            if (int.TryParse(allValues[Array.IndexOf(allKeys, key)], out parsed))
+            if (int.TryParse(AllValues[key], out parsed))
             {
                 return parsed;
             }
@@ -122,10 +122,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public decimal TryGetDecimal(string key)
+        public decimal TryGetDecimal(int key)
         {
             decimal parsed;
-            if (decimal.TryParse(allValues[Array.IndexOf(allKeys, key)], out parsed))
+            if (decimal.TryParse(AllValues[key], out parsed))
             {
                 return parsed;
             }
@@ -139,9 +139,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public DateTime GetDateTime(string key)
+        public DateTime GetDateTime(int key)
         {
-            return Time.UnixTimeStampToDateTime(double.Parse(allValues[Array.IndexOf(allKeys, key)]));
+            return Time.UnixTimeStampToDateTime(double.Parse(AllValues[key]));
         }
 
 

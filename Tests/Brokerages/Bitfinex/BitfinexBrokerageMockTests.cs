@@ -29,6 +29,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             Config.Set("bitfinex-api-secret", "abc");
             Config.Set("bitfinex-api-key", "123");
+            Config.Set("bitfinex-wallet", "trading");
             unit = new BitfinexBrokerage(mockSecurities.Object);
             //DI would be preferable here
             unit.RestClient = mock.Object;

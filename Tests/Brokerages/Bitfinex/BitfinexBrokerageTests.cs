@@ -16,7 +16,7 @@ using Moq;
 
 namespace QuantConnect.Tests.Brokerages.Bitfinex
 {
-    [TestFixture/*, Ignore("This test requires a configured and active account")*/]
+    [TestFixture, Ignore("This test requires a configured and active account")]
     public class BitfinexBrokerageTests : BrokerageTests
     {
 

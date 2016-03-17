@@ -11,6 +11,7 @@ using System.Reflection;
 using Moq;
 using QuantConnect.Configuration;
 using QuantConnect.Securities;
+using System.Threading;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -77,36 +78,66 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             string brokerId = "2";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"6\",\"USD\"]]";
-
             unit.CachedOrderIDs.TryAdd(1, new BitfinexOrder { BrokerId = new List<string> { brokerId } });
+            ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
             {
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(300, e.FillQuantity);
-                Assert.AreEqual(0.04, e.FillPrice);
-                Assert.AreEqual(0.06, e.OrderFee);
+                Assert.AreEqual(0.04m, e.FillPrice);
+                Assert.AreEqual(0.06m, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Filled, e.Status);
+                raised.Set();
             };
 
             unit.OnMessage(unit, GetArgs(json));
+            Assert.IsTrue(raised.WaitOne(1000));
+
         }
 
         [Test()]
-        public void OnMessageTradePartialFillTest2()
+        public void OnMessageTradeExponentTest()
         {
             string brokerId = "2";
-            string json = "[0,\"te\",[\"abc123\",\"BTCUSD\",1457729043," + brokerId + ",0.00543202,420.95,\"MARKET\",null]]";
-
+            string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"0.000006\",\"USD\"]]";
             unit.CachedOrderIDs.TryAdd(1, new BitfinexOrder { BrokerId = new List<string> { brokerId } });
+            ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
             {
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
-                Assert.AreEqual(Orders.OrderStatus.PartiallyFilled, e.Status);
+                Assert.AreEqual(300, e.FillQuantity);
+                Assert.AreEqual(0.04m, e.FillPrice);
+                Assert.AreEqual(0.00000006m, e.OrderFee);
+                Assert.AreEqual(Orders.OrderStatus.Filled, e.Status);
+                raised.Set();
             };
 
             unit.OnMessage(unit, GetArgs(json));
+            Assert.IsTrue(raised.WaitOne(1000));
+        }
+
+        [Test()]
+        public void OnMessageTradeNegativeTest()
+        {
+            string brokerId = "2";
+            string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"-0.000004\",\"<ORD_TYPE>\",\"5\",\"6\",\"USD\"]]";
+            unit.CachedOrderIDs.TryAdd(1, new BitfinexOrder { BrokerId = new List<string> { brokerId } });
+            ManualResetEvent raised = new ManualResetEvent(false);
+
+            unit.OrderStatusChanged += (s, e) =>
+            {
+                Assert.AreEqual("BTCUSD", e.Symbol.Value);
+                Assert.AreEqual(300, e.FillQuantity);
+                Assert.AreEqual(-0.00000004m, e.FillPrice);
+                Assert.AreEqual(0.06m, e.OrderFee);
+                Assert.AreEqual(Orders.OrderStatus.Filled, e.Status);
+                raised.Set();
+            };
+
+            unit.OnMessage(unit, GetArgs(json));
+            Assert.IsTrue(raised.WaitOne(1000));
         }
 
         [Test()]
@@ -114,19 +145,22 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             string brokerId = "2";
             string json = "[0,\"te\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"2\",\"4\",\"<ORD_TYPE>\",\"5\",\"0\",\"\"]]";
-
             unit.CachedOrderIDs.TryAdd(1, new BitfinexOrder { BrokerId = new List<string> { brokerId } });
+            ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
             {
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(200, e.FillQuantity);
-                Assert.AreEqual(0.04, e.FillPrice);
+                Assert.AreEqual(0.04m, e.FillPrice);
                 Assert.AreEqual(0, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.PartiallyFilled, e.Status);
+                raised.Set();
             };
 
             unit.OnMessage(unit, GetArgs(json));
+            Assert.IsTrue(raised.WaitOne(1000));
+
         }
 
         [Test()]
