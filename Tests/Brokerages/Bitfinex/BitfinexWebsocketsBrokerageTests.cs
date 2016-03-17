@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 using System.Reflection;
 using Moq;
 using QuantConnect.Configuration;
-using QuantConnect.Securities;
+using TradingApi.Bitfinex;
 using System.Threading;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
@@ -22,17 +22,11 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         BitfinexWebsocketsBrokerage unit;
         Mock<IWebSocket> mock = new Mock<IWebSocket>();
-        Mock<ISecurityProvider> mockSecurities;
 
         [SetUp()]
         public void Setup()
         {
-            Config.Set("bitfinex-api-secret", "abc");
-            Config.Set("bitfinex-api-key", "123");
-            mockSecurities = new Mock<ISecurityProvider>();
-            unit = new BitfinexWebsocketsBrokerage(mockSecurities.Object);
-            //DI would be preferable here
-            unit.WebSocket = mock.Object;
+            unit = new BitfinexWebsocketsBrokerage("wss://localhost", mock.Object, "abc", "123", "trading", new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, 100m);
         }
 
         [Test()]
@@ -178,6 +172,25 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             var actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
             Assert.AreEqual(0.01m, actual.Price);
+
+            //should not serialize into exponent
+            json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.0000001\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
+
+            unit.OnMessage(unit, GetArgs(json));
+
+            actual = unit.GetNextTicks().First();
+            Assert.AreEqual("BTCUSD", actual.Symbol.Value);
+            Assert.AreEqual(0.01m, actual.Price);
+
+            //should not fail due to parse error on superfluous field
+            json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"abc\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
+
+            unit.OnMessage(unit, GetArgs(json));
+
+            actual = unit.GetNextTicks().First();
+            Assert.AreEqual("BTCUSD", actual.Symbol.Value);
+            Assert.AreEqual(0.01m, actual.Price);
+
         }
 
         [Test()]
@@ -219,7 +232,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             mock.Setup(m => m.Connect()).Verifiable();
 
-            var brokerageMock = new Mock<BitfinexWebsocketsBrokerage>(It.IsAny<ISecurityProvider>());
+            var brokerageMock = new Mock<BitfinexWebsocketsBrokerage>("wss://localhost", mock.Object, "abc", "123", "trading", new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, 100m);
 
             brokerageMock.Setup(m => m.Unsubscribe(null, It.IsAny<List<Symbol>>())).Verifiable();
             brokerageMock.Setup(m => m.Subscribe(null, It.IsAny<List<Symbol>>())).Verifiable();

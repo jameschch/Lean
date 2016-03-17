@@ -8,7 +8,6 @@ using NUnit.Framework;
 using Moq;
 using QuantConnect.Configuration;
 using TradingApi.ModelObjects.Bitfinex.Json;
-using QuantConnect.Securities;
 using TradingApi.ModelObjects;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
@@ -18,21 +17,14 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
     {
 
         BitfinexBrokerage unit;
-        //todo: this is no longer declared virtual.
         Mock<TradingApi.Bitfinex.BitfinexApi> mock = new Mock<TradingApi.Bitfinex.BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
-        Mock<ISecurityProvider> mockSecurities = new Mock<ISecurityProvider>();
         protected Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
         decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
 
         [SetUp()]
         public void Setup()
-        {
-            Config.Set("bitfinex-api-secret", "abc");
-            Config.Set("bitfinex-api-key", "123");
-            Config.Set("bitfinex-wallet", "trading");
-            unit = new BitfinexBrokerage(mockSecurities.Object);
-            //DI would be preferable here
-            unit.RestClient = mock.Object;
+        {     
+            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, 100m);
         }
 
         [Test()]

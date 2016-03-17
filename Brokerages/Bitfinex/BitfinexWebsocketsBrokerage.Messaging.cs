@@ -88,7 +88,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     {
                         throw new Exception("Failed to authenticate with ws gateway");
                     }
-                    Log.Trace("Successful wss auth");
+                    Log.Trace("BitfinexWebsocketsBrokerage.OnMessage(): Successful wss auth");
                 }
                 else if (raw.@event == "info" && raw.code == "20051")
                 {
@@ -106,7 +106,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Authenticate();
                 }
 
-                Log.Trace(e.Data);
+                Log.Trace("BitfinexWebsocketsBrokerage.OnMessage(): " + e.Data);
             }
             catch (Exception ex)
             {
@@ -120,20 +120,20 @@ namespace QuantConnect.Brokerages.Bitfinex
 
             var data = JsonConvert.DeserializeObject<string[]>(response, settings);
             var msg = new TickerMessage(data);
-            lock (ticks)
+            lock (Ticks)
             {
-                ticks.Add(new Tick
+                Ticks.Add(new Tick
                 {
-                    AskPrice = msg.ASK / scaleFactor,
-                    BidPrice = msg.BID / scaleFactor,
-                    AskSize = (long)Math.Round(msg.ASK_SIZE * scaleFactor, 0),
-                    BidSize = (long)Math.Round(msg.BID_SIZE * scaleFactor, 0),
+                    AskPrice = msg.ASK / ScaleFactor,
+                    BidPrice = msg.BID / ScaleFactor,
+                    AskSize = (long)Math.Round(msg.ASK_SIZE * ScaleFactor, 0),
+                    BidSize = (long)Math.Round(msg.BID_SIZE * ScaleFactor, 0),
                     Time = DateTime.UtcNow,
-                    Value = msg.LAST_PRICE / scaleFactor,
+                    Value = msg.LAST_PRICE / ScaleFactor,
                     TickType = TickType.Quote,
                     Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(msg.VOLUME, 2) * scaleFactor)
+                    Quantity = (int)(Math.Round(msg.VOLUME * ScaleFactor, 2))
                 });
             }
         }
@@ -143,7 +143,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             if (data.Length > 0)
             {
-                lock (_cash)
+                lock (_cashLock)
                 {
                     _cash.Clear();
                     for (int i = 0; i < data.Length; i++)
@@ -167,17 +167,17 @@ namespace QuantConnect.Brokerages.Bitfinex
                 (
                     cached.First().Key, Symbol.Create(msg.TRD_PAIR, SecurityType.Forex, Market.Bitfinex), msg.TRD_TIMESTAMP, MapOrderStatus(msg),
                     msg.TRD_AMOUNT_EXECUTED > 0 ? OrderDirection.Buy : OrderDirection.Sell,
-                    msg.TRD_PRICE_EXECUTED / scaleFactor, (int)(msg.TRD_AMOUNT_EXECUTED * scaleFactor),
-                    msg.FEE / scaleFactor, "Bitfinex Fill Event"
+                    msg.TRD_PRICE_EXECUTED / ScaleFactor, (int)(msg.TRD_AMOUNT_EXECUTED * ScaleFactor),
+                    msg.FEE / ScaleFactor, "Bitfinex Fill Event"
                 );
-                fill.FillPrice = msg.TRD_PRICE_EXECUTED / scaleFactor;
+                fill.FillPrice = msg.TRD_PRICE_EXECUTED / ScaleFactor;
 
                 if (msg.FEE_CURRENCY == "BTC")
                 {
-                    msg.FEE = (msg.FEE * msg.TRD_PRICE_EXECUTED) / scaleFactor;
+                    msg.FEE = (msg.FEE * msg.TRD_PRICE_EXECUTED) / ScaleFactor;
                 }
 
-                filledOrderIDs.Add(cached.First().Key);
+                FilledOrderIDs.Add(cached.First().Key);
 
                 if (fill.Status == OrderStatus.Filled)
                 {
@@ -188,7 +188,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
             else
             {
-                unknownOrderIDs.Add(brokerId);
+                UnknownOrderIDs.Add(brokerId);
             }
         }
 
@@ -198,24 +198,24 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected override void Authenticate()
         {
-            string key = apiKey;
+            string key = ApiKey;
             string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
-            WebSocket.Send(JsonConvert.SerializeObject(new
+            _webSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "auth",
                 apiKey = key,
-                authSig = GetHexHashSignature(payload, apiSecret),
+                authSig = GetHexHashSignature(payload, ApiSecret),
                 authPayload = payload
             }));
         }
 
         private void UnAuthenticate()
         {
-            WebSocket.Send(JsonConvert.SerializeObject(new
+            _webSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "unauth"
             }));
-            WebSocket.Close();
+            _webSocket.Close();
         }
 
     }

@@ -20,6 +20,9 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
     public class BitfinexBrokerageTests : BrokerageTests
     {
 
+
+        BitfinexBrokerage unit;
+
         #region Properties
         protected override Symbol Symbol
         {
@@ -55,11 +58,13 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         public override void Setup()
         {
             base.Setup();
+
+            unit = (BitfinexBrokerage)new BitfinexBrokerageFactory().CreateBrokerage(null, null);
         }
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
-            return new BitfinexWebsocketsBrokerage(SecurityProvider);
+            return new BitfinexBrokerageFactory().CreateBrokerage(null, null);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
