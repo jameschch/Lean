@@ -77,8 +77,8 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Api Secret
         /// </summary>
         protected string ApiSecret;
-
         TradingApi.Bitfinex.BitfinexApi _restClient;
+        const string usd = "usd";
         #endregion
 
         /// <summary>
@@ -324,8 +324,21 @@ namespace QuantConnect.Brokerages.Bitfinex
             var response = _restClient.GetActivePositions();
             foreach (var item in response)
             {
-                var symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex);
-                var ticker = _restClient.GetPublicTicker(TradingApi.ModelObjects.BtcInfo.PairTypeEnum.btcusd, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+                var symbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol);
+                var ticker = _restClient.GetPublicTicker(symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+
+                decimal conversionRate = 1m;
+
+                if (!item.Symbol.EndsWith(usd))
+                {
+                    var baseSymbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0,3) + usd);
+                    var baseTicker = _restClient.GetPublicTicker(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+                    conversionRate = decimal.Parse(baseTicker.Mid);
+                }
+                else
+                {
+                    conversionRate = decimal.Parse(ticker.Mid);
+                }
 
                 list.Add(new Holding
                 {
@@ -333,7 +346,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Quantity = decimal.Parse(item.Amount) * ScaleFactor,
                     Type = SecurityType.Forex,
                     CurrencySymbol = "B",
-                    ConversionRate = (decimal.Parse(ticker.Mid) / ScaleFactor),
+                    ConversionRate = (conversionRate / ScaleFactor),
                     MarketPrice = (decimal.Parse(ticker.Mid) / ScaleFactor),
                     AveragePrice = (decimal.Parse(item.Base) / ScaleFactor),
                 });
@@ -354,7 +367,6 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 if (item.Type == Wallet)
                 {
-                    const string usd = "usd";
                     if (item.Currency == usd)
                     {
                         list.Add(new Securities.Cash(item.Currency, item.Amount, 1));

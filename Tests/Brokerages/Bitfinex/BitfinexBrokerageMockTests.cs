@@ -164,18 +164,34 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             };
 
             mock.Setup(m => m.GetActivePositions()).Returns(expected);
-            var ticker = new BitfinexPublicTickerGet
+            var btcusdTicker = new BitfinexPublicTickerGet
             {
                 Mid = "654.32",
             };
-            mock.Setup(m => m.GetPublicTicker(It.IsAny<BtcInfo.PairTypeEnum>(), It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ticker);
+            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.btcusd, It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(btcusdTicker);
+
+            var ethusdTicker = new BitfinexPublicTickerGet
+            {
+                Mid = "123.45",
+            };
+            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.ethusd, It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ethusdTicker);
+
+            var ethbtcTicker = new BitfinexPublicTickerGet
+            {
+                Mid = "98.76",
+            };
+            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.ethbtc, It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ethbtcTicker);
 
             var actual = unit.GetAccountHoldings();
 
             Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "btcusd").Single().Amount)*scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().Quantity);
-            Assert.AreEqual(decimal.Parse(ticker.Mid)/scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(btcusdTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(btcusdTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().ConversionRate);
+
             Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "ethbtc").Single().Amount)*scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().Quantity);
-            Assert.AreEqual(decimal.Parse(ticker.Mid)/scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(ethbtcTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(ethusdTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().ConversionRate);
+
         }
 
         [Test()]
