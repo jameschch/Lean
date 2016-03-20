@@ -163,19 +163,19 @@ namespace QuantConnect.Brokerages.Bitfinex
 
             if (cached.Count() > 0 && cached.First().Value != null)
             {
+                if (msg.FEE_CURRENCY == "BTC")
+                {
+                    msg.FEE = Math.Abs(msg.FEE) * msg.TRD_PRICE_EXECUTED;
+                }
+
                 var fill = new OrderEvent
                 (
                     cached.First().Key, Symbol.Create(msg.TRD_PAIR, SecurityType.Forex, Market.Bitfinex), msg.TRD_TIMESTAMP, MapOrderStatus(msg),
                     msg.TRD_AMOUNT_EXECUTED > 0 ? OrderDirection.Buy : OrderDirection.Sell,
                     msg.TRD_PRICE_EXECUTED / ScaleFactor, (int)(msg.TRD_AMOUNT_EXECUTED * ScaleFactor),
-                    msg.FEE / ScaleFactor, "Bitfinex Fill Event"
+                    Math.Abs(msg.FEE) / ScaleFactor, "Bitfinex Fill Event"
                 );
                 fill.FillPrice = msg.TRD_PRICE_EXECUTED / ScaleFactor;
-
-                if (msg.FEE_CURRENCY == "BTC")
-                {
-                    msg.FEE = (msg.FEE * msg.TRD_PRICE_EXECUTED) / ScaleFactor;
-                }
 
                 FilledOrderIDs.Add(cached.First().Key);
 
