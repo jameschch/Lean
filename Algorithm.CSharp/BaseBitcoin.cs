@@ -56,7 +56,9 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2015, 11, 10);
             SetEndDate(2016, 2, 20);
             SetCash("USD", 1000, 1m);
-            AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
+            var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
+            SetBenchmark(security.Symbol);
+
         }
 
         public void OnData(Ticks data)
