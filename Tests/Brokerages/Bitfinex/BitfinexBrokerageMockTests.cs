@@ -9,6 +9,7 @@ using Moq;
 using QuantConnect.Configuration;
 using TradingApi.ModelObjects.Bitfinex.Json;
 using TradingApi.ModelObjects;
+using System.Threading;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -18,17 +19,18 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         BitfinexBrokerage unit;
         Mock<TradingApi.Bitfinex.BitfinexApi> mock = new Mock<TradingApi.Bitfinex.BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
-        protected Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
-        decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
+        Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
+        decimal scaleFactor;
 
         [SetUp()]
         public void Setup()
         {     
             unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, 100m);
+            scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
         }
 
         [Test()]
-        public void PlaceOrderTest()
+        public void PlaceOrderSubmittedTest()
         {
             var response = new BitfinexNewOrderResponse
             {
@@ -36,28 +38,41 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             };
             mock.Setup(m => m.SendOrder(It.IsAny<BitfinexNewOrderPost>())).Returns(response);
 
-            bool actual = unit.PlaceOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow));
-
-            Assert.IsTrue(actual);
-
+            ManualResetEvent raised = new ManualResetEvent(false);
             unit.OrderStatusChanged += (s, e) =>
             {
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(0, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Submitted, e.Status);
+                raised.Set();
+            };            
+            bool actual = unit.PlaceOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow));
+
+            Assert.IsTrue(actual);
+            Assert.IsTrue(raised.WaitOne(1000));
+        }
+
+        [Test()]
+        public void PlaceOrderInvalidTest()
+        {
+            var response = new BitfinexNewOrderResponse
+            {
+                OrderId = 0,
             };
+            mock.Setup(m => m.SendOrder(It.IsAny<BitfinexNewOrderPost>())).Returns(response);
 
-            response.OrderId = 0;
-            actual = unit.PlaceOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow));
-            Assert.IsFalse(actual);
-
+            var raised = new ManualResetEvent(false);
             unit.OrderStatusChanged += (s, e) =>
             {
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(0, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Invalid, e.Status);
+                raised.Set();
             };
-
+            var actual = unit.PlaceOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow));
+            
+            Assert.IsFalse(actual);
+            Assert.IsTrue(raised.WaitOne(1000));
         }
 
         [Test()]
@@ -90,20 +105,23 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             };
             mock.Setup(m => m.CancelOrder(brokerId)).Returns(response);
 
-            bool actual = unit.CancelOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow) { BrokerId = new List<string> { brokerId.ToString() } });
-
-            Assert.IsTrue(actual);
-
+            ManualResetEvent raised = new ManualResetEvent(false);
             unit.OrderStatusChanged += (s, e) =>
             {
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(0, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Canceled, e.Status);
+                raised.Set();
             };
+                        
+            bool actual = unit.CancelOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow) { BrokerId = new List<string> { brokerId.ToString() } });
+
+            Assert.IsTrue(actual);
 
             brokerId = 0;
             actual = unit.CancelOrder(new Orders.MarketOrder(symbol, 100, DateTime.UtcNow) { BrokerId = new List<string> { brokerId.ToString() } });
             Assert.IsFalse(actual);
+
         }
 
         [Test()]
