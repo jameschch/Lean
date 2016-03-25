@@ -104,9 +104,17 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="AddRemoveSecurityRegressionAlgorithm.py" />
+    <Content Include="MACDTrendAlgorithm.py" />
+    <Content Include="QuandlImporterAlgorithm.py" />
+    <Content Include="OrderTicketDemoAlgorithm.py" />
+    <Content Include="BasicTemplateFillForwardAlgorithm.py" />
     <Content Include="DailyAlgorithm.py" />
+    <Content Include="MarketOnOpenOnCloseAlgorithm.py" />
     <Content Include="ParameterizedAlgorithm.py" />
     <Content Include="DropboxUniverseSelectionAlgorithm.py" />
+    <Content Include="CoarseFundamentalTop5Algorithm.py" />
+    <Content Include="ScheduledEventsAlgorithm.py" />
+    <Content Include="UniverseSelectionDefinitionsAlgorithm.py" />
     <Content Include="UniverseSelectionRegressionAlgorithm.py" />
     <Content Include="UpdateOrderRegressionAlgorithm.py" />
     <Content Include="BasicTemplateAlgorithm.py" />
@@ -624,6 +632,8 @@
     <Content Include="LimitFillRegressionAlgorithm.py" />
     <Content Include="MovingAverageCrossAlgorithm.py" />
     <Content Include="RegressionAlgorithm.py" />
+    <Content Include="UserDefinedUniverseAlgorithm.py" />
+    <Content Include="WarmupAlgorithm.py" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
