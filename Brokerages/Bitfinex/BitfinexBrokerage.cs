@@ -375,7 +375,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                 if (!item.Symbol.EndsWith(usd))
                 {
-                    var baseSymbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0,3) + usd);
+                    var baseSymbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
                     var baseTicker = _restClient.GetPublicTicker(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
                     conversionRate = decimal.Parse(baseTicker.Mid);
                 }
@@ -389,7 +389,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex.ToString()),
                     Quantity = decimal.Parse(item.Amount) * ScaleFactor,
                     Type = SecurityType.Forex,
-                    CurrencySymbol = "B",
+                    CurrencySymbol = item.Symbol.Substring(0, 3).ToUpper(),
                     ConversionRate = (conversionRate / ScaleFactor),
                     MarketPrice = (decimal.Parse(ticker.Mid) / ScaleFactor),
                     AveragePrice = (decimal.Parse(item.Base) / ScaleFactor),
@@ -425,65 +425,6 @@ namespace QuantConnect.Brokerages.Bitfinex
                 }
             }
             return list;
-        }
-
-        /// <summary>
-        /// Get queued tick data
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<Data.BaseData> GetNextTicks()
-        {
-            lock (Ticks)
-            {
-                var copy = Ticks.ToArray();
-                Ticks.Clear();
-                return copy;
-            }
-        }
-
-        /// <summary>
-        /// Begin ticker polling
-        /// </summary>
-        /// <param name="job"></param>
-        /// <param name="symbols"></param>
-        public virtual void Subscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
-        {
-            var task = Task.Run(() => { this.RequestTicker(); }, _tickerToken.Token);
-        }
-
-        //todo: support other currencies
-        private void RequestTicker()
-        {
-            var response = _restClient.GetPublicTicker(TradingApi.ModelObjects.BtcInfo.PairTypeEnum.btcusd, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
-            lock (Ticks)
-            {
-                Ticks.Add(new Tick
-                {
-                    AskPrice = decimal.Parse(response.Ask) / ScaleFactor,
-                    BidPrice = decimal.Parse(response.Bid) / ScaleFactor,
-                    Time = Time.UnixTimeStampToDateTime(double.Parse(response.Timestamp)),
-                    Value = decimal.Parse(response.LastPrice) / ScaleFactor,
-                    TickType = TickType.Quote,
-                    Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex),
-                    DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(decimal.Parse(response.Volume), 2) * ScaleFactor)
-                });
-            }
-            if (!_tickerToken.IsCancellationRequested)
-            {
-                Thread.Sleep(8000);
-                RequestTicker();
-            }
-        }
-
-        /// <summary>
-        /// End ticker polling
-        /// </summary>
-        /// <param name="job"></param>
-        /// <param name="symbols"></param>
-        public virtual void Unsubscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
-        {
-            _tickerToken.Cancel();
         }
 
         private void UpdateCachedOpenOrder(int key, Order updatedOrder)

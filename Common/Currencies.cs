@@ -256,7 +256,7 @@ namespace QuantConnect
             {"TRY", "₺"},
             {"TWD", "NT$"},
             {"ZAR", "R"},
-            {"BTC", "BTC"},
+            {"BTC", "Ƀ"},
             { "ETH", "ETH"}
         };
     }
