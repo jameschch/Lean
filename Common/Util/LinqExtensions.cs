@@ -86,6 +86,18 @@ namespace QuantConnect.Util
         }
 
         /// <summary>
+        /// Produces the set difference of two sequences by using the default equality comparer to compare values.
+        /// </summary>
+        /// <typeparam name="T">The type of the elements of the input sequences.</typeparam>
+        /// <param name="enumerable">An <see cref="T:System.Collections.Generic.IEnumerable`1"/> whose elements that are not also in <paramref name="set"/> will be returned.</param>
+        /// <param name="set">An <see cref="T:System.Collections.Generic.IEnumerable`1"/> whose elements that also occur in the first sequence will cause those elements to be removed from the returned sequence.</param>
+        /// <returns>A sequence that contains the set difference of the elements of two sequences.</returns>
+        public static IEnumerable<T> Except<T>(this IEnumerable<T> enumerable, ISet<T> set)
+        {
+            return enumerable.Where(item => !set.Contains(item));
+        }
+
+        /// <summary>
         /// Returns true if the specified enumerable is null or has no elements
         /// </summary>
         /// <typeparam name="T">The enumerable's item type</typeparam>
@@ -249,7 +261,7 @@ namespace QuantConnect.Util
         /// <param name="enumerable">The source enumerable</param>
         /// <param name="selector">The property selector</param>
         /// <returns>A filtered enumerable distinct on the selected property</returns>
-        public static IEnumerable<T> DistincyBy<T, TPropery>(this IEnumerable<T> enumerable, Func<T, TPropery> selector)
+        public static IEnumerable<T> DistinctBy<T, TPropery>(this IEnumerable<T> enumerable, Func<T, TPropery> selector)
         {
             var hash = new HashSet<TPropery>();
             return enumerable.Where(x => hash.Add(selector(x)));
