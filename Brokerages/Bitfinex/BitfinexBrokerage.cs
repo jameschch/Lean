@@ -318,7 +318,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                         order.Quantity = Convert.ToInt32(decimal.Parse(item.OriginalAmount) * ScaleFactor);
                         order.BrokerId = new List<string> { item.Id.ToString() };
-                        order.Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
+                        order.Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex);
                         order.Time = Time.UnixTimeStampToDateTime(double.Parse(item.Timestamp));
                         order.Price = decimal.Parse(item.Price) / ScaleFactor;
                         order.Status = MapOrderStatus(item);
