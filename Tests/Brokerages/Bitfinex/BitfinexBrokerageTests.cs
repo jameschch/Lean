@@ -12,16 +12,13 @@ using TradingApi.ModelObjects.Bitfinex.Json;
 using QuantConnect.Orders;
 using System.Reflection;
 using Moq;
-
+using TradingApi.Bitfinex;
 
 namespace QuantConnect.Tests.Brokerages.Bitfinex
 {
     [TestFixture, Ignore("This test requires a configured and active account")]
     public class BitfinexBrokerageTests : BrokerageTests
     {
-
-
-        BitfinexBrokerage unit;
 
         #region Properties
         protected override Symbol Symbol
@@ -42,7 +39,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal HighPrice
         {
-            get { return 2000m; }
+            get { return 20m; }
         }
 
         /// <summary>
@@ -50,21 +47,20 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal LowPrice
         {
-            get { return 100m; }
+            get { return 1m; }
         }
         #endregion
 
-        [SetUp]
-        public override void Setup()
-        {
-            base.Setup();
-
-            unit = (BitfinexBrokerage)new BitfinexBrokerageFactory().CreateBrokerage(null, null);
-        }
-
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
-            return new BitfinexBrokerageFactory().CreateBrokerage(null, null);
+            string apiSecret = Config.Get("bitfinex-api-secret");
+            string apiKey = Config.Get("bitfinex-api-key");
+            string wallet = Config.Get("bitfinex-wallet");
+            decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor", "100"));
+            string url = Config.Get("bitfinex-wss", "wss://api2.bitfinex.com:3000/ws");
+            var restClient = new BitfinexApi(apiSecret, apiKey);
+            var webSocketClient = new WebSocketWrapper();
+            return new BitfinexWebsocketsBrokerage(url, webSocketClient, apiKey, apiSecret, wallet, restClient, scaleFactor, securityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
@@ -78,7 +74,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             get
             {
                 return new[]
-                {
+                {                    
                     new TestCaseData(new MarketOrderTestParameters(Symbol)).SetName("MarketOrder"),
                     new TestCaseData(new LimitOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("LimitOrder"),
                     new TestCaseData(new StopMarketOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("StopMarketOrder"),

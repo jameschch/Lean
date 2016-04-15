@@ -35,7 +35,10 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                 Console.WriteLine("Usage: CryptoiqDownloader FROMDATE TODATE EXCHANGE SYMBOL");
                 Console.WriteLine("FROMDATE = yyyymmdd");
                 Console.WriteLine("TODATE = yyyymmdd");
-                Environment.Exit(1);
+                //Environment.Exit(1);
+                //useful detault params
+                args = new string[] { "20160323", DateTime.UtcNow.ToString("yyyyMMdd"), "bitfinex", "BTCUSD" };
+
             }
 
             try
