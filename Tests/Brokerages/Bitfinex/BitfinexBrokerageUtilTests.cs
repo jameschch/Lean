@@ -46,7 +46,8 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         [SetUp]
         public void Setup()
         {
-            unit = new BitfinexWebsocketsBrokerage("wss://localhost", new Mock<WebSocketWrapper>().Object, "abc", "123", "trading", mock.Object, 100m);
+            unit = new BitfinexWebsocketsBrokerage("wss://localhost", new Mock<WebSocketWrapper>().Object, "abc", "123", "trading", mock.Object, 100m,
+                new Mock<ISecurityProvider>().Object);
         }
 
         [Test()]
@@ -111,7 +112,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         public void MapOrderTypeTest()
         {
 
-            unit = new BitfinexBrokerage("", "", "exchange", mock.Object, 1m);
+            unit = new BitfinexBrokerage("", "", "exchange", mock.Object, 1m, new Mock<ISecurityProvider>().Object);
 
             var expected = GetDescriptionFromEnumValue(BitfinexOrderType.exchangeMarket);
             var actual = unit.MapOrderType(OrderType.Market);
@@ -127,7 +128,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
             Assert.Throws<Exception>(() => unit.MapOrderType(OrderType.StopLimit));
 
-            unit = new BitfinexBrokerage("", "", "trading", mock.Object, 100m);
+            unit = new BitfinexBrokerage("", "", "trading", mock.Object, 100m, new Mock<ISecurityProvider>().Object);
 
             expected = GetDescriptionFromEnumValue(BitfinexOrderType.market);
             actual = unit.MapOrderType(OrderType.Market);
@@ -147,7 +148,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         public void MapOrderTypeTest1()
         {
 
-            unit = new BitfinexBrokerage("", "", "exchange", mock.Object, 100m);
+            unit = new BitfinexBrokerage("", "", "exchange", mock.Object, 100m, new Mock<ISecurityProvider>().Object);
 
             var expected = OrderType.Market;
             var actual = unit.MapOrderType(GetDescriptionFromEnumValue(BitfinexOrderType.exchangeMarket));
@@ -165,7 +166,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
             Assert.Throws<Exception>(() => unit.MapOrderType(GetDescriptionFromEnumValue(BitfinexOrderType.market)));
 
-            unit = new BitfinexBrokerage("", "", "trading", mock.Object, 100m);
+            unit = new BitfinexBrokerage("", "", "trading", mock.Object, 100m, new Mock<ISecurityProvider>().Object);
 
             expected = OrderType.Market;
             actual = unit.MapOrderType(GetDescriptionFromEnumValue(BitfinexOrderType.market));

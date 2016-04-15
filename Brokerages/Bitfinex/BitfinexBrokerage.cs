@@ -78,7 +78,12 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected string ApiSecret;
         TradingApi.Bitfinex.BitfinexApi _restClient;
-		const string _exchangeMarket  = "exchange market";
+        /// <summary>
+        /// Security Provider
+        /// </summary>
+        protected ISecurityProvider SecurityProvider;
+
+        const string _exchangeMarket  = "exchange market";
         const string _exchangeLimit = "exchange limit";
         const string _exchangeStop = "exchange stop"  ;     
         const string _market = "market";
@@ -90,7 +95,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Create bitfinex brokerage
         /// </summary>
-        public BitfinexBrokerage(string apiKey, string apiSecret, string wallet, BitfinexApi restClient, decimal scaleFactor)
+        public BitfinexBrokerage(string apiKey, string apiSecret, string wallet, BitfinexApi restClient, decimal scaleFactor, ISecurityProvider securityProvider)
             : base("bitfinex")
         {
             ApiKey = apiKey;
@@ -98,6 +103,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             Wallet = wallet;
             _restClient = restClient;
             ScaleFactor = scaleFactor;
+            SecurityProvider = securityProvider;
         }
 
         /// <summary>
@@ -342,9 +348,9 @@ namespace QuantConnect.Brokerages.Bitfinex
 
             var list = this.GetOpenBitfinexOrders().Select(o => (Order)o).ToList();
 
-            foreach (var item in list)
+            foreach (Order item in list)
             {
-                if (item.Status != OrderStatus.Canceled && item.Status != OrderStatus.Filled && item.Status != OrderStatus.Invalid)
+                if (item.Status.IsOpen())
                 {
                     var cached = this.CachedOrderIDs.Where(c => c.Value.BrokerId.Contains(item.BrokerId.First()));
                     if (cached.Count() > 0 && cached.First().Value != null)

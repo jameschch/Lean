@@ -9,7 +9,9 @@ using Moq;
 using QuantConnect.Configuration;
 using TradingApi.ModelObjects.Bitfinex.Json;
 using TradingApi.ModelObjects;
+using QuantConnect.Securities;
 using System.Threading;
+using QuantConnect.Tests.Brokerages.Bitfinex;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -20,12 +22,13 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         BitfinexBrokerage unit;
         Mock<TradingApi.Bitfinex.BitfinexApi> mock = new Mock<TradingApi.Bitfinex.BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
         Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
+        Mock<ISecurityProvider> securities = new Mock<ISecurityProvider>();
         decimal scaleFactor;
 
         [SetUp()]
         public void Setup()
-        {     
-            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, 100m);
+        {
+            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, 100m, securities.Object);
             scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
         }
 
@@ -138,6 +141,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                     RemainingAmount = "1",
                     ExecutedAmount = "0",
                     IsLive = true,
+					Type = "market",
                     Symbol = "ETHBTC",
                     IsCancelled = false
                 }
@@ -251,5 +255,27 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         }
 
+        [Test()]
+        public void SubscribeTest()
+        {
+            unit.Connect();
+            var response = new BitfinexPublicTickerGet
+            {
+                Ask = "1",
+                Bid = "2",
+                High = "3",
+                LastPrice = "4",
+                Low = "5",
+                Mid = "6",
+                Timestamp = "7",
+                Volume = "8"
+            };
+            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.btcusd, BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker)).Returns(response);
+            unit.Subscribe(null, null);
+            System.Threading.Thread.Sleep(9000);
+            var actual = unit.GetNextTicks();
+            unit.Unsubscribe(null, null);
+            Assert.AreEqual(2, actual.Count());
+        }
     }
 }
