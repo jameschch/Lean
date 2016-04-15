@@ -110,7 +110,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     @event = "unsubscribe",
                     channelId = id,
                 }));
-                this._channelId.Remove(id);
+                //this._channelId.Remove(id);
             }
             catch (Exception ex)
             {
