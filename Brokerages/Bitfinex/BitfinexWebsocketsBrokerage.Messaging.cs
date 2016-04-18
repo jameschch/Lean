@@ -73,14 +73,17 @@ namespace QuantConnect.Brokerages.Bitfinex
                 }
                 else if (raw.channel == "ticker" && raw.@event == "subscribed")
                 {
-                    if (!this._channelId.ContainsKey((int)raw.chanId))
+                    int chanId = (int)raw.chanId;
+                    if (this._channelId.ContainsKey(chanId))
                     {
-                        this._channelId.Add((int)raw.chanId, new Channel { Name = "ticker", Symbol = raw.pair });
+                        this._channelId.Remove(chanId);
                     }
-                    else
+                    string pair = (string)raw.pair;
+                    foreach (int existing in this._channelId.Where(c => c.Value.Symbol == pair).Select(s => s.Key).ToArray())
                     {
-                        this._channelId[(int)raw.chanId] = new Channel { Name = "ticker", Symbol = raw.pair };
+                        _channelId.Remove(existing);
                     }
+                    this._channelId.Add(chanId, new Channel { Name = "ticker", Symbol = raw.pair });
                 }
                 else if (raw.chanId == 0)
                 {
