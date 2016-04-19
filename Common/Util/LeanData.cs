@@ -61,7 +61,14 @@ namespace QuantConnect.Util
                     {
                         case Resolution.Tick:
                             var tick = (Tick) data;
-                            return ToCsv(milliseconds, tick.BidPrice, tick.AskPrice);
+                            if (data.Symbol.ID.Market == Market.Bitfinex)
+                            {
+                                return ToCsv(milliseconds, tick.BidPrice, tick.AskPrice, tick.LastPrice, tick.Quantity);
+                            }
+                            else
+                            {
+                                return ToCsv(milliseconds, tick.BidPrice, tick.AskPrice);
+                            }
 
                         case Resolution.Second:
                         case Resolution.Minute:

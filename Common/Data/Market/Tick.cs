@@ -252,7 +252,17 @@ namespace QuantConnect.Data.Market
                         Time = date.Date.AddMilliseconds(csv[0].ToInt64()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
                         BidPrice = csv[1].ToDecimal();
                         AskPrice = csv[2].ToDecimal();
-                        Value = (BidPrice + AskPrice) / 2;
+
+                        if (config.Market == QuantConnect.Market.Bitfinex && csv.Count == 5)
+                        {
+                            Value = csv[3].ToDecimal();
+                            Quantity = csv[4].ToInt32();
+                        }
+                        else
+                        {
+                            Value = (BidPrice + AskPrice) / 2;
+                        }
+                        
                         break;
                     }
 

@@ -79,7 +79,8 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                                 Value = item.Last / _scaleFactor,
                                 AskPrice = item.Ask / _scaleFactor,
                                 BidPrice = item.Bid / _scaleFactor,
-                                TickType = TickType.Quote
+                                TickType = TickType.Quote,
+                                Quantity = (int)Math.Round(item.Volume * _scaleFactor)
                             };
                         }
                         hour++;
