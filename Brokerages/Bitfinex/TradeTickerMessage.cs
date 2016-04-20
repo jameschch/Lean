@@ -31,10 +31,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         const int _channel_id = 0;
         const int _term = 1;
         const int _seq = 2;
-        const int _id = 3;
-        const int _timestamp = 4;
-        const int _price = 5;
-        const int _amount = 6;
+        const int _timestamp = 3;
+        const int _price = 4;
+        const int _amount = 5;
 
         /// <summary>
         /// Ticker Message constructor
@@ -46,7 +45,6 @@ namespace QuantConnect.Brokerages.Bitfinex
             CHANNEL_ID = GetInt(_channel_id);
             TERM = values[_term];
             SEQ = values[_seq];
-            ID = GetInt(_id);
             TIMESTAMP = GetInt(_timestamp);
             PRICE = TryGetDecimal(_price);
             AMOUNT = TryGetDecimal(_amount);

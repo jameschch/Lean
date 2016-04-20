@@ -44,7 +44,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 if (raw.Type == Newtonsoft.Json.Linq.JTokenType.Array)
                 {
                     int id = raw[0];
-                    string term = raw[1];
+                    string term = raw[1].Type == Newtonsoft.Json.Linq.JTokenType.String ? raw[1]: "";
 
                     if (term == "hb")
                     {
@@ -52,29 +52,28 @@ namespace QuantConnect.Brokerages.Bitfinex
                         _heartbeatCounter = DateTime.UtcNow;
                         return;
                     }
+                    else if (_channelId.ContainsKey(id) && _channelId[id].Name == "ticker")
+                    {
+                        //ticker
+                        PopulateTicker(e.Data, _channelId[id].Symbol);
+                        return;
+                    }
+                    else if (_channelId.ContainsKey(id) && _channelId[id].Name == "trades" && term == "te")
+                    {
+                        //trade ticker
+                        PopulateTradeTicker(e.Data, _channelId[id].Symbol);
+                        return;
+                    }
                     else if (id == 0 && term == "tu" || term == "te")
                     {
                         //trade execution/update
-                        var data = raw[2].ToObject(typeof(string[]));
-                        PopulateTrade(data);
-                    }
-                    else if (id != 0 && term == "tu")
-                    {
-                        //trade ticker
-                        var data = raw.ToObject(typeof(string[]));
-                        PopulateTradeTicker(data, _channelId[id].Symbol);
+                        PopulateTrade(raw[1]);
                     }
                     else if (term == "ws")
                     {
                         //wallet
                         var data = raw[2].ToObject(typeof(string[][]));
                         PopulateWallet(data);
-                    }
-                    else if (_channelId.ContainsKey(id) && _channelId[id].Name == "ticker")
-                    {
-                        //ticker
-                        PopulateTicker(e.Data, _channelId[id].Symbol);
-                        return;
                     }
                 }
                 else if ((raw.channel == "ticker" || raw.channel == "trades") && raw.@event == "subscribed")
@@ -147,22 +146,26 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
 
-        private void PopulateTradeTicker(string[] data, string symbol)
+        private void PopulateTradeTicker(string response, string symbol)
         {
-           
-            var msg = new TradeTickerMessage(data);
-            lock (Ticks)
-            {
-                Ticks.Add(new Tick
+
+                var data = JsonConvert.DeserializeObject<string[]>(response, settings);
+
+                var msg = new TradeTickerMessage(data);
+                lock (Ticks)
                 {
-                    Time = Time.UnixTimeStampToDateTime(msg.TIMESTAMP),
-                    Value = msg.PRICE / ScaleFactor,
-                    TickType = TickType.Trade,
-                    Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
-                    DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(msg.AMOUNT * ScaleFactor))
-                });
-            }
+                    Ticks.Add(new Tick
+                    {
+                        Time = DateTime.UtcNow,
+                        Value = msg.PRICE / ScaleFactor,
+                        TickType = TickType.Trade,
+                        Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
+                        DataType = MarketDataType.Tick,
+                        Quantity = (int)(Math.Round(msg.AMOUNT * ScaleFactor))
+                    });
+                }
+            
+
         }
 
         //todo: Currently populated but not used
