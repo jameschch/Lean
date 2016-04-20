@@ -52,11 +52,17 @@ namespace QuantConnect.Brokerages.Bitfinex
                         _heartbeatCounter = DateTime.UtcNow;
                         return;
                     }
-                    else if (term == "tu" || term == "te")
+                    else if (id == 0 && term == "tu" || term == "te")
                     {
                         //trade execution/update
                         var data = raw[2].ToObject(typeof(string[]));
                         PopulateTrade(data);
+                    }
+                    else if (id != 0 && term == "tu")
+                    {
+                        //trade ticker
+                        var data = raw.ToObject(typeof(string[]));
+                        PopulateTradeTicker(data, _channelId[id].Symbol);
                     }
                     else if (term == "ws")
                     {
@@ -71,19 +77,19 @@ namespace QuantConnect.Brokerages.Bitfinex
                         return;
                     }
                 }
-                else if (raw.channel == "ticker" && raw.@event == "subscribed")
+                else if ((raw.channel == "ticker" || raw.channel == "trades") && raw.@event == "subscribed")
                 {
+                    string channel = (string)raw.channel;
                     int chanId = (int)raw.chanId;
-                    if (this._channelId.ContainsKey(chanId))
-                    {
-                        this._channelId.Remove(chanId);
-                    }
                     string pair = (string)raw.pair;
-                    foreach (int existing in this._channelId.Where(c => c.Value.Symbol == pair).Select(s => s.Key).ToArray())
+
+                    var removing = this._channelId.Where(c => c.Value.Name == channel && c.Value.Symbol == pair).Select(c => c.Key).ToArray();
+
+                    foreach (var item in removing)
                     {
-                        _channelId.Remove(existing);
+                        this._channelId.Remove(item);
                     }
-                    this._channelId.Add(chanId, new Channel { Name = "ticker", Symbol = raw.pair });
+                    this._channelId[chanId] = new Channel { Name = channel, Symbol = raw.pair };
                 }
                 else if (raw.chanId == 0)
                 {
@@ -118,6 +124,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
 
+        //todo: volume returned is the 24hour trading volume, not value of last trade
         private void PopulateTicker(string response, string symbol)
         {
 
@@ -135,8 +142,25 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Value = msg.LAST_PRICE / ScaleFactor,
                     TickType = TickType.Quote,
                     Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
+                    DataType = MarketDataType.Tick
+                });
+            }
+        }
+
+        private void PopulateTradeTicker(string[] data, string symbol)
+        {
+           
+            var msg = new TradeTickerMessage(data);
+            lock (Ticks)
+            {
+                Ticks.Add(new Tick
+                {
+                    Time = Time.UnixTimeStampToDateTime(msg.TIMESTAMP),
+                    Value = msg.PRICE / ScaleFactor,
+                    TickType = TickType.Trade,
+                    Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(msg.VOLUME * ScaleFactor, 2))
+                    Quantity = (int)(Math.Round(msg.AMOUNT * ScaleFactor))
                 });
             }
         }

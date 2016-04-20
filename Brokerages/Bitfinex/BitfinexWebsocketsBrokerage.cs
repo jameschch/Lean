@@ -85,6 +85,13 @@ namespace QuantConnect.Brokerages.Bitfinex
                     channel = "ticker",
                     pair = item.ToString()
                 }));
+
+                _webSocket.Send(JsonConvert.SerializeObject(new
+                {
+                    @event = "subscribe",
+                    channel = "trades",
+                    pair = item.ToString()
+                }));
             }
         }
 
@@ -97,8 +104,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             foreach (var item in symbols)
             {
-                var channel = _channelId.Where(c => c.Value.Symbol == item.ToString()).SingleOrDefault();
-                Unsubscribe(channel.Key);
+                foreach (var channel in _channelId.Where(c => c.Value.Symbol == item.ToString()))
+                {
+                    Unsubscribe(channel.Key);
+                }               
             }
         }
 
@@ -111,7 +120,6 @@ namespace QuantConnect.Brokerages.Bitfinex
                     @event = "unsubscribe",
                     channelId = id,
                 }));
-                //this._channelId.Remove(id);
             }
             catch (Exception ex)
             {

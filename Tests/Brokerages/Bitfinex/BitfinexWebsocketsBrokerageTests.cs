@@ -13,6 +13,7 @@ using QuantConnect.Configuration;
 using TradingApi.Bitfinex;
 using System.Threading;
 using QuantConnect.Securities;
+using QuantConnect.Data.Market;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -212,6 +213,28 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             Assert.AreEqual(4.3272m, actual.Price);
         }
 
+        [Test()]
+        public void OnMessageTradeTickerTest()
+        {
+
+            string json = "{\"event\":\"subscribed\",\"channel\":\"trades\",\"chanId\":\"5\",\"pair\":\"btcusd\"}";
+            unit.OnMessage(unit, GetArgs(json));
+
+            json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"btcusd\"}";
+            unit.OnMessage(unit, GetArgs(json));
+
+            json = "[ 5, 'tu', '1234-BTCUSD', 15254529, 1443659698, 236.42, 0.49064538 ]";
+
+            unit.OnMessage(unit, GetArgs(json));
+
+            var actual = unit.GetNextTicks().First();
+            Assert.AreEqual("BTCUSD", actual.Symbol.Value);
+            Assert.AreEqual(2.3642m, actual.Price);
+            Assert.AreEqual(49, ((Tick)actual).Quantity);
+
+            //test some channel substiution
+            OnMessageTickerTest2();
+        }
 
         [Test()]
         public void OnMessageInfoHardResetTest()
@@ -245,6 +268,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             unit.OnMessage(unit, GetArgs(json));
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"ethbtc\"}";
             unit.OnMessage(unit, GetArgs(json));
+            json = "{\"event\":\"subscribed\",\"channel\":\"trades\",\"chanId\":\"3\",\"pair\":\"ethbtc\"}";
+            unit.OnMessage(unit, GetArgs(json));
 
             //return ticks for subs.
             json = "[\"1\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
@@ -270,6 +295,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"btcusd\"}";
             unit.OnMessage(unit, GetArgs(json));
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"ethbtc\"}";
+            unit.OnMessage(unit, GetArgs(json));
+            json = "{\"event\":\"subscribed\",\"channel\":\"trades\",\"chanId\":\"4\",\"pair\":\"btcusd\"}";
             unit.OnMessage(unit, GetArgs(json));
 
             //return ticks for new subs. eth is now 1 and btc is 2

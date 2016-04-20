@@ -184,6 +184,7 @@
     <Compile Include="Bitfinex\BitfinexWebsocketsPaperBrokerage.cs" />
     <Compile Include="Bitfinex\Channel.cs" />
     <Compile Include="Bitfinex\IWebSocket.cs" />
+    <Compile Include="Bitfinex\TradeTickerMessage.cs" />
     <Compile Include="Bitfinex\TickerMessage.cs" />
     <Compile Include="Bitfinex\TradeMessage.cs" />
     <Compile Include="Bitfinex\WalletMessage.cs" />
