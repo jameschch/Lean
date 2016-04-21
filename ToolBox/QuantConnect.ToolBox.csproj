@@ -144,6 +144,8 @@
   <ItemGroup>
     <Compile Include="AlgoSeekOptionsConverter\AlgoSeekOptionsParser.cs" />
     <Compile Include="AlgoSeekOptionsConverter\Program.cs" />
+    <Compile Include="BitcoinChartsDownloader\BitcoinChartsDownloader.cs" />
+    <Compile Include="BitcoinChartsDownloader\Program.cs" />
     <Compile Include="Bz2StreamProvider.cs" />
     <Compile Include="CoarseUniverseGenerator\Program.cs" />
     <Compile Include="ConsolidatorDataProcessor.cs" />
