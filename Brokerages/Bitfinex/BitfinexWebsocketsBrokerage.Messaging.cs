@@ -67,7 +67,8 @@ namespace QuantConnect.Brokerages.Bitfinex
                     else if (id == 0 && term == "tu" || term == "te")
                     {
                         //trade execution/update
-                        PopulateTrade(raw[1]);
+                        var data = raw[2].ToObject(typeof(string[]));
+                        PopulateTrade(data);
                     }
                     else if (term == "ws")
                     {

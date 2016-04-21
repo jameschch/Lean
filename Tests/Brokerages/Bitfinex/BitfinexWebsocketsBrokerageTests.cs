@@ -223,8 +223,10 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"btcusd\"}";
             unit.OnMessage(unit, GetArgs(json));
 
-            json = "[ 5, 'tu', '1234-BTCUSD', 15254529, 1443659698, 236.42, 0.49064538 ]";
+            json = "[ 5, 'te', '1234-BTCUSD', 1443659698, 236.42, 0.49064538 ]";
+            unit.OnMessage(unit, GetArgs(json));
 
+            json = "[ 5, 'tu', '1234-BTCUSD', 9869875, 1443659698, 987.42, 0.123 ]";
             unit.OnMessage(unit, GetArgs(json));
 
             var actual = unit.GetNextTicks().First();
@@ -232,7 +234,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             Assert.AreEqual(2.3642m, actual.Price);
             Assert.AreEqual(49, ((Tick)actual).Quantity);
 
-            //test some channel substiution
+            //test some channel substitution
             OnMessageTickerTest2();
         }
 
