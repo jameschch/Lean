@@ -1,4 +1,18 @@
-﻿using System;
+﻿/*
+ * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
+ * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); 
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,6 +28,9 @@ using TradingApi.Bitfinex;
 using System.Threading;
 using QuantConnect.Securities;
 using QuantConnect.Data.Market;
+using QuantConnect.Tests.Indicators;
+using System.Diagnostics;
+using System.IO;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -24,12 +41,13 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         BitfinexWebsocketsBrokerage unit;
         Mock<IWebSocket> mock = new Mock<IWebSocket>();
+        decimal scaleFactor = 100m;
 
         [SetUp()]
         public void Setup()
         {
-            unit = new BitfinexWebsocketsBrokerage("wss://localhost", mock.Object, "abc", "123", "trading", 
-                new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, 100m, new Mock<ISecurityProvider>().Object);
+            unit = new BitfinexWebsocketsBrokerage("wss://localhost", mock.Object, "abc", "123", "trading",
+                new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, scaleFactor, new Mock<ISecurityProvider>().Object);
         }
 
         [Test()]
@@ -255,7 +273,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         [Test()]
         public void OnMessageInfoSoftResetTest()
-        {       
+        {
 
             mock.Setup(m => m.Connect()).Verifiable();
             var brokerageMock = new Mock<BitfinexWebsocketsBrokerage>("wss://localhost", mock.Object, "abc", "123", "trading",
@@ -319,6 +337,43 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             mock.Verify();
         }
 
+        [Test()]
+        public void OnMessageTradeSplitFillTest()
+        {
+            int expectedQuantity = 200;
+
+            var order = new Orders.MarketOrder { BrokerId = new List<string> { "700658426" }, Quantity = expectedQuantity };
+            unit.CachedOrderIDs.TryAdd(1, order);
+            unit.FillSplit.TryAdd(1, new BitfinexFill(order, scaleFactor));
+            ManualResetEvent raised = new ManualResetEvent(false);
+
+            decimal expectedFee = 1.72366541m;
+            decimal actualFee = 0;
+            decimal actualQuantity = 0;
+
+            unit.OrderStatusChanged += (s, e) =>
+            {
+                Assert.AreEqual("BTCUSD", e.Symbol.Value);
+                actualFee += e.OrderFee;
+                actualQuantity += e.AbsoluteFillQuantity;
+
+                if (e.Status == Orders.OrderStatus.Filled)
+                {
+                    raised.Set();
+                    Assert.AreEqual(expectedQuantity, actualQuantity);
+                    Assert.AreEqual(expectedFee, Math.Round(actualFee, 8));
+                }
+            };
+
+            foreach (var line in File.ReadLines(Path.Combine("TestData", "btcusd_fill.txt")))
+            {
+                unit.OnMessage(unit, GetArgs(line));
+            }
+            Assert.IsTrue(raised.WaitOne(1000));
+
+        }
+
+        [DebuggerStepThrough]
         private MessageEventArgs GetArgs(string json)
         {
             BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;

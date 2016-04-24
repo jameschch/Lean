@@ -122,21 +122,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         }
 
         /// <summary>
-        /// Map exchange order status
-        /// </summary>
-        /// <param name="msg"></param>
-        /// <returns></returns>
-        public static OrderStatus MapOrderStatus(TradeMessage msg)
-        {
-            if (Math.Abs(msg.FEE) != 0)
-            {
-                return OrderStatus.Filled;
-            }
-
-            return OrderStatus.PartiallyFilled;
-        }
-
-        /// <summary>
         /// Creates authentication hash
         /// </summary>
         /// <param name="payload"></param>

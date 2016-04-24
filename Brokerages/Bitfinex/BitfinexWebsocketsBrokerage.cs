@@ -29,6 +29,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TradingApi.Bitfinex;
 using WebSocketSharp;
+using QuantConnect.Orders;
 
 namespace QuantConnect.Brokerages.Bitfinex
 {
@@ -107,7 +108,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 foreach (var channel in _channelId.Where(c => c.Value.Symbol == item.ToString()))
                 {
                     Unsubscribe(channel.Key);
-                }               
+                }
             }
         }
 
@@ -167,6 +168,14 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             this.Disconnect();
         }
+
+        public override bool PlaceOrder(Order order)
+        {
+            var result = base.PlaceOrder(order);
+            this.FillSplit.TryAdd(order.Id, new BitfinexFill(order, ScaleFactor));
+            return result;
+        }
+
 
         private async Task CheckConnection()
         {

@@ -185,18 +185,6 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
         }
 
-        [Test()]
-        public void MapOrderStatusTest1()
-        {
-            var msg = new TradeMessage(new string[] { "<TRD_SEQ>", "<TRD_ID>", "<TRD_PAIR>", "1", "2", "3", "4", "<ORD_TYPE>", "5", "0", "<FEE_CURRENCY>" });
-            var actual = BitfinexBrokerage.MapOrderStatus(msg);
-            Assert.AreEqual(OrderStatus.PartiallyFilled, actual);
-
-            msg.FEE = 1m;
-            actual = BitfinexBrokerage.MapOrderStatus(msg);
-            Assert.AreEqual(OrderStatus.Filled, actual);
-        }
-
         private static string GetDescriptionFromEnumValue(Enum value)
         {
             System.ComponentModel.DescriptionAttribute attribute = value.GetType()

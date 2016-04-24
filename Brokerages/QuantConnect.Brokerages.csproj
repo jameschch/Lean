@@ -177,6 +177,7 @@
     <Compile Include="Bitfinex\BitfinexBrokerage.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerage.Messaging.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerage.Util.cs" />
+    <Compile Include="Bitfinex\BitfinexFill.cs" />
     <Compile Include="Bitfinex\BitfinexWebsocketsPaperBrokerageFactory.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerageFactory.cs" />
     <Compile Include="Bitfinex\BitfinexWebsocketsBrokerage.cs" />
