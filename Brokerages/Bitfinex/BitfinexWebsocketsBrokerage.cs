@@ -17,6 +17,7 @@ using QuantConnect.Configuration;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
+using QuantConnect.Orders;
 using QuantConnect.Securities;
 using System;
 using System.Collections.Concurrent;
@@ -29,7 +30,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using TradingApi.Bitfinex;
 using WebSocketSharp;
-using QuantConnect.Orders;
 
 namespace QuantConnect.Brokerages.Bitfinex
 {
@@ -169,6 +169,11 @@ namespace QuantConnect.Brokerages.Bitfinex
             this.Disconnect();
         }
 
+        /// <summary>
+        /// Add bitfinex order and prepare for fill message
+        /// </summary>
+        /// <param name="order"></param>
+        /// <returns></returns>
         public override bool PlaceOrder(Order order)
         {
             var result = base.PlaceOrder(order);

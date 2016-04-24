@@ -140,9 +140,29 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             //todo: wait for callback from auth before posting
             Authenticate();
+
+            int quantity = (int)Math.Floor(SecurityProvider.GetHoldingsQuantity(order.Symbol));
+            Orders.Order crossOrder = null;
+            if (OrderCrossesZero(order, quantity))
+            {
+                crossOrder = order.Clone();
+                var firstOrderQuantity = -quantity;
+                var secondOrderQuantity = order.Quantity - firstOrderQuantity;
+                crossOrder.Quantity = secondOrderQuantity;
+                order.Quantity = firstOrderQuantity;
+            }
+
+            return this.PlaceOrder(order, crossOrder);
+        }
+
+        private bool PlaceOrder(Orders.Order order, Orders.Order crossOrder = null)
+        {
+
+            int totalQuantity = order.Quantity + (crossOrder != null ? crossOrder.Quantity : 0);
+
             var newOrder = new BitfinexNewOrderPost
             {
-                Amount = ((order.Quantity < 0 ? order.Quantity * -1 : order.Quantity) / ScaleFactor).ToString(),
+                Amount = (Math.Abs(order.Quantity) / ScaleFactor).ToString(),
                 Price = GetPrice(order).ToString(),
                 Symbol = order.Symbol.Value,
                 Type = MapOrderType(order.Type),
@@ -152,11 +172,14 @@ namespace QuantConnect.Brokerages.Bitfinex
 
             var response = _restClient.SendOrder(newOrder);
 
-            if (response != null)
+            if (response != null && response.OrderId != 0)
             {
-                if (response.OrderId != 0)
+                if (CachedOrderIDs.ContainsKey(order.Id))
                 {
-
+                    CachedOrderIDs[order.Id].BrokerId.Add(response.OrderId.ToString());
+                }
+                else
+                {
                     Order caching = null;
                     if (order.Type == OrderType.Market)
                     {
@@ -178,22 +201,31 @@ namespace QuantConnect.Brokerages.Bitfinex
                     caching.Id = order.Id;
                     caching.BrokerId = new List<string> { response.OrderId.ToString() };
                     caching.Price = order.Price / ScaleFactor;
-                    caching.Quantity = order.Quantity * (int)ScaleFactor;
+                    caching.Quantity = totalQuantity * (int)ScaleFactor;
                     caching.Status = OrderStatus.Submitted;
                     caching.Symbol = order.Symbol;
                     caching.Time = order.Time;
 
                     CachedOrderIDs.TryAdd(order.Id, caching);
-
-                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Submitted });
-                    Log.Trace("BitfinexBrokerage.PlaceOrder(): Order completed successfully orderid:" + response.OrderId.ToString());
-                    return true;
                 }
-            }
+                if (crossOrder != null && crossOrder.Status != OrderStatus.Submitted)
+                {
+                    order.Status = OrderStatus.Submitted;
+                    //switching active order
+                    return PlaceOrder(crossOrder, order);
+                }
 
-            OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Invalid });
-            Log.Trace("BitfinexBrokerage.PlaceOrder(): Order failed Order Id: " + order.Id + " timestamp:" + order.Time + " quantity: " + order.Quantity.ToString());
-            return false;
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Submitted });
+                Log.Trace("BitfinexBrokerage.PlaceOrder(): Order completed successfully orderid:" + order.Id.ToString());
+            }
+            else
+            {
+                //todo: maybe only secondary of cross order failed and order will partially fill.
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Invalid });
+                Log.Trace("BitfinexBrokerage.PlaceOrder(): Order failed Order Id: " + order.Id + " timestamp:" + order.Time + " quantity: " + order.Quantity.ToString());
+                return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -203,35 +235,17 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public override bool UpdateOrder(Orders.Order order)
         {
-
-            bool hasFaulted = false;
+            bool cancelled;
             foreach (string id in order.BrokerId)
             {
-                var post = new BitfinexCancelReplacePost
+                cancelled = this.CancelOrder(order);
+                if (!cancelled)
                 {
-                    Amount = (order.Quantity / ScaleFactor).ToString(),
-                    CancelOrderId = int.Parse(id),
-                    Symbol = order.Symbol.Value,
-                    Price = order.Price <= 0 ? order.Id.ToString() : (order.Price * ScaleFactor).ToString(),
-                    Type = MapOrderType(order.Type),
-                    Exchange = _exchange,
-                    Side = order.Quantity > 0 ? buy : sell
-                };
-                var response = _restClient.CancelReplaceOrder(post);
-                if (response.OrderId == 0)
-                {
-                    hasFaulted = true;
-                    break;
+                    return false;
                 }
-            }
 
-            if (hasFaulted)
-            {
-                return false;
             }
-
-            UpdateCachedOpenOrder(order.Id, order);
-            return true;
+            return this.PlaceOrder(order);
         }
 
         /// <summary>
@@ -454,6 +468,23 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected virtual void Authenticate()
         { }
+
+        /// <summary>
+        /// Determines whether or not the specified order will bring us across the zero line for holdings
+        /// </summary>
+        protected bool OrderCrossesZero(Order order, decimal quantity)
+        {
+            if (quantity > 0 && order.Quantity < 0)
+            {
+                return (quantity + order.Quantity) < 0;
+            }
+            else if (quantity < 0 && order.Quantity > 0)
+            {
+                return (quantity + order.Quantity) > 0;
+            }
+            return false;
+        }
+
 
     }
 

@@ -97,6 +97,7 @@
     <Compile Include="Brokerages\Bitfinex\BitfinexBrokerageLitecoinTests.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexBrokerageUtilTests.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexBrokerageTests.cs" />
+    <Compile Include="Brokerages\Bitfinex\BitfinexTestsHelpers.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexWebsocketsBrokerageTests.cs" />
     <Compile Include="Brokerages\BrokerageTests.cs" />
     <Compile Include="Brokerages\Fxcm\FxcmBrokerageDataQueueHandlerTests.cs" />

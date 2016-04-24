@@ -31,6 +31,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Tests.Indicators;
 using System.Diagnostics;
 using System.IO;
+using QuantConnect.Tests.Brokerages.Bitfinex;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -92,8 +93,9 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         public void OnMessageTradeTest()
         {
             string brokerId = "2";
-            string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"6\",\"USD\"]]";
-            unit.CachedOrderIDs.TryAdd(1, new Orders.MarketOrder { BrokerId = new List<string> { brokerId } });
+            string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"6\",\"BTC\"]]";
+
+            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, scaleFactor, 300);
             ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
@@ -101,7 +103,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(300, e.FillQuantity);
                 Assert.AreEqual(0.04m, e.FillPrice);
-                Assert.AreEqual(0.06m, e.OrderFee);
+                Assert.AreEqual(24m, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Filled, e.Status);
                 raised.Set();
             };
@@ -116,7 +118,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             string brokerId = "2";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"0.000006\",\"USD\"]]";
-            unit.CachedOrderIDs.TryAdd(1, new Orders.MarketOrder { BrokerId = new List<string> { brokerId } });
+            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, scaleFactor, 300);
             ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
@@ -124,7 +126,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(300, e.FillQuantity);
                 Assert.AreEqual(0.04m, e.FillPrice);
-                Assert.AreEqual(0.00000006m, e.OrderFee);
+                Assert.AreEqual(0.000006m, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Filled, e.Status);
                 raised.Set();
             };
@@ -138,7 +140,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             string brokerId = "2";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"-0.000004\",\"<ORD_TYPE>\",\"5\",\"6\",\"USD\"]]";
-            unit.CachedOrderIDs.TryAdd(1, new Orders.LimitOrder { BrokerId = new List<string> { brokerId } });
+            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, scaleFactor, 300);
+
             ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
@@ -146,36 +149,13 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 Assert.AreEqual("BTCUSD", e.Symbol.Value);
                 Assert.AreEqual(300, e.FillQuantity);
                 Assert.AreEqual(-0.00000004m, e.FillPrice);
-                Assert.AreEqual(0.06m, e.OrderFee);
+                Assert.AreEqual(6m, e.OrderFee);
                 Assert.AreEqual(Orders.OrderStatus.Filled, e.Status);
                 raised.Set();
             };
 
             unit.OnMessage(unit, GetArgs(json));
             Assert.IsTrue(raised.WaitOne(1000));
-        }
-
-        [Test()]
-        public void OnMessageTradePartialFillTest()
-        {
-            string brokerId = "2";
-            string json = "[0,\"te\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"2\",\"4\",\"<ORD_TYPE>\",\"5\",\"0\",\"\"]]";
-            unit.CachedOrderIDs.TryAdd(1, new Orders.MarketOrder { BrokerId = new List<string> { brokerId } });
-            ManualResetEvent raised = new ManualResetEvent(false);
-
-            unit.OrderStatusChanged += (s, e) =>
-            {
-                Assert.AreEqual("BTCUSD", e.Symbol.Value);
-                Assert.AreEqual(200, e.FillQuantity);
-                Assert.AreEqual(0.04m, e.FillPrice);
-                Assert.AreEqual(0, e.OrderFee);
-                Assert.AreEqual(Orders.OrderStatus.PartiallyFilled, e.Status);
-                raised.Set();
-            };
-
-            unit.OnMessage(unit, GetArgs(json));
-            Assert.IsTrue(raised.WaitOne(1000));
-
         }
 
         [Test()]
@@ -192,7 +172,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             var actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
-            Assert.AreEqual(0.01m, actual.Price);
+            Assert.AreEqual(0.0001m, actual.Price);
 
             //should not serialize into exponent
             json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.0000001\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
@@ -201,7 +181,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
-            Assert.AreEqual(0.01m, actual.Price);
+            Assert.AreEqual(0.0001m, actual.Price);
 
             //should not fail due to parse error on superfluous field
             json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"abc\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
@@ -210,7 +190,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
-            Assert.AreEqual(0.01m, actual.Price);
+            Assert.AreEqual(0.0001m, actual.Price);
 
         }
 
@@ -228,7 +208,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             var actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
-            Assert.AreEqual(4.3272m, actual.Price);
+            Assert.AreEqual(4.32625m, actual.Price);
         }
 
         [Test()]
@@ -301,10 +281,10 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             var actual = unit.GetNextTicks();
 
             var tick = actual.Where(a => a.Symbol.Value == "ETHBTC").Single();
-            Assert.AreEqual(0.02m, tick.Price);
+            Assert.AreEqual(0.0002m, tick.Price);
 
             tick = actual.Where(a => a.Symbol.Value == "BTCUSD").Single();
-            Assert.AreEqual(0.01m, tick.Price);
+            Assert.AreEqual(0.0001m, tick.Price);
 
 
             //trigger reset event
@@ -329,10 +309,10 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             actual = unit.GetNextTicks();
 
             tick = actual.Where(a => a.Symbol.Value == "ETHBTC").Single();
-            Assert.AreEqual(0.01m, tick.Price);
+            Assert.AreEqual(0.0001m, tick.Price);
 
             tick = actual.Where(a => a.Symbol.Value == "BTCUSD").Single();
-            Assert.AreEqual(0.02m, tick.Price);
+            Assert.AreEqual(0.0002m, tick.Price);
 
             mock.Verify();
         }
@@ -342,9 +322,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             int expectedQuantity = 200;
 
-            var order = new Orders.MarketOrder { BrokerId = new List<string> { "700658426" }, Quantity = expectedQuantity };
-            unit.CachedOrderIDs.TryAdd(1, order);
-            unit.FillSplit.TryAdd(1, new BitfinexFill(order, scaleFactor));
+            BitfinexTestsHelpers.AddOrder(unit, 1, "700658426", scaleFactor, expectedQuantity);
+
             ManualResetEvent raised = new ManualResetEvent(false);
 
             decimal expectedFee = 1.72366541m;
