@@ -762,7 +762,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <returns>String URL of log</returns>
         private string ProcessLogMessages(AlgorithmNodePacket job)
         {
-            var remoteUrl = @"http://data.quantconnect.com/";
+            var remoteUrl = @"http://localhost/";
             var logLength = 0;
 
             try
