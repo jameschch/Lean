@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  * 
@@ -14,36 +14,34 @@
  *
 */
 
-using System;
-using System.Windows.Forms;
-
-namespace QuantConnect.Views.WinForms
+namespace QuantConnect.Securities
 {
     /// <summary>
-    /// Primary Form for use with LEAN:
+    /// Provides an implementation of <see cref="ISecurityInitializer"/> that executes
+    /// each initializer in order
     /// </summary>
-    public partial class LeanEngineWinForm : Form
+    public class CompositeSecurityInitializer : ISecurityInitializer
     {
+        private readonly ISecurityInitializer[] _initializers;
+
         /// <summary>
-        /// Trigger a terminate message to the Lean Engine.
+        /// Initializes a new instance of the <see cref="CompositeSecurityInitializer"/> class
         /// </summary>
-        private void OnClosed(object sender, EventArgs eventArgs)
+        /// <param name="initializers">The initializers to execute in order</param>
+        public CompositeSecurityInitializer(params ISecurityInitializer[] initializers)
         {
-            _engine.SystemHandlers.Dispose();
-            _engine.AlgorithmHandlers.Dispose();
-            Environment.Exit(0);
+            _initializers = initializers;
         }
 
         /// <summary>
-        /// Binding to the Console Key Press. In the console there's virtually nothing for user input other than the end of the backtest.
+        /// Execute each of the internally held initializers in sequence
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="keyEventArgs"></param>
-        private void ConsoleOnKeyUp(object sender, KeyEventArgs keyEventArgs)
+        /// <param name="security">The security to be initialized</param>
+        public void Initialize(Security security)
         {
-            if (!_resultsHandler.IsActive)
+            foreach (var initializer in _initializers)
             {
-                Environment.Exit(0);
+                initializer.Initialize(security);
             }
         }
     }

@@ -147,15 +147,15 @@ namespace QuantConnect.Statistics
             return new Dictionary<string, string> 
             { 
                 { "Total Trades", totalTransactions.ToString(CultureInfo.InvariantCulture) },
-                { "Average Win", Math.Round(totalPerformance.PortfolioStatistics.AverageWinRate * 100, 2) + "%"  },
-                { "Average Loss", Math.Round(totalPerformance.PortfolioStatistics.AverageLossRate * 100, 2) + "%" },
-                { "Compounding Annual Return", Math.Round(totalPerformance.PortfolioStatistics.CompoundingAnnualReturn * 100, 3) + "%" },
-                { "Drawdown", (Math.Round(totalPerformance.PortfolioStatistics.Drawdown * 100, 3)) + "%" },
+                { "Average Win", Math.Round(totalPerformance.PortfolioStatistics.AverageWinRate.SafeMultiply100(), 2) + "%"  },
+                { "Average Loss", Math.Round(totalPerformance.PortfolioStatistics.AverageLossRate.SafeMultiply100(), 2) + "%" },
+                { "Compounding Annual Return", Math.Round(totalPerformance.PortfolioStatistics.CompoundingAnnualReturn.SafeMultiply100(), 3) + "%" },
+                { "Drawdown", (Math.Round(totalPerformance.PortfolioStatistics.Drawdown.SafeMultiply100(), 3)) + "%" },
                 { "Expectancy", Math.Round(totalPerformance.PortfolioStatistics.Expectancy, 3).ToString(CultureInfo.InvariantCulture) },
-                { "Net Profit", Math.Round(totalPerformance.PortfolioStatistics.TotalNetProfit * 100, 3) + "%"},
+                { "Net Profit", Math.Round(totalPerformance.PortfolioStatistics.TotalNetProfit.SafeMultiply100(), 3) + "%"},
                 { "Sharpe Ratio", Math.Round((double)totalPerformance.PortfolioStatistics.SharpeRatio, 3).ToString(CultureInfo.InvariantCulture) },
-                { "Loss Rate", Math.Round(totalPerformance.PortfolioStatistics.LossRate * 100) + "%" },
-                { "Win Rate", Math.Round(totalPerformance.PortfolioStatistics.WinRate * 100) + "%" }, 
+                { "Loss Rate", Math.Round(totalPerformance.PortfolioStatistics.LossRate.SafeMultiply100()) + "%" },
+                { "Win Rate", Math.Round(totalPerformance.PortfolioStatistics.WinRate.SafeMultiply100()) + "%" }, 
                 { "Profit-Loss Ratio", Math.Round(totalPerformance.PortfolioStatistics.ProfitLossRatio, 2).ToString(CultureInfo.InvariantCulture) },
                 { "Alpha", Math.Round((double)totalPerformance.PortfolioStatistics.Alpha, 3).ToString(CultureInfo.InvariantCulture) },
                 { "Beta", Math.Round((double)totalPerformance.PortfolioStatistics.Beta, 3).ToString(CultureInfo.InvariantCulture) },
@@ -166,6 +166,13 @@ namespace QuantConnect.Statistics
                 { "Treynor Ratio", Math.Round((double)totalPerformance.PortfolioStatistics.TreynorRatio, 3).ToString(CultureInfo.InvariantCulture) },
                 { "Total Fees", "$" + totalFees.ToString("0.00") }
             };
+        }
+
+        private static decimal SafeMultiply100(this decimal value)
+        {
+            const decimal max = decimal.MaxValue/100m;
+            if (value >= max) return decimal.MaxValue;
+            return value*100m;
         }
 
         /// <summary>
@@ -247,20 +254,21 @@ namespace QuantConnect.Statistics
         /// <returns>The list of benchmark differences</returns>
         private static List<double> CreateBenchmarkDifferences(SortedDictionary<DateTime, decimal> benchmark, SortedDictionary<DateTime, decimal> equity)
         {
-            // to find the delta in benchmark for first day, we need to know the price at the opening
-            // moment of the day, but since we cannot find this, we cannot find the first benchmark's delta,
-            // so we pad it with Zero. If running a short backtest this will skew results, longer backtests
-            // will not be affected much
-            var listBenchmark = new List<double> { 0 };
+            // to find the delta in benchmark for first day, we need to know the price at
+            // the opening moment of the day, but since we cannot find this, we cannot find
+            // the first benchmark's delta, so we start looking for data in a inexistent day. 
+            // If running a short backtest this will skew results, longer backtests will not be affected much
+            var dtPrevious = new DateTime();
+
+            var listBenchmark = new List<double>();
 
             var minDate = equity.Keys.FirstOrDefault().AddDays(-1);
             var maxDate = equity.Keys.LastOrDefault();
 
             // Get benchmark performance array for same period:
-            var dtPrevious = new DateTime();
             benchmark.Keys.ToList().ForEach(dt =>
             {
-                if (dt >= minDate && dt < maxDate)
+                if (dt >= minDate && dt <= maxDate)
                 {
                     decimal previous;
                     if (benchmark.TryGetValue(dtPrevious, out previous) && previous != 0)

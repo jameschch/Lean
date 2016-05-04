@@ -11,28 +11,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
 */
 
-using System.Drawing;
-using System.Windows.Forms;
-
-namespace QuantConnect.Views.WinForms
+namespace QuantConnect.Logging
 {
     /// <summary>
-    /// Public extensions methods for the forms.
-    /// Credit: http://stackoverflow.com/questions/1926264/color-different-parts-of-a-richtextbox-string/1926822#1926822
+    /// Provides an implementation of <see cref="ILogHandler"/> that writes all log messages to a file on disk
+    /// without timestamps.
     /// </summary>
-    public static class RichTextBoxExtensions
+    /// <remarks>
+    /// This type is provided for convenience/setting from configuration
+    /// </remarks>
+    public class RegressionFileLogHandler : FileLogHandler
     {
-        public static void AppendText(this RichTextBox box, string text, Color color)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RegressionFileLogHandler"/> class
+        /// that will write to a 'regression.log' file in the executing directory
+        /// </summary>
+        public RegressionFileLogHandler()
+            : base("regression.log", false)
         {
-            box.SelectionStart = box.TextLength;
-            box.SelectionLength = 0;
-
-            box.SelectionColor = color;
-            box.AppendText(text);
-            box.SelectionColor = box.ForeColor;
         }
     }
 }

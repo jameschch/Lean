@@ -459,7 +459,7 @@ namespace QuantConnect.Lean.Engine.Results
 
                 //Create a result packet to send to the browser.
                 var result = new BacktestResultPacket((BacktestNodePacket) job,
-                    new BacktestResult(charts, orders, profitLoss, statisticsResults.Summary, statisticsResults.RollingPerformances)
+                    new BacktestResult(charts, orders, profitLoss, statisticsResults.Summary, statisticsResults.RollingPerformances, statisticsResults.TotalPerformance)
                     {
                         RuntimeStatistics = _runtimeStatistics
                     }, 1m)
@@ -529,22 +529,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="message">Message we'd like shown in console.</param>
         public void DebugMessage(string message) 
         {
-            if (message == _debugMessage) return;
-            if (message.Trim() == "") return;
             if (Messages.Count > 500) return;
-
-            if (_debugMessageCount++ < _debugMessageMax)
-            {
-                if (message.Length > _debugMessageLength)
-                {
-                    message = message.Substring(0, 100) + "...";
-                }
-            }
-            else
-            {
-                message = "Maximum " + _debugMessageMax + " messages of " + _debugMessageLength + " characters per " + _debugMessagePeriod + ". This is to avoid crashing your browser. If you'd like more please use Log() command instead.";
-            }
-
             Messages.Enqueue(new DebugPacket(_job.ProjectId, _backtestId, _compileId, message));
 
             //Save last message sent:
