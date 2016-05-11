@@ -88,7 +88,7 @@ namespace QuantConnect.Brokerages
             return new BitfinexSlippageModel();
         }
 
-        //todo: Implement maximum transaction size check
+        //todo: check minimum trade limits
         /// <summary>
         /// Validates pending orders based on currency pair, order amount, security type
         /// </summary>
@@ -99,15 +99,21 @@ namespace QuantConnect.Brokerages
         public override bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
             message = null;
-            string[] symbol = { "BTCUSD", "ETHUSD", "ETHBTC", "LTCUSD", "LTCBTC" };
+            Dictionary<string, int> symbol = new Dictionary<string,int> { {"BTCUSD", 2}, {"ETHUSD", 2}, {"ETHBTC", 4}, {"LTCUSD", 2}, {"LTCBTC", 4} };
+            
             var securityType = order.SecurityType;
-            if (securityType != SecurityType.Forex || !symbol.Contains(order.Symbol.ToString()))
+            if (securityType != SecurityType.Forex || !symbol.ContainsKey(order.Symbol.Value))
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported", "This trade is not supported.");
-
                 return false;
-            }          
+            }
 
+            if (NumberOfDecimals(order.Quantity) > symbol[order.Symbol.Value])
+            {
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported", string.Format("Exceeded {0} decimal places for currency pair {1}.",
+                    symbol[security.Symbol.Value].ToString(), order.Symbol.Value));
+                return false;            
+            }
 
             return true;
         }

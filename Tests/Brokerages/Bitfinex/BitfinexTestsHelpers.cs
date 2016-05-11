@@ -20,7 +20,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
         private static SubscriptionDataConfig CreateConfig()
         {
-            return new SubscriptionDataConfig(typeof(TradeBar), "BTCUSD", Resolution.Minute, TimeZones.Utc, TimeZones.Utc, false, true, false);
+            return new SubscriptionDataConfig(typeof(TradeBar), Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex), Resolution.Minute, TimeZones.Utc, TimeZones.Utc, false, true, false);
         }
 
         public static void AddOrder(BitfinexBrokerage unit, int id, string brokerId, decimal scaleFactor, int quantity)
