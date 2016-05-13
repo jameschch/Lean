@@ -159,8 +159,8 @@ namespace QuantConnect.Algorithm
         {
             return MarketOrder(symbol, quantity, asynchronous, tag);
         }
-						
-		/// <summary>
+
+        /// <summary>
         /// Market order implementation: Send a market order and wait for it to be filled.
         /// </summary>
         /// <param name="symbol">Symbol of the MarketType Required.</param>
@@ -172,7 +172,7 @@ namespace QuantConnect.Algorithm
         {
             return MarketOrder(symbol, (decimal)quantity, asynchronous, tag);
         }
-		
+
         /// <summary>
         /// Market order implementation: Send a market order and wait for it to be filled.
         /// </summary>
@@ -690,6 +690,11 @@ namespace QuantConnect.Algorithm
             SetHoldings(symbol, (decimal)percentage, liquidateExistingHoldings, tag);
         }
 
+        public void SetHoldings(Symbol symbol, decimal percentage, bool liquidateExistingHoldings = false, string tag = "")
+        {
+            SetHoldings<int>(symbol, percentage, liquidateExistingHoldings, tag);      
+        }
+
         /// <summary>
         /// Automatically place an order which will set the holdings to between 100% or -100% of *PORTFOLIO VALUE*.
         /// E.g. SetHoldings("AAPL", 0.1); SetHoldings("IBM", -0.2); -> Sets portfolio as long 10% APPL and short 20% IBM
@@ -700,7 +705,7 @@ namespace QuantConnect.Algorithm
         /// <param name="liquidateExistingHoldings">bool flag to clean all existing holdings before setting new faction.</param>
         /// <param name="tag">Tag the order with a short string.</param>
         /// <seealso cref="MarketOrder"/>
-        public void SetHoldings(Symbol symbol, decimal percentage, bool liquidateExistingHoldings = false, string tag = "")
+        public void SetHoldings<T>(Symbol symbol, decimal percentage, bool liquidateExistingHoldings = false, string tag = "")
         {
             //Initialize Requirements:
             Security security;
@@ -726,11 +731,23 @@ namespace QuantConnect.Algorithm
             }
 
             //Only place trade if we've got > 1 share to order.
-            var quantity = CalculateOrderQuantity(symbol, percentage);
+            dynamic quantity = CalculateOrderQuantity<T>(symbol, percentage);
             if (Math.Abs(quantity) > 0)
             {
                 MarketOrder(symbol, quantity, false, tag);
             }
+        }
+
+        //todo: add back in
+        /// <summary>
+        /// Calculate the order quantity to achieve target-percent holdings.
+        /// </summary>
+        /// <param name="symbol">Security object we're asking for</param>
+        /// <param name="target">Target percentag holdings</param>
+        /// <returns>Order quantity to achieve this percentage</returns>
+        public int CalculateOrderQuantity(Symbol symbol, decimal target)
+        {
+            return CalculateOrderQuantity<int>(symbol, target);
         }
 
         /// <summary>
@@ -739,9 +756,9 @@ namespace QuantConnect.Algorithm
         /// <param name="symbol">Security object we're asking for</param>
         /// <param name="target">Target percentag holdings</param>
         /// <returns>Order quantity to achieve this percentage</returns>
-        public decimal CalculateOrderQuantity(Symbol symbol, double target)
+        public int CalculateOrderQuantity(Symbol symbol, double target)
         {
-            return CalculateOrderQuantity(symbol, (decimal)target);
+            return CalculateOrderQuantity<int>(symbol, (decimal)target);
         }
 
         /// <summary>
@@ -752,16 +769,16 @@ namespace QuantConnect.Algorithm
         /// if you have 2x leverage and request 100% holdings, it will utilize half of the 
         /// available margin</param>
         /// <returns>Order quantity to achieve this percentage</returns>
-        public decimal CalculateOrderQuantity(Symbol symbol, decimal target)
+        public T CalculateOrderQuantity<T>(Symbol symbol, decimal target)
         {
             var security = Securities[symbol];
             var price = security.Price;
 
             // can't order it if we don't have data
-            if (price == 0) return 0;
+            if (price == 0) return (T)Convert.ChangeType(0, typeof(T));
 
             // if targeting zero, simply return the negative of the quantity
-            if (target == 0) return -security.Holdings.Quantity;
+            if (target == 0) return (T)Convert.ChangeType(-security.Holdings.Quantity, typeof(T));
 
             // this is the value in dollars that we want our holdings to have
             var targetPortfolioValue = target * Portfolio.TotalPortfolioValue;
@@ -777,7 +794,7 @@ namespace QuantConnect.Algorithm
 
             // calculate the total margin available
             var marginRemaining = Portfolio.GetMarginRemaining(symbol, direction);
-            if (marginRemaining <= 0) return 0;
+            if (marginRemaining <= 0) return (T)Convert.ChangeType(0, typeof(T));
 
             // continue iterating while we do not have enough margin for the order
             decimal marginRequired;
@@ -786,7 +803,10 @@ namespace QuantConnect.Algorithm
             var feeToPriceRatio = 0;
 
             // compute the initial order quantity
-            var orderQuantity = (int)(targetOrderValue / unitPrice);
+            var orderQuantity = (targetOrderValue / unitPrice);
+
+            orderQuantity = typeof(T) == typeof(int) ? Math.Floor(orderQuantity) : orderQuantity;
+
             var iterations = 0;
 
             do
@@ -814,8 +834,14 @@ namespace QuantConnect.Algorithm
 
             } while (orderQuantity > 0 && (marginRequired > marginRemaining || orderValue + orderFees > targetOrderValue));
 
+
+            //floor when not returning decimal
+            orderQuantity = typeof(T) == typeof(int) ? Math.Floor(orderQuantity): orderQuantity;
+
             // add directionality back in
-            return (direction == OrderDirection.Sell ? -1 : 1) * orderQuantity;
+            orderQuantity = (direction == OrderDirection.Sell ? -1 : 1) * orderQuantity;
+
+            return (T)Convert.ChangeType(orderQuantity, typeof(T));
         }
 
         /// <summary>
