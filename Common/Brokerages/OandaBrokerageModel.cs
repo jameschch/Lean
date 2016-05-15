@@ -94,6 +94,11 @@ namespace QuantConnect.Brokerages
                 return false;
             }
 
+            if (!ValidateQuantityFloored(order.Quantity, out message))
+            {
+                return false;
+            }
+
             return true;
         }
 

@@ -49,7 +49,13 @@ namespace QuantConnect.Brokerages
         /// <returns>True if the brokerage could process the order, false otherwise</returns>
         public override bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
+
             message = null;
+
+            if (!ValidateQuantityFloored(order.Quantity, out message))
+            {
+                return false;
+            }
 
             //https://www.interactivebrokers.com/en/?f=%2Fen%2Ftrading%2FforexOrderSize.php
             switch (order.SecurityType)

@@ -85,6 +85,12 @@ namespace QuantConnect.Brokerages
         public virtual bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
             message = null;
+
+            if (!ValidateQuantityFloored(order.Quantity, out message))
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -234,6 +240,23 @@ namespace QuantConnect.Brokerages
                 return new DelayedSettlementModel(Equity.DefaultSettlementDays, Equity.DefaultSettlementTime);
             
             return new ImmediateSettlementModel();
+        }
+
+        protected bool ValidateQuantityFloored(decimal quantity, out BrokerageMessageEvent message)
+        {
+            message = null;
+
+            // validate quantity floored
+            if (quantity != Math.Floor(quantity))
+            {
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                    "The order quantity must not be fractional."
+                    );
+
+                return false;
+            }
+
+            return true;
         }
 
     }

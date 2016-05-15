@@ -74,6 +74,11 @@ namespace QuantConnect.Brokerages
                     );
             }
 
+            if (!ValidateQuantityFloored(order.Quantity, out message))
+            {
+                return false;
+            }
+
             // tradier order limits
             return true;
         }
