@@ -33,9 +33,21 @@ namespace QuantConnect.Algorithm.CSharp
     {
 
         const string btcusd = "BTCUSD";
-
+        protected virtual decimal StopLoss { get { return 0.1m; } }
+        protected virtual decimal TakeProfit { get { return 0.1m; } }
         protected string BTCUSD { get { return btcusd; } }
 
+        public enum StopLossStrategy
+        {
+            UnrealizedProfit,
+            TotalPortfolioValue
+        }
+
+        public enum TakeProfitStrategy
+        {
+            UnrealizedProfit,
+            TotalPortfolioValue
+        }
 
         /// <summary>
         /// Constructor sets up some custom providers and handlers for Bitfinex
@@ -53,8 +65,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2015, 11, 10);
-            SetEndDate(2016, 2, 20);
+            SetStartDate(2016, 2, 2);
+            SetEndDate(2016, 5, 5);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
             SetBenchmark(security.Symbol);
@@ -104,6 +116,52 @@ namespace QuantConnect.Algorithm.CSharp
                 Liquidate();
             }
             SetHoldings(BTCUSD, -3.0m);
+        }
+
+        protected void TryStopLoss(string symbol = btcusd, StopLossStrategy strategy = StopLossStrategy.TotalPortfolioValue)
+        {
+            if (Portfolio[symbol].Invested)
+            {
+                if (strategy == StopLossStrategy.TotalPortfolioValue)
+                {
+                    if (Portfolio[BTCUSD].TotalCloseProfit() / Portfolio.TotalPortfolioValue < -StopLoss)
+                    {
+                        Liquidate();
+                        Output("stop");
+                    }
+                }
+                else if (strategy == StopLossStrategy.UnrealizedProfit)
+                {
+                    if (Portfolio[symbol].UnrealizedProfitPercent < -StopLoss)
+                    {
+                        Liquidate();
+                        Output("stop");
+                    }
+                }
+            }
+        }
+
+        protected void TryTakeProfit(string symbol = btcusd, TakeProfitStrategy strategy = TakeProfitStrategy.TotalPortfolioValue)
+        {
+            if (Portfolio[symbol].Invested)
+            {
+                if (strategy == TakeProfitStrategy.TotalPortfolioValue)
+                {
+                    if (Portfolio[BTCUSD].TotalCloseProfit() / Portfolio.TotalPortfolioValue > TakeProfit)
+                    {
+                        Liquidate();
+                        Output("take");
+                    }
+                }
+                else if (strategy == TakeProfitStrategy.UnrealizedProfit)
+                {
+                    if (Portfolio[symbol].UnrealizedProfitPercent > TakeProfit)
+                    {
+                        Liquidate();
+                        Output("take");
+                    }
+                }
+            }
         }
 
     }
