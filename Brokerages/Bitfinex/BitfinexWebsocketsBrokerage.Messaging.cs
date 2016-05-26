@@ -139,7 +139,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     AskSize = (long)Math.Round(msg.ASK_SIZE * ScaleFactor, 0),
                     BidSize = (long)Math.Round(msg.BID_SIZE * ScaleFactor, 0),
                     Time = DateTime.UtcNow,
-                    Value = (msg.ASK - ((msg.ASK - msg.BID) / 2m)) / ScaleFactor,
+                    Value = ((msg.ASK + msg.BID) / 2m) / ScaleFactor,
                     TickType = TickType.Quote,
                     Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick
