@@ -15,6 +15,7 @@
 using NodaTime;
 using QuantConnect.Brokerages;
 using QuantConnect.Data.Market;
+using QuantConnect.Indicators;
 using QuantConnect.Securities;
 using System;
 using System.Collections.Generic;
@@ -35,18 +36,21 @@ namespace QuantConnect.Algorithm.CSharp
         const string btcusd = "BTCUSD";
         protected virtual decimal StopLoss { get { return 0.1m; } }
         protected virtual decimal TakeProfit { get { return 0.1m; } }
+        protected virtual decimal AtrScale { get { return 2m; } }
         protected string BTCUSD { get { return btcusd; } }
 
         public enum StopLossStrategy
         {
             UnrealizedProfit,
-            TotalPortfolioValue
+            TotalPortfolioValue,
+            AverageTrueRange
         }
 
         public enum TakeProfitStrategy
         {
             UnrealizedProfit,
-            TotalPortfolioValue
+            TotalPortfolioValue,
+            AverageTrueRange
         }
 
         /// <summary>
@@ -65,12 +69,11 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2016, 2, 2);
+            SetStartDate(2016, 1, 2);
             SetEndDate(2016, 5, 5);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
             SetBenchmark(security.Symbol);
-
         }
 
         public void OnData(Ticks data)
@@ -88,7 +91,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         protected virtual void Output(string title)
         {
-            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Portfolio[BTCUSD].LastTradeProfit
+            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Math.Round(Portfolio[BTCUSD].LastTradeProfit, 2)
                 + " Total:" + Portfolio.TotalPortfolioValue);
         }
 
@@ -118,7 +121,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetHoldings(BTCUSD, -3.0m);
         }
 
-        protected void TryStopLoss(string symbol = btcusd, StopLossStrategy strategy = StopLossStrategy.TotalPortfolioValue)
+        protected void TryStopLoss(string symbol = btcusd, StopLossStrategy strategy = StopLossStrategy.TotalPortfolioValue, AverageTrueRange atr = null)
         {
             if (Portfolio[symbol].Invested)
             {
@@ -138,10 +141,19 @@ namespace QuantConnect.Algorithm.CSharp
                         Output("stop");
                     }
                 }
+                else if (strategy == StopLossStrategy.AverageTrueRange)
+                {
+                    decimal atrLimit = Portfolio[BTCUSD].AbsoluteHoldingsCost * atr * AtrScale;
+                    if (Portfolio.TotalUnrealisedProfit < -atrLimit)
+                    {
+                        Liquidate();
+                        Output("stop");
+                    }
+                }
             }
         }
 
-        protected void TryTakeProfit(string symbol = btcusd, TakeProfitStrategy strategy = TakeProfitStrategy.TotalPortfolioValue)
+        protected void TryTakeProfit(string symbol = btcusd, TakeProfitStrategy strategy = TakeProfitStrategy.TotalPortfolioValue, AverageTrueRange atr = null)
         {
             if (Portfolio[symbol].Invested)
             {
@@ -156,6 +168,15 @@ namespace QuantConnect.Algorithm.CSharp
                 else if (strategy == TakeProfitStrategy.UnrealizedProfit)
                 {
                     if (Portfolio[symbol].UnrealizedProfitPercent > TakeProfit)
+                    {
+                        Liquidate();
+                        Output("take");
+                    }
+                }
+                else if (strategy == TakeProfitStrategy.AverageTrueRange)
+                {
+                    decimal atrLimit = Portfolio[BTCUSD].AbsoluteHoldingsCost * atr * AtrScale;
+                    if (Portfolio.TotalUnrealisedProfit > atrLimit)
                     {
                         Liquidate();
                         Output("take");
