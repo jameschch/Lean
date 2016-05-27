@@ -55,6 +55,10 @@ namespace QuantConnect.Indicators
         /// <summary>
         /// The Kaufman Adaptive Moving Average
         /// </summary>
-        Kama
+        Kama,
+        /// <summary>
+        /// The Fractal Adaptive Moving Average
+        /// </summary>
+        Frama
     }
 }

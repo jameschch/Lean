@@ -60,6 +60,9 @@ namespace QuantConnect.Indicators
                 case MovingAverageType.Kama:
                     return new KaufmanAdaptiveMovingAverage(period);
 
+                case MovingAverageType.Frama:
+                    return new FractalAdaptiveMovingAverage(period);
+
                 default:
                     throw new ArgumentOutOfRangeException("movingAverageType");
             }
@@ -103,6 +106,9 @@ namespace QuantConnect.Indicators
 
                 case MovingAverageType.Kama:
                     return new KaufmanAdaptiveMovingAverage(name, period);
+
+                case MovingAverageType.Frama:
+                    return new FractalAdaptiveMovingAverage(name, period, 198);
 
                 default:
                     throw new ArgumentOutOfRangeException("movingAverageType");
