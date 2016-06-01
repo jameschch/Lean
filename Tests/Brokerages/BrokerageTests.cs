@@ -401,7 +401,7 @@ namespace QuantConnect.Tests.Brokerages
             bool orderFilled = false;
             var manualResetEvent = new ManualResetEvent(false);
 
-            var qty = 1000000;
+            var qty = 1000000m;
             var remaining = qty;
             var sync = new object();
             Brokerage.OrderStatusChanged += (sender, orderEvent) =>

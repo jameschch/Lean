@@ -120,6 +120,14 @@ namespace QuantConnect.Brokerages
         /// <param name="accountType">The account type</param>
         /// <returns>The settlement model for this brokerage</returns>
         ISettlementModel GetSettlementModel(Security security, AccountType accountType);
+
+        /// <summary>
+        /// Modify the order quantity to conform to minimum lot size
+        /// </summary>
+        /// <param name="security">The security to truncate</param>
+        /// <param name="quantity">The order quantity</param>
+        /// <returns>The modified quantity</returns>
+        decimal TruncateQuantity(Security security, decimal quantity);
     }
 
     /// <summary>

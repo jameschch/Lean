@@ -158,7 +158,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         private bool PlaceOrder(Orders.Order order, Orders.Order crossOrder = null)
         {
 
-            int totalQuantity = order.Quantity + (crossOrder != null ? crossOrder.Quantity : 0);
+            decimal totalQuantity = order.Quantity + (crossOrder != null ? crossOrder.Quantity : 0);
 
             var newOrder = new BitfinexNewOrderPost
             {

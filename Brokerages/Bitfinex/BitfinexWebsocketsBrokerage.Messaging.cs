@@ -124,7 +124,6 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
 
-        //todo: volume returned is the 24hour trading volume, not value of last trade
         private void PopulateTicker(string response, string symbol)
         {
 

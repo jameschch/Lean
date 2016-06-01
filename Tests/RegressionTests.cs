@@ -260,6 +260,29 @@ namespace QuantConnect.Tests
                 {"Total Fees", "$3.09"},
             };
 
+            var fractionalQuantityRegressionStatistics = new Dictionary<string, string>
+            {
+                {"Total Trades", "6"},
+                {"Average Win", "2.57%"},
+                {"Average Loss", "-0.01%"},
+                {"Compounding Annual Return", "900.493%"},
+                {"Drawdown", "3.300%"},
+                {"Expectancy", "86.582"},
+                {"Net Profit", "2.556%"},
+                {"Sharpe Ratio", "3.003"},
+                {"Loss Rate", "67%"},
+                {"Win Rate", "33%"},
+                {"Profit-Loss Ratio", "261.75"},
+                {"Alpha", "-0.014"},
+                {"Beta", "0.996"},
+                {"Annual Standard Deviation", "0.452"},
+                {"Annual Variance", "0.204"},
+                {"Information Ratio", "-10.05"},
+                {"Tracking Error", "0.002"},
+                {"Treynor Ratio", "1.361"},
+                {"Total Fees", "$22.33"},
+            };
+
             return new List<AlgorithmStatisticsTestParameters>
             {
                 // CSharp
@@ -273,6 +296,7 @@ namespace QuantConnect.Tests
                 new AlgorithmStatisticsTestParameters("RegressionAlgorithm", regressionStatistics, Language.CSharp),
                 new AlgorithmStatisticsTestParameters("UniverseSelectionRegressionAlgorithm", universeSelectionRegressionStatistics, Language.CSharp),
                 new AlgorithmStatisticsTestParameters("UpdateOrderRegressionAlgorithm", updateOrderRegressionStatistics, Language.CSharp),
+                new AlgorithmStatisticsTestParameters("FractionalQuantityRegressionAlgorithm", fractionalQuantityRegressionStatistics, Language.CSharp),
 
                 // FSharp
                 new AlgorithmStatisticsTestParameters("BasicTemplateAlgorithm", basicTemplateStatistics, Language.FSharp),

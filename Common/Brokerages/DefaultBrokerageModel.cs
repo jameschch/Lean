@@ -85,6 +85,12 @@ namespace QuantConnect.Brokerages
         public virtual bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
             message = null;
+
+            if (!ValidateQuantity(order.Quantity, security, out message))
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -234,6 +240,78 @@ namespace QuantConnect.Brokerages
                 return new DelayedSettlementModel(Equity.DefaultSettlementDays, Equity.DefaultSettlementTime);
             
             return new ImmediateSettlementModel();
+        }
+
+        /// <summary>
+        /// Ensure the order quantity is not fractional
+        /// </summary>
+        /// <param name="quantity">The order quantity</param>
+        /// <param name="message">The error message returned</param>
+        /// <returns>Returns true is order quantity is valid</returns>
+        protected bool ValidateQuantity(decimal quantity, Security security, out BrokerageMessageEvent message)
+        {
+            message = null;
+
+            //reject fractional if not supported.
+            if (Math.Abs(security.SymbolProperties.LotSize % 1) == 0)
+            {
+                if (Math.Abs(quantity % 1) > 0)
+                {
+                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                        "The order quantity must not be fractional."
+                        );
+
+                    return false;
+                }
+            }
+            else
+            {
+                if (Math.Abs(quantity) < security.SymbolProperties.LotSize)
+                {
+                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                       string.Format("The minimum order quantity must be greater than {0}.", security.SymbolProperties.LotSize.ToString())
+                       );
+
+                    return false;
+                }
+                else if (GetDecimalPlaces(quantity) > GetDecimalPlaces(security.SymbolProperties.LotSize))
+                {
+                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                       string.Format("The maximum decimal places of order quantity cannot be be greater than {0}.", GetDecimalPlaces(security.SymbolProperties.LotSize).ToString())
+                       );
+
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Modify the order quantity to conform to minimum lot size
+        /// </summary>
+        /// <param name="security">The security to truncate</param>
+        /// <param name="quantity">The order quantity</param>
+        /// <returns>The modified quantity</returns>
+        public virtual decimal TruncateQuantity(Security security, decimal quantity)
+        {
+            if (Math.Abs(security.SymbolProperties.LotSize % 1) != 0)
+            {
+                decimal places = (decimal)Math.Pow(10, (double)GetDecimalPlaces(security.SymbolProperties.LotSize));
+                decimal truncated = Math.Truncate(quantity);
+                var decimals = (quantity - truncated) * places;
+                decimals = Math.Truncate(decimals) / places;
+                truncated += decimals;
+                return truncated;
+            }
+    
+            return Math.Truncate(quantity);
+
+        }
+
+        private int GetDecimalPlaces(decimal quantity)
+        {
+            return BitConverter.GetBytes(decimal.GetBits(quantity)[3])[2];
         }
 
     }

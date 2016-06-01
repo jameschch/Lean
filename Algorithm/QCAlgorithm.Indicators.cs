@@ -1013,6 +1013,43 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Creates an FractalAdaptiveMovingAverage (FRAMA) indicator for the symbol. The indicator will be automatically
+        /// updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol whose FRAMA we want</param>
+        /// <param name="period">The period of the FRAMA</param>
+        /// <param name="longPeriod">The long period of the FRAMA</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The FRAMA for the given parameters</returns>
+        public FractalAdaptiveMovingAverage FRAMA(Symbol symbol, int period, int longPeriod = 198, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, "FRAMA" + period, resolution);
+            var frama = new FractalAdaptiveMovingAverage(name, period, longPeriod);
+            RegisterIndicator(symbol, frama, resolution, selector);
+            return frama;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="symbol"></param>
+        /// <param name="period"></param>
+        /// <param name="n"></param>
+        /// <param name="delta"></param>
+        /// <param name="tool"></param>
+        /// <param name="resolution"></param>
+        /// <param name="selector"></param>
+        /// <returns></returns>
+        public SwissArmyKnife SWISS(Symbol symbol, int period, int n, double delta, SwissArmyKnifeTool tool, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
+        {
+            string name = CreateIndicatorName(symbol, "SWISS" + period, resolution);
+            var swiss = new SwissArmyKnife(name, period, n, delta, tool);
+            RegisterIndicator(symbol, swiss, resolution, selector);
+            return swiss;
+        }
+
+        /// <summary>
         /// Creates and registers a new consolidator to receive automatic updates at the specified resolution as well as configures
         /// the indicator to receive updates from the consolidator.
         /// </summary>

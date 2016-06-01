@@ -101,6 +101,7 @@
     <Compile Include="Brokerages\Bitfinex\BitfinexTestsHelpers.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexWebsocketsBrokerageTests.cs" />
     <Compile Include="Brokerages\BrokerageTests.cs" />
+    <Compile Include="Brokerages\DefaultBrokerageModelTests.cs" />
     <Compile Include="Brokerages\Fxcm\FxcmBrokerageDataQueueHandlerTests.cs" />
     <Compile Include="Brokerages\Fxcm\FxcmBrokerageTests.cs" />
     <Compile Include="Brokerages\Fxcm\FxcmLimitOrderTestParameters.cs" />
@@ -208,6 +209,7 @@
     <Compile Include="Indicators\AccumulationDistributionOscillatorTests.cs" />
     <Compile Include="Indicators\AccumulationDistributionTests.cs" />
     <Compile Include="Indicators\AverageDirectionalIndexTests.cs" />
+    <Compile Include="Indicators\SwissArmyKnifeTests.cs" />
     <Compile Include="Indicators\FractalAdaptiveMovingAverageTests.cs" />
     <Compile Include="Indicators\KaufmanAdaptiveMovingAverageTests.cs" />
     <Compile Include="Indicators\AverageDirectionalMovementIndexRatingTests.cs" />

@@ -28,8 +28,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         [SetUp()]
         public void Setup()
         {
-            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, 100m, securities.Object);
             scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
+            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, scaleFactor, securities.Object);
         }
 
         [Test()]

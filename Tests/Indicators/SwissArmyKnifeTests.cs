@@ -1,4 +1,4 @@
-﻿﻿/*
+﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  * 
@@ -15,24 +15,36 @@
 
 using System;
 using NUnit.Framework;
-using QuantConnect.Data;
-using QuantConnect.Data.Market;
-using QuantConnect.Securities;
+using QuantConnect.Indicators;
 
-namespace QuantConnect.Tests.Common.Securities.Cfd
+namespace QuantConnect.Tests.Indicators
 {
     [TestFixture]
-    public class CfdTests
+    public class SwissArmyKnifeTests
     {
+
         [Test]
-        public void ConstructorExtractsQuoteCurrency()
+        public void ResetsProperly()
         {
-            var symbol = Symbol.Create("DE30EUR", SecurityType.Cfd, Market.Oanda);
-            var config = new SubscriptionDataConfig(typeof(TradeBar), symbol, Resolution.Minute, TimeZones.Utc, TimeZones.NewYork, true, true, true);
-            var symbolProperties = new SymbolProperties("Dax German index", "EUR", 1, 1, 1);
-            var cfd = new QuantConnect.Securities.Cfd.Cfd(SecurityExchangeHours.AlwaysOpen(config.DataTimeZone), new Cash("EUR", 0, 0), config, symbolProperties);
-            Assert.AreEqual("EUR", cfd.QuoteCurrency.Symbol);
+            var sak = new SwissArmyKnife(4, 4, 0.1, SwissArmyKnifeTool.EMA);
+
+            foreach (var data in TestHelper.GetDataStream(5))
+            {
+                sak.Update(data);
+            }
+            Assert.IsTrue(sak.IsReady);
+            Assert.AreNotEqual(0m, sak.Current.Value);
+            Assert.AreNotEqual(0, sak.Samples);
+
+            sak.Reset();
+
+            TestHelper.AssertIndicatorIsInDefaultState(sak);
         }
 
+        [Test]
+        public void ComparesAgainstExternalData()
+        {
+            //todo: external data tests
+        }
     }
 }

@@ -47,13 +47,13 @@ namespace QuantConnect.Tests.Common.Orders.Fees
 
             //hack: no parameterless constructors
             sub = (SubscriptionDataConfig)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(SubscriptionDataConfig));
-            security = new Mock<Security>(SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc), sub, new Cash("USD",1,1), new SymbolProperties("","USD",1,1));
+            security = new Mock<Security>(SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc), sub, new Cash("USD", 1, 1), new SymbolProperties("", "USD", 1, 1, 1));
             security.Setup(s => s.Price).Returns(price);
         }
 
         [Test()]
         public void GetTakerOrderFeeTest()
-        {          
+        {
             var order = new Mock<MarketOrder>();
             order.Setup(o => o.Type).Returns(OrderType.Market);
             order.Object.Quantity = 10;

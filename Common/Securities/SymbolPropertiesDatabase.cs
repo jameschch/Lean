@@ -129,7 +129,9 @@ namespace QuantConnect.Securities
                 description: csv[3], 
                 quoteCurrency: csv[4],
                 contractMultiplier: csv[5].ToDecimal(), 
-                pipSize: csv[6].ToDecimal());
+                pipSize: csv[6].ToDecimal(),
+                lotSize: csv.Count() == 8 ? csv[7].ToDecimal() : 1
+                );
         }
 
 

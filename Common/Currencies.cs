@@ -257,7 +257,8 @@ namespace QuantConnect
             {"TWD", "NT$"},
             {"ZAR", "R"},
             {"BTC", "Ƀ"},
-            { "ETH", "ETH"}
+            {"ETH", "ETH"},
+            {"LTC", "LTC"}		
         };
     }
 }
