@@ -9,7 +9,7 @@
     "environment": "backtesting",
 
     // algorithm class selector
-    "algorithm-type-name": "BitcoinRsiAlgorithm",
+    "algorithm-type-name": "Blackfish",
 
     // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
     "algorithm-language": "CSharp",
@@ -22,7 +22,8 @@
     //"algorithm-location": "QuantConnect.Algorithm.Java.dll",
 
     // engine
-    "data-folder": "../../../Data/",
+    "data-folder": "../../../../Data_Decimal/",
+    "data-directory": "../../../../Data_Decimal/",   
 
     // handlers
     "log-handler": "QuantConnect.Logging.CompositeLogHandler",
@@ -84,7 +85,7 @@
     "bitfinex-api-secret": "",
     "bitfinex-api-key": "",
     "bitfinex-wss":  "wss://api2.bitfinex.com:3000/ws",
-    "bitfinex-scale-factor":  "100",
+    "bitfinex-scale-factor":  "1",
 
     "environments": {
 

@@ -38,6 +38,7 @@ namespace QuantConnect.Algorithm.CSharp
         protected virtual decimal TakeProfit { get { return 0.1m; } }
         protected virtual decimal AtrScale { get { return 2m; } }
         protected string BTCUSD { get { return btcusd; } }
+        RollingWindow<decimal> unrealizedProfit = new RollingWindow<decimal>(2);
 
         public enum StopLossStrategy
         {
@@ -50,7 +51,8 @@ namespace QuantConnect.Algorithm.CSharp
         {
             UnrealizedProfit,
             TotalPortfolioValue,
-            AverageTrueRange
+            AverageTrueRange,
+            UntilReversal
         }
 
         /// <summary>
@@ -58,19 +60,18 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public BaseBitcoin()
         {
-            //This is needed for margin call warning behaviour
-            Portfolio = new BitfinexSecurityPortfolioManager(Securities, Transactions);
             //Non default brokerage for Forex. Cash or Margin accounts are supported
             SetBrokerageModel(BrokerageName.BitfinexBrokerage, AccountType.Margin);
             SetTimeZone(DateTimeZone.Utc);
             //Can be slow to fill. 20 second timeout should be adequate in most conditions
             Transactions.MarketOrderFillTimeout = new TimeSpan(0, 0, 20);
+            Portfolio.MarginCallModel = new BitfinexMarginCallModel(Portfolio);
         }
 
         public override void Initialize()
         {
-            SetStartDate(2016, 1, 2);
-            SetEndDate(2016, 5, 5);
+            SetStartDate(2016, 2, 1);
+            SetEndDate(2016, 5, 1);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
             SetBenchmark(security.Symbol);
@@ -177,6 +178,15 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     decimal atrLimit = Portfolio[BTCUSD].AbsoluteHoldingsCost * atr * AtrScale;
                     if (Portfolio.TotalUnrealisedProfit > atrLimit)
+                    {
+                        Liquidate();
+                        Output("take");
+                    }
+                }
+                else if (strategy == TakeProfitStrategy.UntilReversal)
+                {
+                    unrealizedProfit.Add(Math.Round(Portfolio[symbol].UnrealizedProfitPercent, 1));
+                    if (unrealizedProfit[0] > 0 && unrealizedProfit.IsReady && unrealizedProfit[0] < unrealizedProfit[1])
                     {
                         Liquidate();
                         Output("take");
