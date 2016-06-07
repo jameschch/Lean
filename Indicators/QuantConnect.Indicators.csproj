@@ -119,6 +119,7 @@
     <Compile Include="ChandeMomentumOscillator.cs" />
     <Compile Include="DonchianChannel.cs" />
     <Compile Include="DoubleExponentialMovingAverage.cs" />
+    <Compile Include="EmpiricalModeDecomposition.cs" />
     <Compile Include="FractalAdaptiveMovingAverage.cs" />
     <Compile Include="SwissArmyKnife.cs" />
     <Compile Include="VolumeWeightedAveragePriceIndicator.cs" />
