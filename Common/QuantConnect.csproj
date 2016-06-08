@@ -120,6 +120,7 @@
     <Compile Include="Benchmarks\FuncBenchmark.cs" />
     <Compile Include="Benchmarks\IBenchmark.cs" />
     <Compile Include="Benchmarks\SecurityBenchmark.cs" />
+    <Compile Include="Brokerages\OKCoinBrokerageModel.cs" />
     <Compile Include="Brokerages\BrokerageName.cs" />
     <Compile Include="Brokerages\BitfinexBrokerageModel.cs" />
     <Compile Include="Brokerages\DefaultBrokerageModel.cs" />

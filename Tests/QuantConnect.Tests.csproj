@@ -247,6 +247,7 @@
     <Compile Include="Indicators\RateOfChangePercentTests.cs" />
     <Compile Include="Indicators\RateOfChangeTests.cs" />
     <Compile Include="Indicators\StochasticTests.cs" />
+    <Compile Include="Brokerages\OKCoin\OKCoinWebsocketsBrokerageTests.cs" />
     <Compile Include="Queues\FileCommandQueueHandlerTests.cs" />
     <Compile Include="RegressionTests.cs" />
     <Compile Include="Symbols.cs" />
@@ -341,6 +342,7 @@
     <Folder Include="Adapters\" />
     <Folder Include="API\" />
     <Folder Include="Messaging\" />
+    <Folder Include="OKCoin\" />
     <Folder Include="Tasks\" />
     <Folder Include="UserInterface\" />
   </ItemGroup>
