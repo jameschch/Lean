@@ -44,10 +44,6 @@ namespace QuantConnect.Indicators
         /// BandPass Filter
         /// </summary>
         BandPass,
-        /// <summary>
-        /// BandStop Filter
-        /// </summary>
-        BandStop
     }
 
     /// <summary>
@@ -68,7 +64,7 @@ namespace QuantConnect.Indicators
         double _b2 = 0;
         double _a0 = 1;
         double _a1 = 0;
-        double _a2 = 0; double alpha; double beta;
+        double _a2 = 0;
 
         /// <summary>
         /// Swiss Army Knife indicator by John Ehlers
@@ -95,10 +91,9 @@ namespace QuantConnect.Indicators
             _tool = tool;
             _delta = delta;
             _filt = new RollingWindow<double>(2) { 0.0, 0.0 };
-            _price = new RollingWindow<double>(9) { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-
-            
-            
+            _price = new RollingWindow<double>(3);
+            double alpha;
+            double beta;
             double gamma;
 
             if (_tool == SwissArmyKnifeTool.Gauss)
@@ -124,7 +119,7 @@ namespace QuantConnect.Indicators
             if (_tool == SwissArmyKnifeTool.HighPass)
             {
                 alpha = (Math.Cos(2 * Math.PI / _period) + Math.Sin(2 * Math.PI / _period) - 1) / Math.Cos(2 * Math.PI / _period);
-                _c0 = 1 + alpha / 2;
+                _c0 = (1 + alpha) / 2;
                 _b1 = -1;
                 _a1 = 1 - alpha;
             }
@@ -133,7 +128,7 @@ namespace QuantConnect.Indicators
             {
                 beta = 2.415 * (1 - Math.Cos(2 * Math.PI / _period));
                 alpha = -beta + Math.Sqrt(Math.Pow(beta, 2) + 2d * beta);
-                _c0 = (1 + alpha / 2) * (1 + alpha / 2);
+                _c0 = (1 + alpha) * (1 + alpha) / 4;
                 _b1 = -2;
                 _b2 = 1;
                 _a1 = 2d * (1 - alpha);
@@ -146,24 +141,12 @@ namespace QuantConnect.Indicators
                 gamma = (1 / Math.Cos(4 * Math.PI * _delta / _period));
                 alpha = gamma - Math.Sqrt(Math.Pow(gamma, 2) - 1);
                 _c0 = (1 - alpha) / 2d;
-                _b0 = 1d;
-                _b2 = -1d;
+                _b0 = 1;
+                _b2 = -1;
                 _a1 = -beta * (1 - alpha);
-                //a1 = beta*(1 + alpha); 
                 _a2 = alpha;
             }
 
-            if (_tool == SwissArmyKnifeTool.BandStop)
-            {
-                beta = Math.Cos(2 * Math.PI / _period);
-                gamma = 1d / Math.Cos(4 * Math.PI * _delta / _period);
-                alpha = gamma - Math.Sqrt(Math.Pow(gamma, 2) - 1);
-                _c0 = (1 + alpha) / 2d;
-                _b1 = -2d * beta;
-                _b2 = 1;
-                _a1 = beta * (1 + alpha);
-                _a2 = -alpha;
-            }
         }
 
 
@@ -172,7 +155,7 @@ namespace QuantConnect.Indicators
         /// </summary>
         public override bool IsReady
         {
-            get { return Samples*2 >= _period; }
+            get { return Samples >= _period; }
         }
 
         /// <summary>
@@ -181,18 +164,17 @@ namespace QuantConnect.Indicators
         /// <param name="input">The input given to the indicator</param>
         /// <returns>A new value for this indicator</returns>
         protected override decimal ComputeNextValue(IndicatorDataPoint input)
-        {      
+        {
 
-            _price.Add((double)input.Price);          
+            _price.Add((double)input.Price);
 
-            if (IsReady)
+            if (_price.Samples == 1)
             {
-                System.Diagnostics.Debugger.Break();
+                _price.Add(_price[0]);
+                _price.Add(_price[0]);           
             }
 
-            //Math.Round(c0, 2) * (1.0d * 124.265d + 0.0 * 124.515d + -1.0d * 125.01d) + Math.Round(a1, 2) * -0.02 + a2 * 0.06;
-            //double signal = a0 * c0 * (b0 * _price[0] + b1 * _price[1] + b2 * _price[2]) + a0 * (a1 * _filt[0] + a2 * _filt[1]) - c1 * _price[7];
-            double signal = Math.Round(Math.Round(_c0,2) * (_b0 * _price[0] + _b1 * _price[1] + _b2 * _price[2]) + Math.Round(_a1,2) * _filt[0] + Math.Round(_a2,2) * _filt[1] - _c1 * _price[0], 2);
+            double signal = _a0 * _c0 * (_b0 * _price[0] + _b1 * _price[1] + _b2 * _price[2]) + _a0 * (_a1 * _filt[0] + _a2 * _filt[1]);
 
             _filt.Add(signal);
 
@@ -206,8 +188,8 @@ namespace QuantConnect.Indicators
         {
             _period = 20;
             _delta = 0.1;
-            _filt = new RollingWindow<double>(4);
-            _price = new RollingWindow<double>(4);
+            _filt = new RollingWindow<double>(2) { 0.0, 0.0 };
+            _price = new RollingWindow<double>(3);
             base.Reset();
         }
 

@@ -10,7 +10,7 @@ namespace QuantConnect.Indicators
 {
     
     /// <summary>
-    /// The Empirical Mode Decomposition by John Ehlers utilizies a BandPass filter to determine if the market is cyclical (1) or trending (-1).
+    /// The Empirical Mode Decomposition by John Ehlers utilizies a BandPass filter to determine if the market ove a given period is cyclical (1) or trending (-1).
     /// </summary>
     public class EmpiricalModeDecomposition : Indicator
     {
@@ -86,7 +86,7 @@ namespace QuantConnect.Indicators
         /// Computes the next value of this indicator from the given state
         /// </summary>
         /// <param name="input">The input given to the indicator</param>
-        /// <returns>A positive integer if market is cyclical. A negative integer indicates trending</returns>
+        /// <returns>A positive value if market is cyclical. A negative value indicates trending</returns>
         protected override decimal ComputeNextValue(IndicatorDataPoint input)
         {
             _price.Add((double)input.Price);
@@ -135,6 +135,9 @@ namespace QuantConnect.Indicators
             return _bandPassSma > lowerBand && _bandPassSma < upperBand ? 1 : -1;
         }
 
+        /// <summary>
+        /// Resets the indicator to initial state
+        /// </summary>
         public override void Reset()
         {
             _price.Reset();
