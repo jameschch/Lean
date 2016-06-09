@@ -46,12 +46,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         void Connect();
 
         /// <summary>
-        /// Wraps message event handler setter
-        /// </summary>
-        /// <param name="handler"></param>
-        void OnMessage(EventHandler<WebSocketSharp.MessageEventArgs> handler);
-
-        /// <summary>
         /// Wraps Close method
         /// </summary>
         void Close();
@@ -60,6 +54,13 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Wraps IsAlive
         /// </summary>
         bool IsAlive { get; }
+
+        /// <summary>
+        /// Wraps Url
+        /// </summary>
+        Uri Url { get; }
+
+        event EventHandler<MessageEventArgs> OnMessage;
 
     }
 }

@@ -11,12 +11,12 @@ namespace QuantConnect.Brokerages.OKCoin
     public class MD5Util
     {
 
-        public static string BuildSign(Dictionary<string, string> sArray, string secretKey)
+        public static string BuildSign(Dictionary<string, string> data, string secretKey)
         {
             string mysign = "";
             try
             {
-                string prestr = MD5Util.CreateLinkstring(sArray);
+                string prestr = MD5Util.CreateLinkstring(data);
                 prestr = (prestr + ("&secret_key=" + secretKey));
 
                 mysign = GetMD5string(prestr);
@@ -29,9 +29,9 @@ namespace QuantConnect.Brokerages.OKCoin
             return mysign;
         }
 
-        public static string CreateLinkstring(Dictionary<string, string> param)
+        public static string CreateLinkstring(Dictionary<string, string> data)
         {
-            List<string> keys = new List<string>(param.Keys.OrderBy(k => k));
+            List<string> keys = new List<string>(data.Keys.OrderBy(k => k));
 
             string prestr = "";
             for (int i = 0; (i < keys.Count); i++)
@@ -39,11 +39,11 @@ namespace QuantConnect.Brokerages.OKCoin
                 string key = keys[i];
                 if ((i == (keys.Count - 1)))
                 {
-                    prestr = (prestr + (key + ("=" + param[key])));
+                    prestr = (prestr + (key + ("=" + data[key])));
                 }
                 else
                 {
-                    prestr = (prestr + (key + ("=" + (param[key] + "&"))));
+                    prestr = (prestr + (key + ("=" + (data[key] + "&"))));
                 }
 
             }
@@ -62,7 +62,7 @@ namespace QuantConnect.Brokerages.OKCoin
             HashAlgorithm md5 = HashAlgorithm.Create("MD5");
             byte[] hashed = md5.ComputeHash(bytes);
 
-            return BitConverter.ToString(hashed).Replace("-", "").ToLower();
+            return BitConverter.ToString(hashed).Replace("-", "").ToUpper();
         }
 
 

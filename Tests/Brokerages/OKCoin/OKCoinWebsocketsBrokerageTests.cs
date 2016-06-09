@@ -6,23 +6,57 @@ using System.Threading.Tasks;
 using QuantConnect.Brokerages.OKCoin;
 using NUnit.Framework;
 using Moq;
+using QuantConnect.Brokerages.Bitfinex;
+using QuantConnect.Tests.Brokerages.Bitfinex;
 namespace QuantConnect.Tests.Brokerages.OKCoin
 {
     [TestFixture()]
     public class OKCoinWebsocketsBrokerageTests
     {
+
+        OKCoinBrokerageFactory factory;
+        OKCoinWebsocketsBrokerage live;
+        OKCoinWebsocketsBrokerage unit;
+        Mock<IWebSocket> orderWebSocket;
+
+        public OKCoinWebsocketsBrokerageTests()
+        {
+            factory = new OKCoinBrokerageFactory();
+            live = (OKCoinWebsocketsBrokerage)factory.CreateBrokerage(new Packets.LiveNodePacket { BrokerageData = factory.BrokerageData },
+               new Mock<Interfaces.IAlgorithm>().Object);
+
+            orderWebSocket = new Mock<IWebSocket>();
+            var webSocket = new Mock<IWebSocket>();
+            webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
+
+            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "", "",
+                 "spot", 1m, new Mock<Securities.ISecurityProvider>().Object);
+        }
+
         [Test()]
         public void SubscribeTest()
         {
-            var factory = new OKCoinBrokerageFactory();
-            OKCoinWebsocketsBrokerage unit = (OKCoinWebsocketsBrokerage)factory.CreateBrokerage(new Packets.LiveNodePacket { BrokerageData = factory.BrokerageData },
-               new Mock<Interfaces.IAlgorithm>().Object);
 
             var symbol = new List<Symbol> { Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin) };
 
-            unit.Subscribe(null, symbol);
+            live.Subscribe(null, symbol);
 
 
         }
+
+        [Test()]
+        public void PlaceOrderTest()
+        {
+            string json = "[{\"channel\":\"ok_spotusd_trade\", \"data\":{ \"order_id\":\"125433029\",\"result\":\"true\"}}]";
+
+            orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+            var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
+            unit.PlaceOrder(new Orders.MarketOrder { Id = 123, Quantity = 123, Symbol = symbol });
+
+            string actual = unit.CachedOrderIDs.First().Value.BrokerId.First();
+            Assert.IsFalse(string.IsNullOrEmpty(actual));
+
+        }
+
     }
 }

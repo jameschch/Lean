@@ -4,9 +4,12 @@ using QuantConnect.Data.Market;
 using QuantConnect.Securities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using WebSocketSharp;
 
 namespace QuantConnect.Tests.Brokerages.Bitfinex
 {
@@ -28,6 +31,20 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             var order = new Orders.MarketOrder { BrokerId = new List<string> { brokerId }, Quantity = quantity };
             unit.CachedOrderIDs.TryAdd(1, order);
             unit.FillSplit.TryAdd(1, new BitfinexFill(order, scaleFactor));
+        }
+
+        [DebuggerStepThrough]
+        public static MessageEventArgs GetArgs(string json)
+        {
+            BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            System.Globalization.CultureInfo culture = null;
+            MessageEventArgs args = (MessageEventArgs)Activator.CreateInstance(typeof(MessageEventArgs), flags, null, new object[]
+            {
+                Opcode.Text,
+                System.Text.Encoding.UTF8.GetBytes(json)
+            }, culture);
+
+            return args;
         }
 
     }
