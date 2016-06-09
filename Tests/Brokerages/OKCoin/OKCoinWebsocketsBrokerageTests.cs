@@ -18,6 +18,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         OKCoinWebsocketsBrokerage live;
         OKCoinWebsocketsBrokerage unit;
         Mock<IWebSocket> orderWebSocket;
+        Mock<IWebSocket> webSocket;
 
         public OKCoinWebsocketsBrokerageTests()
         {
@@ -26,10 +27,10 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
                new Mock<Interfaces.IAlgorithm>().Object);
 
             orderWebSocket = new Mock<IWebSocket>();
-            var webSocket = new Mock<IWebSocket>();
+            webSocket = new Mock<IWebSocket>();
             webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
 
-            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "", "",
+            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "usd", "", "",
                  "spot", 1m, new Mock<Securities.ISecurityProvider>().Object);
         }
 
@@ -55,6 +56,33 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             string actual = unit.CachedOrderIDs.First().Value.BrokerId.First();
             Assert.IsFalse(string.IsNullOrEmpty(actual));
+
+        }
+
+
+        [Test()]
+        public void GetCashBalanceUsdTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+            orderWebSocket = new Mock<IWebSocket>();
+            orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+            var actual = unit.GetCashBalance();
+
+        }
+
+        [Test()]
+        public void GetCashBalanceCnyTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+
+            orderWebSocket = new Mock<IWebSocket>();
+            orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+
+            var cnyUnit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "cny", "", "",
+            "spot", 1m, new Mock<Securities.ISecurityProvider>().Object);
+
+            var actual = cnyUnit.GetCashBalance();
+
 
         }
 

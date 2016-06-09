@@ -245,7 +245,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             string key = ApiKey;
             string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
-            _webSocket.Send(JsonConvert.SerializeObject(new
+            WebSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "auth",
                 apiKey = key,
@@ -256,11 +256,11 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         private void UnAuthenticate()
         {
-            _webSocket.Send(JsonConvert.SerializeObject(new
+            WebSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "unauth"
             }));
-            _webSocket.Close();
+            WebSocket.Close();
         }
 
     }

@@ -38,7 +38,7 @@ namespace QuantConnect.Brokerages.OKCoin
     /// <summary>
     /// OKCoin WebSockets integration
     /// </summary>
-    public partial class OKCoinWebsocketsBrokerage : Brokerage, IDataQueueHandler, IDisposable
+    public partial class OKCoinWebsocketsBrokerage : BitfinexWebsocketsBrokerage
     {
 
         #region Declarations
@@ -48,7 +48,6 @@ namespace QuantConnect.Brokerages.OKCoin
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
         const int _heartBeatTimeout = 30;
-        IWebSocket _webSocket;
         object _cashLock = new object();
         JsonSerializerSettings settings = new JsonSerializerSettings
         {
@@ -71,46 +70,23 @@ namespace QuantConnect.Brokerages.OKCoin
         public ConcurrentDictionary<int, OKCoinFill> FillSplit { get; set; }
         //todo: support cny
         string _baseCurrency = "usd";
-        string _apiKey;
-        string _apiSecret;
         string _spotOrFuture = "spot";
         IWebSocket _orderWebSocket;
-        object placeOrderLock = new object();
-        int placeOrderTimeout = 3000;
+        object _placeOrderLock = new object();
+        int _placeOrderTimeout = 3000;
         #endregion
 
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IWebSocket orderWebSocket, string apiKey, string apiSecret, string spotOrFuture,
+        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IWebSocket orderWebSocket, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture,
             decimal scaleFactor, ISecurityProvider securityProvider)
-            : base("OKCoin")
+            : base(url, webSocket, apiKey, apiSecret, null, null, scaleFactor, securityProvider)
         {
-            _webSocket = webSocket;
-            _webSocket.Initialize(url);
-            _apiKey = apiKey;
-            _apiSecret = apiSecret;
             _spotOrFuture = spotOrFuture;
             _orderWebSocket = orderWebSocket;
             _orderWebSocket.Initialize(url);
-
-            var parameters = new Dictionary<string, string>
-            {
-                {"api_key" , _apiKey},
-                {"sign" , _apiSecret},
-            };
-
-            var sign = MD5Util.BuildSign(parameters, _apiSecret);
-
-            parameters["sign"] = sign;
-
-            _webSocket.Send(JsonConvert.SerializeObject(new
-            {
-                @event = "addChannel",
-                channel = "ok_sub_" + spotOrFuture + _baseCurrency + "_userinfo",
-                parameters = parameters
-            }));
-
+            _baseCurrency = baseCurrency;
         }
 
         /// <summary>
@@ -118,7 +94,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         /// <param name="job"></param>
         /// <param name="symbols"></param>
-        public void Subscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
+        public override void Subscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
         {
             if (!this.IsConnected)
             {
@@ -127,9 +103,9 @@ namespace QuantConnect.Brokerages.OKCoin
 
             foreach (var item in symbols)
             {
-                string ticker = string.Format("ok_sub_spot{0}_{1}_ticker", item.ToString().Substring(3, 3), item.ToString().Substring(0, 3));
+                string ticker = string.Format("ok_sub_{0}{1}_{2}_ticker", _spotOrFuture, item.ToString().Substring(3, 3), item.ToString().Substring(0, 3));
 
-                _webSocket.Send(JsonConvert.SerializeObject(new
+                WebSocket.Send(JsonConvert.SerializeObject(new
                 {
                     @event = "addChannel",
                     channel = ticker,
@@ -138,15 +114,15 @@ namespace QuantConnect.Brokerages.OKCoin
 
                 var parameters = new Dictionary<string, string>
                 {
-                    {"api_key" , _apiKey},
-                    {"sign" , _apiSecret},
+                    {"api_key" , ApiKey},
+                    {"sign" , ApiSecret},
                 };
 
-                var sign = MD5Util.BuildSign(parameters, _apiSecret);
+                var sign = MD5Util.BuildSign(parameters, ApiSecret);
 
                 parameters["sign"] = sign;
 
-                _webSocket.Send(JsonConvert.SerializeObject(new
+                WebSocket.Send(JsonConvert.SerializeObject(new
                 {
                     @event = "addChannel",
                     channel = "ok_sub" + _spotOrFuture + _baseCurrency + "_trades",
@@ -167,7 +143,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         /// <param name="job"></param>
         /// <param name="symbols"></param>
-        public void Unsubscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
+        public override void Unsubscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
         {
             foreach (var item in symbols)
             {
@@ -182,7 +158,7 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             try
             {
-                _webSocket.Send(JsonConvert.SerializeObject(new
+                WebSocket.Send(JsonConvert.SerializeObject(new
                 {
                     @event = "unsubscribe",
                     channelId = id,
@@ -199,7 +175,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         public override bool IsConnected
         {
-            get { return _webSocket.IsAlive; }
+            get { return WebSocket.IsAlive; }
         }
 
         /// <summary>
@@ -207,13 +183,13 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         public override void Connect()
         {
-            _webSocket.Connect();
+            WebSocket.Connect();
             if (this._checkConnectionTask == null || this._checkConnectionTask.IsFaulted || this._checkConnectionTask.IsCanceled || this._checkConnectionTask.IsCompleted)
             {
                 this._checkConnectionTask = Task.Run(() => CheckConnection());
                 this._checkConnectionToken = new CancellationTokenSource();
             }
-            _webSocket.OnMessage += OnMessage;
+            WebSocket.OnMessage += OnMessage;
         }
 
         /// <summary>
@@ -222,7 +198,7 @@ namespace QuantConnect.Brokerages.OKCoin
         public override void Disconnect()
         {
             _checkConnectionToken.Cancel();
-            this._webSocket.Close();
+            this.WebSocket.Close();
         }
 
         /// <summary>
@@ -245,14 +221,14 @@ namespace QuantConnect.Brokerages.OKCoin
 
             var parameters = new Dictionary<string, string>
                 {
-                    {"api_key" , _apiKey},
+                    {"api_key" , ApiKey},
                     {"symbol" , order.Symbol.Value.Substring(0, 3) + "_" + order.Symbol.Value.Substring(3, 3)},
                     {"type" , order.Direction.ToString().ToLower()},
                     {"price" , (order.Price * ScaleFactor).ToString()},
                     {"amount" , (order.Quantity * ScaleFactor).ToString()}
                 };
 
-            var sign = MD5Util.BuildSign(parameters, _apiSecret);
+            var sign = MD5Util.BuildSign(parameters, ApiSecret);
 
             parameters["sign"] = sign;
 
@@ -270,7 +246,7 @@ namespace QuantConnect.Brokerages.OKCoin
             };
 
             //wait for order respose before sending another
-            lock (placeOrderLock)
+            lock (_placeOrderLock)
             {
                 _orderWebSocket.Send(JsonConvert.SerializeObject(new
                 {
@@ -279,7 +255,7 @@ namespace QuantConnect.Brokerages.OKCoin
                     parameters = parameters
                 }));
 
-                tcs.Task.Wait(placeOrderTimeout);
+                tcs.Task.Wait(_placeOrderTimeout);
 
                 CachedOrderIDs.AddOrUpdate(order.Id, order);
             }
@@ -311,12 +287,12 @@ namespace QuantConnect.Brokerages.OKCoin
             try
             {
                 this.Unsubscribe();
-                _webSocket.Close();
+                WebSocket.Close();
             }
             catch (Exception)
             {
             }
-            _webSocket.Connect();
+            WebSocket.Connect();
             this.Subscribe(null, subscribed);
         }
 
@@ -337,20 +313,6 @@ namespace QuantConnect.Brokerages.OKCoin
         }
 
         /// <summary>
-        /// Get queued tick data
-        /// </summary>
-        /// <returns></returns>
-        public IEnumerable<Data.BaseData> GetNextTicks()
-        {
-            lock (Ticks)
-            {
-                var copy = Ticks.ToArray();
-                Ticks.Clear();
-                return copy;
-            }
-        }
-
-        /// <summary>
         /// Cancel an existing order
         /// </summary>
         /// <param name="order"></param>
@@ -365,15 +327,15 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     var parameters = new Dictionary<string, string>
                     {
-                        {"api_key" , _apiKey},
-                        {"sign" , _apiSecret},
+                        {"api_key" , ApiKey},
+                        {"sign" , ApiSecret},
                         {"symbol" , order.Symbol.Value.Substring(0, 3) + "_" + order.Symbol.Value.Substring(3, 3)},
                         {"order_id" , id.ToString()}
                     };
-                    var sign = MD5Util.BuildSign(parameters, _apiSecret);
+                    var sign = MD5Util.BuildSign(parameters, ApiSecret);
                     parameters["sign"] = sign;
 
-                    _webSocket.Send(JsonConvert.SerializeObject(new
+                    WebSocket.Send(JsonConvert.SerializeObject(new
                     {
                         @event = "addChannel",
                         channel = "ok" + _spotOrFuture + _baseCurrency + "_cancel_order",
@@ -420,7 +382,74 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             var list = new List<Securities.Cash>();
 
+            var parameters = new Dictionary<string, string>
+                {
+                    {"api_key" , ApiKey},
+                };
+            var sign = MD5Util.BuildSign(parameters, ApiSecret);
+            parameters["sign"] = sign;
+
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+            _orderWebSocket.OnMessage += (sender, e) =>
+            {
+                var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
+
+                if (raw.data.info.funds.free.btc != 0)
+                {
+                    list.Add(new Cash("BTC", (decimal)raw.data.info.funds.free.btc, GetConversionRate("BTC" + _baseCurrency)));
+                }
+                if (raw.data.info.funds.free.usd != 0)
+                {
+                    list.Add(new Cash("USD", (decimal)raw.data.info.funds.free.usd, GetConversionRate("USD")));
+                }
+                if (raw.data.info.funds.free.ltc != 0)
+                {
+                    list.Add(new Cash("LTC", (decimal)raw.data.info.funds.free.ltc, GetConversionRate("LTC" + _baseCurrency)));
+                }
+                if (raw.data.info.funds.free.cny != 0)
+                {
+                    list.Add(new Cash("CNY", (decimal)raw.data.info.funds.free.cny, GetConversionRate("CNY")));
+                }
+
+                tcs.SetResult(true);
+            };
+
+            _orderWebSocket.Send(JsonConvert.SerializeObject(new
+            {
+                @event = "addChannel",
+                channel = "ok" + _spotOrFuture + _baseCurrency + "_userinfo",
+                parameters = parameters
+            }));
+
+            tcs.Task.Wait(_placeOrderTimeout);
+
             return list;
+        }
+
+        private decimal GetConversionRate(string symbol)
+        {
+            if (_baseCurrency == symbol.ToLower())
+            {
+                return 1m;
+            }
+
+            string url;
+            if (symbol == "USD" || symbol == "CNY")
+            {
+                url = @"http://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22" 
+                    + symbol + _baseCurrency + "%22)&env=store://datatables.org/alltableswithkeys";
+                return decimal.Parse(new System.Xml.XPath.XPathDocument(url).CreateNavigator().SelectSingleNode("//Rate").InnerXml);
+            }
+            else
+            {
+                url = string.Format("https://www.okcoin.{0}/api/v1/ticker.do?symbol={1}_{2}", _baseCurrency == "usd" ? "com" : "cn", symbol.Substring(0, 3), _baseCurrency);
+                using (System.Net.WebClient rest = new System.Net.WebClient())
+                {
+                    var raw = JsonConvert.DeserializeObject<dynamic>(rest.DownloadString(url), settings);
+                    return ((decimal)raw.ticker.high + (decimal)raw.ticker.low) / 2;
+                }
+            }
         }
 
         //todo:
