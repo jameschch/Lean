@@ -48,6 +48,8 @@ namespace QuantConnect.Brokerages
         /// <summary>
         /// Transaction and submit/execution rules will use Bitfinex models
         /// </summary>
-        BitfinexBrokerage
+        BitfinexBrokerage,
+
+        OKCoin
     }
 }

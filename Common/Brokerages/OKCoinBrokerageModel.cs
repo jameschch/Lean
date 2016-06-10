@@ -99,7 +99,7 @@ namespace QuantConnect.Brokerages
         public override bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
             message = null;
-            Dictionary<string, int> symbol = new Dictionary<string,int> { {"BTCUSD", 2}, {"ETHUSD", 2}, {"ETHBTC", 4}, {"LTCUSD", 2}, {"LTCBTC", 4} };
+            Dictionary<string, int> symbol = new Dictionary<string,int> { {"BTCUSD", 2}, {"BTCCNY", 2}, {"LTCUSD", 4}, {"LTCBTC", 4} };
             
             var securityType = order.SecurityType;
             if (securityType != SecurityType.Forex || !symbol.ContainsKey(order.Symbol.Value))

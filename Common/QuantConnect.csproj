@@ -212,6 +212,7 @@
     <Compile Include="Orders\Fees\InteractiveBrokersFeeModel.cs" />
     <Compile Include="Orders\Fees\FxcmFeeModel.cs" />
     <Compile Include="Orders\Fees\IFeeModel.cs" />
+    <Compile Include="Orders\Fees\OKCoinFeeModel.cs" />
     <Compile Include="Orders\Fills\ImmediateFillModel.cs" />
     <Compile Include="Orders\Fills\IFillModel.cs" />
     <Compile Include="Orders\MarketOnCloseOrder.cs" />
@@ -266,7 +267,6 @@
     <Compile Include="Securities\CompositeSecurityInitializer.cs" />
     <Compile Include="Securities\ConstantFeeTransactionModel.cs" />
     <Compile Include="Securities\DelayedSettlementModel.cs" />
-    <Compile Include="Securities\Forex\BitfinexTransactionModel.cs" />
     <Compile Include="Securities\FuncSecurityInitializer.cs" />
     <Compile Include="Securities\IndicatorVolatilityModel.cs" />
     <Compile Include="Securities\ISecurityInitializer.cs" />

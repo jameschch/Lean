@@ -12,33 +12,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
-
-using QuantConnect.Orders;
-using QuantConnect.Orders.Fees;
-using QuantConnect.Orders.Fills;
-using QuantConnect.Orders.Slippage;
-using QuantConnect.Securities.Interfaces;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace QuantConnect.Securities.Forex
+namespace QuantConnect.Orders.Fees
 {
+
     /// <summary>
-    /// Bitfinex Transaction Model Class. Provided for backwards compatibility
+    /// Provides an implementation of <see cref="IFeeModel"/> that models Bitfinex order fees
     /// </summary>
-    /// <seealso cref="SecurityTransactionModel"/>
-    /// <seealso cref="ISecurityTransactionModel"/>
-    [Obsolete]
-    public class BitfinexTransactionModel : SecurityTransactionModel
+    public class OKCoinFeeModel : BitfinexFeeModel
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="BitfinexTransactionModel"/> class
-        /// </summary>
-        public BitfinexTransactionModel()
-            : base(new ImmediateFillModel(), new BitfinexFeeModel(), new BitfinexSlippageModel())
-        {
-        }
 
-
+    
     }
-
 }
