@@ -57,12 +57,12 @@ namespace QuantConnect.Brokerages.OKCoin
             {
                 return new Dictionary<string, string>
                 {
-                    {"apiSecret" ,Config.Get("OKCoin-api-secret", "123")},
-                    {"apiKey" ,Config.Get("OKCoin-api-key", "123")},
-                    {"wallet" ,Config.Get("OKCoin-wallet", "123")},
-                    {"url" , Config.Get("OKCoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
-                    {"url-international" , Config.Get("OKCoin-wss", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
-                    {"scaleFactor", Config.Get("OKCoin-scale-factor", "1")},
+                    {"apiSecret" ,Config.Get("okcoin-api-secret", "123")},
+                    {"apiKey" ,Config.Get("okcoin-api-key", "123")},
+                    {"wallet" ,Config.Get("okcoin-wallet", "123")},
+                    {"url" , Config.Get("okcoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
+                    {"url-international" , Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
+                    {"scaleFactor", Config.Get("okcoin-scale-factor", "1")},
                     {"spotOrFuture", Config.Get("spotOrFuture", "spot")},
                     {"baseCurrency", Config.Get("baseCurrency", "usd")}
                 };
