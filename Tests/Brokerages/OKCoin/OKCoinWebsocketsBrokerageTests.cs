@@ -94,5 +94,32 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             Assert.AreEqual(actual.Single(a => a.Symbol == "CNY").Amount, 246);
         }
 
+        [Test()]
+        public void GetAccountHoldingsTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
+            orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+
+            var actual = unit.GetAccountHoldings();
+
+            Assert.AreEqual(actual.Where(a => a.Symbol.Value == "BTCUSD").Sum(a => a.Quantity), 12.35);
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCCNY").Quantity, 12.34);
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "LTCUSD").Quantity, -12.34);
+        }
+
+        [Test()]
+        public void GetOpenOrdersTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
+            orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+
+            var actual = unit.GetOpenOrders();
+
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.PartiallyFilled).Quantity, 99);
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "LTCUSD").Quantity, -0.1);
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.Canceled).Quantity, 56.78);
+
+        }
+
     }
 }

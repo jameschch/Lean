@@ -437,7 +437,7 @@ namespace QuantConnect.Brokerages.OKCoin
             string url;
             if (symbol == "USD" || symbol == "CNY")
             {
-                url = @"http://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22" 
+                url = @"http://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22"
                     + symbol + _baseCurrency + "%22)&env=store://datatables.org/alltableswithkeys";
                 return decimal.Parse(new System.Xml.XPath.XPathDocument(url).CreateNavigator().SelectSingleNode("//Rate").InnerXml);
             }
@@ -460,6 +460,36 @@ namespace QuantConnect.Brokerages.OKCoin
         public override List<Holding> GetAccountHoldings()
         {
             var list = new List<Holding>();
+
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+            _orderWebSocket.OnMessage += (sender, e) =>
+            {
+                var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
+
+                foreach (var item in raw.data.orders)
+                {
+                    if ((int)item.status == 2 || (int)item.status == 1)
+                    {
+                        list.Add(new Holding
+                        {
+                            AveragePrice = (decimal)item.avg_price,
+                            CurrencySymbol = ((string)item.symbol).Substring(0, 3).ToUpper(),
+                            Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                            Symbol = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
+                            Type = SecurityType.Forex,
+                        });
+                    }
+
+                }
+
+                tcs.SetResult(true);
+            };
+
+            GetOrders();
+
+            tcs.Task.Wait(_placeOrderTimeout);
+
             return list;
         }
 
@@ -469,10 +499,77 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <returns></returns>
         public override List<Order> GetOpenOrders()
         {
-
             var list = new List<Order>();
 
+            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+
+            _orderWebSocket.OnMessage += (sender, e) =>
+            {
+                var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
+
+                foreach (var item in raw.data.orders)
+                {
+                    if ((int)item.status != 2)
+                    {
+
+                        string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
+
+                        list.Add(new Orders.MarketOrder
+                        {
+                            Price = (decimal)item.price,
+                            BrokerId = new List<string> { (string)item.order_id },
+                            Quantity = (item.type == "buy_market" ? (decimal)item.deal_amount : -(decimal)item.deal_amount),
+                            Symbol = Symbol.Create(symbol, SecurityType.Forex, Market.Bitfinex.ToString()),
+                            PriceCurrency = symbol,
+                            Time = Time.UnixTimeStampToDateTime((double)item.create_date),
+                            Status = MapOrderStatus((int)item.status)
+                        });
+                    }
+
+                }
+
+                tcs.SetResult(true);
+            };
+
+            GetOrders();
+
+            tcs.Task.Wait(_placeOrderTimeout);
+
             return list;
+        }
+
+        private void GetOrders()
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                {"api_key" , ApiKey},
+            };
+            var sign = MD5Util.BuildSign(parameters, ApiSecret);
+            parameters["sign"] = sign;
+
+            _orderWebSocket.Send(JsonConvert.SerializeObject(new
+            {
+                @event = "addChannel",
+                channel = "ok" + _spotOrFuture + _baseCurrency + "_orderinfo",
+                parameters = parameters
+            }));
+        }
+
+        private OrderStatus MapOrderStatus(int status)
+        {
+            switch(status)
+            {
+                case -1: 
+                    return OrderStatus.Canceled;
+                case 0: 
+                    return OrderStatus.Submitted;
+                case 1:
+                    return OrderStatus.PartiallyFilled;
+                case 4:
+                    return OrderStatus.Canceled;
+            };
+
+            return OrderStatus.None;
         }
 
     }
