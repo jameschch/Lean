@@ -27,6 +27,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
                new Mock<Interfaces.IAlgorithm>().Object);
 
             orderWebSocket = new Mock<IWebSocket>();
+
             webSocket = new Mock<IWebSocket>();
             webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
 
@@ -64,10 +65,14 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         public void GetCashBalanceUsdTest()
         {
             string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
-            orderWebSocket = new Mock<IWebSocket>();
             orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+
             var actual = unit.GetCashBalance();
 
+            Assert.AreEqual(actual.Single(a => a.Symbol == "USD").Amount, 456);
+            Assert.IsTrue(actual.Single(a => a.Symbol == "BTC").Amount > 0);
+            Assert.IsTrue(actual.Single(a => a.Symbol == "LTC").Amount > 0);
+            Assert.IsTrue(actual.Single(a => a.Symbol == "CNY").Amount > 0);
         }
 
         [Test()]
@@ -83,7 +88,10 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             var actual = cnyUnit.GetCashBalance();
 
-
+            Assert.IsTrue(actual.Single(a => a.Symbol == "USD").Amount > 0);
+            Assert.IsTrue(actual.Single(a => a.Symbol == "BTC").Amount > 0);
+            Assert.IsTrue(actual.Single(a => a.Symbol == "LTC").Amount > 0);
+            Assert.AreEqual(actual.Single(a => a.Symbol == "CNY").Amount, 246);
         }
 
     }
