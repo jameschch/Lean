@@ -43,7 +43,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <summary>
         /// Timestamp
         /// </summary>
-        public int CreatedDate { get; set; }
+        public long CreatedDate { get; set; }
         /// <summary>
         /// Amount Executed
         /// </summary>

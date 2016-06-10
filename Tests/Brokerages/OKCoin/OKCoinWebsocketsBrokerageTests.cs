@@ -8,6 +8,7 @@ using NUnit.Framework;
 using Moq;
 using QuantConnect.Brokerages.Bitfinex;
 using QuantConnect.Tests.Brokerages.Bitfinex;
+using System.Threading;
 namespace QuantConnect.Tests.Brokerages.OKCoin
 {
     [TestFixture()]
@@ -19,6 +20,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         OKCoinWebsocketsBrokerage unit;
         Mock<IWebSocket> orderWebSocket;
         Mock<IWebSocket> webSocket;
+        Mock<OKCoinWebsocketsBrokerage> mock;
 
         public OKCoinWebsocketsBrokerageTests()
         {
@@ -33,6 +35,9 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "usd", "", "",
                  "spot", 1m, new Mock<Securities.ISecurityProvider>().Object);
+
+            mock = new Mock<OKCoinWebsocketsBrokerage>(It.IsAny<string>(), It.IsAny<IWebSocket>(), It.IsAny<IWebSocket>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<IServiceProvider>());
         }
 
         [Test()]
@@ -119,6 +124,50 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             Assert.AreEqual(actual.Single(a => a.Symbol.Value == "LTCUSD").Quantity, -0.1);
             Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.Canceled).Quantity, 56.78);
 
+        }
+
+        [Test()]
+        public void OnMessageTickerTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_sub_spotusd_btc_ticker.txt");
+
+            unit.OnMessage(null, BitfinexTestsHelpers.GetArgs(json));
+
+            var actual = unit.GetNextTicks();
+
+            Assert.AreEqual(2478.4, actual.First().Price);
+
+        }
+
+        [Test()]
+        public void OnMessageTradesTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_sub_spotusd_trades.txt");
+
+            var order = new Orders.MarketOrder
+            {
+                BrokerId = new List<string> { "268013884" },
+                Id = 123,
+                Quantity = 1.105m
+            };
+
+            unit.CachedOrderIDs.AddOrUpdate(order.Id, order);
+            unit.FillSplit = new System.Collections.Concurrent.ConcurrentDictionary<int, OKCoinFill>();
+            unit.FillSplit.TryAdd(order.Id, new OKCoinFill(order, 1));
+
+            ManualResetEvent raised = new ManualResetEvent(false);
+
+            unit.OrderStatusChanged += (s, e) =>
+            {
+                Assert.AreEqual("BTCUSD", e.Symbol.Value);
+                Assert.AreEqual(0, e.OrderFee);
+                Assert.AreEqual(Orders.OrderStatus.PartiallyFilled, e.Status);
+                Assert.AreEqual(1, e.FillQuantity);
+                raised.Set();
+            };
+
+            unit.OnMessage(null, BitfinexTestsHelpers.GetArgs(json));
+            Assert.IsTrue(raised.WaitOne(1000));
         }
 
     }

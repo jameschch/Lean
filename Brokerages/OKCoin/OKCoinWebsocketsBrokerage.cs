@@ -43,7 +43,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
         #region Declarations
         List<Securities.Cash> _cash = new List<Securities.Cash>();
-        Dictionary<int, Channel> _channelId = new Dictionary<int, Channel>();
+        Dictionary<string, Channel> _channelId = new Dictionary<string, Channel>();
         Task _checkConnectionTask = null;
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
@@ -53,8 +53,6 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             FloatParseHandling = FloatParseHandling.Decimal
         };
-        protected decimal ScaleFactor = 1;
-        protected List<Tick> Ticks = new List<Tick>();
         /// <summary>
         /// List of known orders
         /// </summary>
@@ -145,29 +143,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <param name="symbols"></param>
         public override void Unsubscribe(Packets.LiveNodePacket job, IEnumerable<Symbol> symbols)
         {
-            foreach (var item in symbols)
-            {
-                foreach (var channel in _channelId.Where(c => c.Value.Symbol == item.ToString()))
-                {
-                    Unsubscribe(channel.Key);
-                }
-            }
-        }
 
-        private void Unsubscribe(int id)
-        {
-            try
-            {
-                WebSocket.Send(JsonConvert.SerializeObject(new
-                {
-                    @event = "unsubscribe",
-                    channelId = id,
-                }));
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Error encountered whilst attempting unsubscribe.");
-            }
         }
 
         /// <summary>

@@ -69,13 +69,14 @@ namespace QuantConnect.Brokerages.OKCoin
             return false;
         }
 
+        //todo: docs say tradeprice is filled amount. Check this
         /// <summary>
         /// Compares fill amouns to determine if fill is complete
         /// </summary>
         /// <returns></returns>
         public bool IsCompleted()
         {
-            decimal quantity = messages.Sum(m => m.Value.TradePrice) * _scaleFactor;
+            decimal quantity = messages.Sum(m => m.Value.CompletedTradeAmount) * _scaleFactor;
             return quantity >= _order.Quantity;
         }
 
