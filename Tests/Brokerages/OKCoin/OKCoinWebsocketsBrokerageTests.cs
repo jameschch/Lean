@@ -68,6 +68,20 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             Assert.IsFalse(string.IsNullOrEmpty(actual));
         }
 
+        [Test()]
+        public void PlaceLimitOrderTest()
+        {
+            string json = "[{\"channel\":\"ok_spotusd_trade\", \"data\":{ \"order_id\":\"125433029\",\"result\":\"true\"}}]";
+            orderWebSocket.Reset();
+
+            orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+            var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
+            unit.PlaceOrder(new Orders.LimitOrder { Id = 123, Quantity = 123, Symbol = symbol, LimitPrice = 123 });
+
+            string actual = unit.CachedOrderIDs.First().Value.BrokerId.First();
+            Assert.IsFalse(string.IsNullOrEmpty(actual));
+        }
+
 
         [Test()]
         public void GetCashBalanceUsdTest()

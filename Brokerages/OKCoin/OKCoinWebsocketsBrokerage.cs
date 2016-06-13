@@ -197,8 +197,8 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     {"api_key" , ApiKey},
                     {"symbol" , order.Symbol.Value.Substring(0, 3) + "_" + order.Symbol.Value.Substring(3, 3)},
-                    {"type" , order.Direction.ToString().ToLower()},
-                    {"price" , (order.Price * ScaleFactor).ToString()},
+                    {"type" , MapOrderType(order.Type, order.Direction)},
+                    {"price" , order.Type == OrderType.Market ?  (order.Quantity * ScaleFactor).ToString() : (((LimitOrder)order).LimitPrice * ScaleFactor).ToString()},
                     {"amount" , (order.Quantity * ScaleFactor).ToString()}
                 };
 
@@ -235,6 +235,34 @@ namespace QuantConnect.Brokerages.OKCoin
             }
 
             return placed;
+        }
+
+        private string MapOrderType(OrderType orderType, OrderDirection direction)
+        {
+            if (orderType == OrderType.Market)
+            {
+                if (direction == OrderDirection.Buy)
+                {
+                    return "buy_market";
+                }
+                else
+                {
+                    return "sell_market";
+                }
+            }
+            else if (orderType == OrderType.Limit)
+            {
+                if (direction == OrderDirection.Buy)
+                {
+                    return "buy";
+                }
+                else
+                {
+                    return "sell";
+                }
+            }
+
+            throw new NotSupportedException("OKCoin supports limit and market orders only.");
         }
 
         private async Task CheckConnection()
@@ -407,6 +435,8 @@ namespace QuantConnect.Brokerages.OKCoin
                 return 1m;
             }
 
+
+            //todo: Why is this needed? Only one of these base currencies is active
             string url;
             if (symbol == "USD" || symbol == "CNY")
             {
@@ -530,11 +560,11 @@ namespace QuantConnect.Brokerages.OKCoin
 
         private OrderStatus MapOrderStatus(int status)
         {
-            switch(status)
+            switch (status)
             {
-                case -1: 
+                case -1:
                     return OrderStatus.Canceled;
-                case 0: 
+                case 0:
                     return OrderStatus.Submitted;
                 case 1:
                     return OrderStatus.PartiallyFilled;
