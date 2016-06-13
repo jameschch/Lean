@@ -221,7 +221,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     fill.Status = OrderStatus.Filled;
                     fill.OrderFee = Math.Abs(split.TotalFee());
-                    fill.FillQuantity = (int)Math.Floor(split.TotalQuantity() * ScaleFactor);
+                    fill.FillQuantity = split.TotalQuantity() * ScaleFactor;
                     FilledOrderIDs.Add(cached.First().Key);
 
                     Order outOrder = cached.First().Value;
