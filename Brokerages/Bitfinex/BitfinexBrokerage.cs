@@ -141,7 +141,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             //todo: wait for callback from auth before posting
             Authenticate();
 
-            int quantity = (int)Math.Floor(SecurityProvider.GetHoldingsQuantity(order.Symbol));
+            decimal quantity = SecurityProvider.GetHoldingsQuantity(order.Symbol);
             Orders.Order crossOrder = null;
             if (OrderCrossesZero(order, quantity))
             {
@@ -339,7 +339,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                             continue;
                         }
 
-                        order.Quantity = Convert.ToInt32(decimal.Parse(item.OriginalAmount) * ScaleFactor);
+                        order.Quantity = decimal.Parse(item.OriginalAmount) * ScaleFactor;
                         order.BrokerId = new List<string> { item.Id.ToString() };
                         order.Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex);
                         order.Time = Time.UnixTimeStampToDateTime(double.Parse(item.Timestamp));
