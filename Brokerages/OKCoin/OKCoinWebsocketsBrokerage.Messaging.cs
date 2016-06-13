@@ -47,16 +47,20 @@ namespace QuantConnect.Brokerages.OKCoin
                     raw = raw[0];
 
                     if (((string)raw.channel).EndsWith("ticker"))
-                    {                       
+                    {
                         //ticker
                         PopulateTicker(raw);
                         return;
                     }
-                        //todo: populate trade fill
-                    else if (((string)raw.channel).EndsWith("trades"))
+                    else if (((string)raw.channel) == "ok_sub_spot" + _baseCurrency + "_trades")
                     {
                         //trade update
                         PopulateTrade(raw);
+                    }
+                    else if (System.Text.RegularExpressions.Regex.IsMatch(((string)raw.channel), @"ok_sub_spot(usd|cny)_\w{3}_trades"))
+                    {
+                        //trade update
+                        PopulateTradeTicker(raw);
                     }
                 }
 
@@ -72,9 +76,8 @@ namespace QuantConnect.Brokerages.OKCoin
         private void PopulateTicker(dynamic raw)
         {
 
+            string pair = GetPair(raw);
             string channel = (string)raw.channel;
-            string pair = channel.Substring(15, 3).ToUpper() + channel.Substring(11, 3).ToUpper();
-
             this._channelId[channel] = new Channel { Name = channel, Symbol = pair };
 
             lock (Ticks)
@@ -92,23 +95,26 @@ namespace QuantConnect.Brokerages.OKCoin
             }
         }
 
-        private void PopulateTradeTicker(string response, string symbol)
+        private void PopulateTradeTicker(dynamic raw)
         {
-            var msg = JsonConvert.DeserializeObject<TradeTickerMessage>(response, settings);
+            string pair = GetPair(raw);
 
             lock (Ticks)
             {
-                Ticks.Add(new Tick
+                foreach(var item in raw.data)
                 {
-                    Time = DateTime.UtcNow,
-                    Value = msg.PRICE / ScaleFactor,
-                    TickType = TickType.Trade,
-                    Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.OKCoin),
-                    DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(msg.AMOUNT * ScaleFactor))
-                });
-            }
+                    Ticks.Add(new Tick
+                    {
+                        Time = DateTime.UtcNow,
+                        Value = (decimal)item[1] / ScaleFactor,
+                        TickType = TickType.Trade,
+                        Symbol = Symbol.Create(pair.ToUpper(), SecurityType.Forex, Market.OKCoin),
+                        DataType = MarketDataType.Tick,
+                        Quantity = (int)(Math.Round((decimal)item[2] * ScaleFactor))
+                    });
+                }
 
+            }
 
         }
 
@@ -173,6 +179,12 @@ namespace QuantConnect.Brokerages.OKCoin
             {
                 UnknownOrderIDs.Add(brokerId);
             }
+        }
+
+        private string GetPair(dynamic raw)
+        {
+            string channel = (string)raw.channel;
+            return channel.Substring(15, 3).ToUpper() + channel.Substring(11, 3).ToUpper();
         }
 
     }

@@ -9,6 +9,7 @@ using Moq;
 using QuantConnect.Brokerages.Bitfinex;
 using QuantConnect.Tests.Brokerages.Bitfinex;
 using System.Threading;
+using QuantConnect.Data.Market;
 namespace QuantConnect.Tests.Brokerages.OKCoin
 {
     [TestFixture()]
@@ -167,8 +168,22 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             };
 
             unit.OnMessage(null, BitfinexTestsHelpers.GetArgs(json));
-            Assert.IsTrue(raised.WaitOne(1000));
+            Assert.IsTrue(raised.WaitOne(1000));             
         }
+
+        [Test()]
+        public void OnMessageTradesTickerTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_sub_spotusd_btc_trades.txt");
+
+            unit.OnMessage(null, BitfinexTestsHelpers.GetArgs(json));
+
+            var actual = unit.GetNextTicks();
+
+            Assert.AreEqual(2463.86, actual.First().Price);
+            Assert.AreEqual(0, ((Tick)actual.First()).Quantity);
+        }
+
 
     }
 }
