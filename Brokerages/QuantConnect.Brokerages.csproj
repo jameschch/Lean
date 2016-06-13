@@ -244,8 +244,6 @@
     <Compile Include="OKCoin\OKCoinWebsocketsBrokerage.Messaging.cs" />
     <Compile Include="OKCoin\TickerMessage.cs" />
     <Compile Include="OKCoin\TradeMessage.cs" />
-    <Compile Include="OKCoin\TradeTickerMessage.cs" />
-    <Compile Include="OKCoin\WalletMessage.cs" />
     <Compile Include="Paper\PaperBrokerage.cs" />
     <Compile Include="Paper\PaperBrokerageFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

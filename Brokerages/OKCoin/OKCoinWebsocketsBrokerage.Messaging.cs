@@ -118,23 +118,6 @@ namespace QuantConnect.Brokerages.OKCoin
 
         }
 
-        //todo: Currently populated but not used
-        private void PopulateWallet(string[][] data)
-        {
-            if (data.Length > 0)
-            {
-                lock (_cashLock)
-                {
-                    _cash.Clear();
-                    for (int i = 0; i < data.Length; i++)
-                    {
-                        var msg = new WalletMessage();
-                        _cash.Add(new Securities.Cash(msg.WLT_CURRENCY, msg.WLT_BALANCE, 1));
-                    }
-                }
-            }
-        }
-
         private void PopulateTrade(dynamic raw)
         {
             var msg = JsonConvert.DeserializeObject<TradeMessage>(raw.data.ToString(), settings);

@@ -27,11 +27,15 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             factory = new OKCoinBrokerageFactory();
             live = (OKCoinWebsocketsBrokerage)factory.CreateBrokerage(new Packets.LiveNodePacket { BrokerageData = factory.BrokerageData },
-               new Mock<Interfaces.IAlgorithm>().Object);
+               new Mock<Interfaces.IAlgorithm>().Object);           
+        }
 
+        [TestFixtureSetUp()]
+        public void Setup()
+        {
             orderWebSocket = new Mock<IWebSocket>();
-
             webSocket = new Mock<IWebSocket>();
+
             webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
 
             unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "usd", "", "",
@@ -46,9 +50,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
 
             var symbol = new List<Symbol> { Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin) };
-
             live.Subscribe(null, symbol);
-
 
         }
 
@@ -56,6 +58,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         public void PlaceOrderTest()
         {
             string json = "[{\"channel\":\"ok_spotusd_trade\", \"data\":{ \"order_id\":\"125433029\",\"result\":\"true\"}}]";
+            orderWebSocket.Reset();
 
             orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
@@ -63,7 +66,6 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             string actual = unit.CachedOrderIDs.First().Value.BrokerId.First();
             Assert.IsFalse(string.IsNullOrEmpty(actual));
-
         }
 
 
@@ -71,6 +73,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         public void GetCashBalanceUsdTest()
         {
             string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+            orderWebSocket.Reset();
             orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
             var actual = unit.GetCashBalance();
@@ -85,8 +88,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         public void GetCashBalanceCnyTest()
         {
             string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+            orderWebSocket.Reset();
 
-            orderWebSocket = new Mock<IWebSocket>();
             orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
             var cnyUnit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "cny", "", "",
@@ -104,6 +107,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         public void GetAccountHoldingsTest()
         {
             string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
+            orderWebSocket.Reset();
+
             orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
             var actual = unit.GetAccountHoldings();
@@ -117,6 +122,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         public void GetOpenOrdersTest()
         {
             string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
+            orderWebSocket.Reset();
+
             orderWebSocket.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { orderWebSocket.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
             var actual = unit.GetOpenOrders();

@@ -80,6 +80,7 @@ namespace QuantConnect.Brokerages.OKCoin
             return quantity >= _order.Quantity;
         }
 
+        //todo: docs say tradeprice is filled amount. Check this
         /// <summary>
         /// Total amount executed across all fills
         /// </summary>
