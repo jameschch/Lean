@@ -58,8 +58,12 @@ namespace QuantConnect.Brokerages.Bitfinex
                         PopulateTicker(e.Data, _channelId[id].Symbol);
                         return;
                     }
-                    else if (_channelId.ContainsKey(id) && _channelId[id].Name == "trades" && term == "te")
+                    else if (_channelId.ContainsKey(id) && _channelId[id].Name == "trades" && (term == "te" || term == "tu"))
                     {
+                        if (term == "tu")
+                        {
+                            return;
+                        }
                         //trade ticker
                         PopulateTradeTicker(e.Data, _channelId[id].Symbol);
                         return;

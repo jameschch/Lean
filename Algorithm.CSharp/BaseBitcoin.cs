@@ -70,10 +70,15 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2016, 2, 1);
-            SetEndDate(2016, 5, 1);
+            SetStartDate(2016, 1, 12);
+            SetEndDate(2016, 6, 20);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
+            if (LiveMode)
+            {
+                AddSecurity(SecurityType.Forex, "ETHUSD", Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
+                AddSecurity(SecurityType.Forex, "LTCUSD", Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
+            }
             SetBenchmark(security.Symbol);
         }
 
@@ -100,26 +105,26 @@ namespace QuantConnect.Algorithm.CSharp
         /// Must liquidate before reversing position
         /// </summary>
         //todo: implement transaction limits in brokerage model
-        protected virtual void Long()
+        protected virtual void Long(string symbol = btcusd)
         {
-            if (Portfolio[BTCUSD].IsShort)
+            if (Portfolio[symbol].IsShort)
             {
                 Liquidate();
             }
-            SetHoldings(BTCUSD, 3.0m);
+            SetHoldings(symbol, 3.0m);
         }
 
         /// <summary>
         /// Must liquidate before reversing position
         /// </summary>
         //todo: implement transaction limits in brokerage model
-        protected virtual void Short()
+        protected virtual void Short(string symbol = btcusd)
         {
-            if (Portfolio[BTCUSD].IsLong)
+            if (Portfolio[symbol].IsLong)
             {
                 Liquidate();
             }
-            SetHoldings(BTCUSD, -3.0m);
+            SetHoldings(symbol, -3.0m);
         }
 
         protected void TryStopLoss(string symbol = btcusd, StopLossStrategy strategy = StopLossStrategy.TotalPortfolioValue, AverageTrueRange atr = null)
