@@ -1049,6 +1049,14 @@ namespace QuantConnect.Algorithm
             return swiss;
         }
 
+        public EmpiricalModeDecomposition EMD(Symbol symbol, int period, double delta, decimal fraction, int mesaLength, Resolution? resolution = null, Func<BaseData, TradeBar> selector = null)
+        {
+            string name = CreateIndicatorName(symbol, "EMA" + period, resolution);
+            var emd = new EmpiricalModeDecomposition(name, period, delta, fraction, mesaLength);
+            RegisterIndicator(symbol, emd, resolution, selector);
+            return emd;
+        }
+
         /// <summary>
         /// Creates Universal Oscillator for the symbol. The indicator will be automatically
         /// updated on the given resolution.

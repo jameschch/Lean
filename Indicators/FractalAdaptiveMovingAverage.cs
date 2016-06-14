@@ -23,7 +23,7 @@ namespace QuantConnect.Indicators
     /// <summary>
     /// The Fractal Adaptive Moving Average (FRAMA) by John Ehlers
     /// </summary>
-    public class FractalAdaptiveMovingAverage : IndicatorBase<IndicatorDataPoint>
+    public class FractalAdaptiveMovingAverage : Indicator
     {
 
         int _n = 16;

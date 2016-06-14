@@ -28,7 +28,7 @@ namespace QuantConnect.Tests.Indicators
         [Test]
         public void ComputesCorrectly()
         {
-            var nu = new EmpiricalModeDecomposition("", 13);
+            var nu = new EmpiricalModeDecomposition("", 26, 0.4, 0.1m, 26);
             var old = new EmpiricalModeDecompositionOld();
             bool first = true;
 
@@ -46,14 +46,14 @@ namespace QuantConnect.Tests.Indicators
                 decimal price = decimal.Parse(parts[1]);
 
                 var now = DateTime.UtcNow;
-                nu.Update(now, price);
+                nu.Update(new TradeBar { Time = now, High = price * 2, Low = 0 });
                 var expected = old.IsCyclical(new TradeBar { Time = now, High = price * 2, Low = 0 });
 
-                if (nu.IsReady)
+                if (nu.IsReady && old.IsReady)
                 {
                     Assert.IsTrue((expected && nu > 0) || (!expected && nu < 0));
                 }
-            }        
+            }
         }
 
         [Test]
