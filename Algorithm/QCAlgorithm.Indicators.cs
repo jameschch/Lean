@@ -1031,21 +1031,39 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// 
+        /// Creates Swiss Army Knife transformation for the symbol. The indicator will be automatically
+        /// updated on the given resolution.
         /// </summary>
-        /// <param name="symbol"></param>
-        /// <param name="period"></param>
-        /// <param name="delta"></param>
-        /// <param name="tool"></param>
-        /// <param name="resolution"></param>
-        /// <param name="selector"></param>
-        /// <returns></returns>
+        /// <param name="symbol">The symbol to use for calculations</param>
+        /// <param name="period">The period of the calculation</param>
+        /// <param name="delta">The delta scale of the BandStop or BandPass</param>
+        /// <param name="tool">The tool os the Swiss Army Knife</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">elects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The calculation using the given tool</returns>
         public SwissArmyKnife SWISS(Symbol symbol, int period, double delta, SwissArmyKnifeTool tool, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
         {
             string name = CreateIndicatorName(symbol, "SWISS" + period, resolution);
             var swiss = new SwissArmyKnife(name, period, delta, tool);
             RegisterIndicator(symbol, swiss, resolution, selector);
             return swiss;
+        }
+
+        /// <summary>
+        /// Creates Universal Oscillator for the symbol. The indicator will be automatically
+        /// updated on the given resolution.
+        /// </summary>
+        /// <param name="symbol">The symbol to use for calculations</param>
+        /// <param name="period">The period of the calculation</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The UniversalOscillator indicator for the requested symbol over the specified period</returns>
+        public UniversalOscillator UNIOSC(Symbol symbol, int period, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, "UNIOSC" + period, resolution);
+            var uni = new UniversalOscillator(name, period);
+            RegisterIndicator(symbol, uni, resolution, selector);
+            return uni;
         }
 
         /// <summary>

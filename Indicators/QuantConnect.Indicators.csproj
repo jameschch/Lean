@@ -122,6 +122,7 @@
     <Compile Include="EmpiricalModeDecomposition.cs" />
     <Compile Include="FractalAdaptiveMovingAverage.cs" />
     <Compile Include="SwissArmyKnife.cs" />
+    <Compile Include="UniversalOscillator.cs" />
     <Compile Include="VolumeWeightedAveragePriceIndicator.cs" />
     <Compile Include="FisherTransform.cs" />
     <Compile Include="HeikinAshi.cs" />
