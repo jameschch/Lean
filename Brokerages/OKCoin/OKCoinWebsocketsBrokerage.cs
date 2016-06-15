@@ -70,7 +70,7 @@ namespace QuantConnect.Brokerages.OKCoin
         string _spotOrFuture = "spot";
         IWebSocket _orderWebSocket;
         object _placeOrderLock = new object();
-        int _placeOrderTimeout = 3000;
+        int _responseTimeout = 3000;
         #endregion
 
         /// <summary>
@@ -229,7 +229,7 @@ namespace QuantConnect.Brokerages.OKCoin
                     parameters = parameters
                 }));
 
-                tcs.Task.Wait(_placeOrderTimeout);
+                tcs.Task.Wait(_responseTimeout);
 
                 CachedOrderIDs.AddOrUpdate(order.Id, order);
             }
@@ -423,7 +423,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 parameters = parameters
             }));
 
-            tcs.Task.Wait(_placeOrderTimeout);
+            tcs.Task.Wait(_responseTimeout);
 
             return list;
         }
@@ -491,7 +491,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             GetOrders();
 
-            tcs.Task.Wait(_placeOrderTimeout);
+            tcs.Task.Wait(_responseTimeout);
 
             return list;
         }
@@ -536,7 +536,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             GetOrders();
 
-            tcs.Task.Wait(_placeOrderTimeout);
+            tcs.Task.Wait(_responseTimeout);
 
             return list;
         }

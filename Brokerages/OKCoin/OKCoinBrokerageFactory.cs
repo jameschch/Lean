@@ -63,8 +63,8 @@ namespace QuantConnect.Brokerages.OKCoin
                     {"url" , Config.Get("okcoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
                     {"url-international" , Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
                     {"scaleFactor", Config.Get("okcoin-scale-factor", "1")},
-                    {"spotOrFuture", Config.Get("spotOrFuture", "spot")},
-                    {"baseCurrency", Config.Get("baseCurrency", "usd")}
+                    {"spotOrFuture", Config.Get("okcoin-spotOrFuture", "spot")},
+                    {"baseCurrency", Config.Get("okcoin-baseCurrency", "usd")}
                 };
             }
         }
