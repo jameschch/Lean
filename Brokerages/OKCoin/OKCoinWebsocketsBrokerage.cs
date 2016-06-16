@@ -578,9 +578,9 @@ namespace QuantConnect.Brokerages.OKCoin
         public string BuildSign(Dictionary<string, string> data)
         {
             var pairs = data.Keys.OrderBy(k => k).Select(k => k + "=" + data[k]);
-            string joined = string.Join("&", pairs.ToArray()).TrimEnd('&');
-
+            string joined = string.Join("&", pairs.ToArray());
             joined += "&secret_key=" + this.ApiSecret;
+
             return joined.ToMD5();
         }
 
