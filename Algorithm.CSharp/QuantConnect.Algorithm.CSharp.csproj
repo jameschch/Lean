@@ -67,12 +67,9 @@
     </Compile>
     <Compile Include="DelistingEventsAlgorithm.cs" />
     <Compile Include="DropboxBaseDataUniverseSelectionAlgorithm.cs" />
-    <Compile Include="EmpiricalModeDecomposition.cs" />
     <Compile Include="EquitiesLabAlgorithm.cs" />
     <Compile Include="HistoryAlgorithm.cs" />
     <Compile Include="HistoryAndWarmupRegressionAlgorithm.cs" />
-    <Compile Include="InverseFisherTransform.cs" />
-    <Compile Include="LeastSquares.cs" />
     <Compile Include="LimitFillRegressionAlgorithm.cs" />
     <Compile Include="BasicTemplateFillForwardAlgorithm.cs" />
     <Compile Include="BenchmarkAlgorithm.cs" />
@@ -88,15 +85,9 @@
     <Compile Include="ETFGlobalRotationAlgorithm.cs" />
     <Compile Include="IndicatorSuiteAlgorithm.cs" />
     <Compile Include="LiveFeaturesAlgorithm.cs" />
-    <Compile Include="Blackfish.cs" />
-    <Compile Include="FracDee.cs" />
-    <Compile Include="MamaFamaJama.cs" />
     <Compile Include="OpeningBreakoutAlgorithm.cs" />
     <Compile Include="DropboxUniverseSelectionAlgorithm.cs" />
     <Compile Include="ParameterizedAlgorithm.cs" />
-    <Compile Include="Puria.cs" />
-    <Compile Include="SwissArmyCross.cs" />
-    <Compile Include="ThoseFour.cs" />
     <Compile Include="UniverseSelectionDefinitionsAlgorithm.cs" />
     <Compile Include="UserDefinedUniverseAlgorithm.cs" />
     <Compile Include="WarmupAlgorithm.cs" />
