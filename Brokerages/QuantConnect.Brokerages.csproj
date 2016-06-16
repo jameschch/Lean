@@ -237,7 +237,6 @@
     <Compile Include="Oanda\Session\RatesSession.cs" />
     <Compile Include="Oanda\Session\StreamSession.cs" />
     <Compile Include="OKCoin\BaseMessage.cs" />
-    <Compile Include="OKCoin\MD5Util.cs" />
     <Compile Include="OKCoin\OKCoinFill.cs" />
     <Compile Include="OKCoin\OKCoinBrokerageFactory.cs" />
     <Compile Include="OKCoin\OKCoinWebsocketsBrokerage.cs" />

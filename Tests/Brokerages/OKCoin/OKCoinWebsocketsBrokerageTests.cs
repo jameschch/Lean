@@ -27,7 +27,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             factory = new OKCoinBrokerageFactory();
             live = (OKCoinWebsocketsBrokerage)factory.CreateBrokerage(new Packets.LiveNodePacket { BrokerageData = factory.BrokerageData },
-               new Mock<Interfaces.IAlgorithm>().Object);           
+               new Mock<Interfaces.IAlgorithm>().Object);
         }
 
         [TestFixtureSetUp()]
@@ -38,7 +38,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
 
-            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "usd", "", "",
+            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, orderWebSocket.Object, "usd", "", "abc123",
                  "spot", 1m, new Mock<Securities.ISecurityProvider>().Object);
 
             mock = new Mock<OKCoinWebsocketsBrokerage>(It.IsAny<string>(), It.IsAny<IWebSocket>(), It.IsAny<IWebSocket>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -189,7 +189,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             };
 
             unit.OnMessage(null, BitfinexTestsHelpers.GetArgs(json));
-            Assert.IsTrue(raised.WaitOne(1000));             
+            Assert.IsTrue(raised.WaitOne(1000));
         }
 
         [Test()]
@@ -203,6 +203,13 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             Assert.AreEqual(2463.86, actual.First().Price);
             Assert.AreEqual(0, ((Tick)actual.First()).Quantity);
+        }
+
+        [Test()]
+        public void BuildSign()
+        {
+            var actual = unit.BuildSign(new Dictionary<string, string> { { "api_key", "abc123" }, { "symbol", "BCTUSD" } });
+            Assert.AreEqual("eead4f2c8bb341a14fa3b26e8baca560", actual);
         }
 
 

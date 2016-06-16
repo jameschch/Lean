@@ -38,7 +38,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         /// </summary>
         protected override decimal HighPrice
         {
-            get { return 5000m; }
+            get { return 9000m; }
         }
 
         /// <summary>

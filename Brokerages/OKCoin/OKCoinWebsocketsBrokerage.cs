@@ -115,7 +115,7 @@ namespace QuantConnect.Brokerages.OKCoin
                     {"sign" , ApiSecret},
                 };
 
-                var sign = MD5Util.BuildSign(parameters, ApiSecret);
+                var sign = BuildSign(parameters);
                 parameters["sign"] = sign;
                 WebSocket.Send(JsonConvert.SerializeObject(new
                 {
@@ -202,7 +202,7 @@ namespace QuantConnect.Brokerages.OKCoin
                     {"amount" , (order.Quantity * ScaleFactor).ToString()}
                 };
 
-            var sign = MD5Util.BuildSign(parameters, ApiSecret);
+            var sign = BuildSign(parameters);
 
             parameters["sign"] = sign;
 
@@ -334,7 +334,7 @@ namespace QuantConnect.Brokerages.OKCoin
                         {"symbol" , order.Symbol.Value.Substring(0, 3) + "_" + order.Symbol.Value.Substring(3, 3)},
                         {"order_id" , id.ToString()}
                     };
-                    var sign = MD5Util.BuildSign(parameters, ApiSecret);
+                    var sign = BuildSign(parameters);
                     parameters["sign"] = sign;
 
                     WebSocket.Send(JsonConvert.SerializeObject(new
@@ -387,7 +387,7 @@ namespace QuantConnect.Brokerages.OKCoin
             {
                 {"api_key" , ApiKey},
             };
-            var sign = MD5Util.BuildSign(parameters, ApiSecret);
+            var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
@@ -547,7 +547,7 @@ namespace QuantConnect.Brokerages.OKCoin
             {
                 {"api_key" , ApiKey},
             };
-            var sign = MD5Util.BuildSign(parameters, ApiSecret);
+            var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
             _orderWebSocket.Send(JsonConvert.SerializeObject(new
@@ -573,6 +573,15 @@ namespace QuantConnect.Brokerages.OKCoin
             };
 
             return OrderStatus.None;
+        }
+
+        public string BuildSign(Dictionary<string, string> data)
+        {
+            var pairs = data.Keys.OrderBy(k => k).Select(k => k + "=" + data[k]);
+            string joined = string.Join("&", pairs.ToArray()).TrimEnd('&');
+
+            joined += "&secret_key=" + this.ApiSecret;
+            return joined.ToMD5();
         }
 
     }

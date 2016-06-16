@@ -358,7 +358,6 @@
     <Folder Include="Adapters\" />
     <Folder Include="API\" />
     <Folder Include="Messaging\" />
-    <Folder Include="OKCoin\" />
     <Folder Include="Tasks\" />
     <Folder Include="UserInterface\" />
   </ItemGroup>
