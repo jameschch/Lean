@@ -352,11 +352,10 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         }
 
-        //todo: check json sample
         [Test()]
         public void OnMessageWalletTest()
         {
-            string json = "[0,\"ws\", [\"trading\",\"btc\",\"123.456789\",\"99.99\"]]";
+            string json = "[0,\"ws\", [[\"trading\",\"btc\",\"123.456789\",\"99.99\"], [\"exchange\",\"btc\",\"123.456789\",\"99.99\"]]]";
 
             ManualResetEvent raised = new ManualResetEvent(false);
 
