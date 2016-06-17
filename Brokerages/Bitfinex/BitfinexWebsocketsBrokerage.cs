@@ -41,18 +41,17 @@ namespace QuantConnect.Brokerages.Bitfinex
     {
 
         #region Declarations
-        List<Securities.Cash> _cash = new List<Securities.Cash>();
         Dictionary<int, Channel> _channelId = new Dictionary<int, Channel>();
         Task _checkConnectionTask = null;
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
         const int _heartBeatTimeout = 30;
         IWebSocket _webSocket;
-        object _cashLock = new object();
         JsonSerializerSettings settings = new JsonSerializerSettings
         {
             FloatParseHandling = FloatParseHandling.Decimal
         };
+        DateTime previousAuthentication = DateTime.Now.AddSeconds(-10);
         #endregion
 
         /// <summary>

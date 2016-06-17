@@ -128,6 +128,11 @@ namespace QuantConnect.Brokerages
         /// <param name="quantity">The order quantity</param>
         /// <returns>The modified quantity</returns>
         decimal TruncateQuantity(Security security, decimal quantity);
+
+        /// <summary>
+        /// Allows the brokerage to push cashbook updates. This is disabled by default.
+        /// </summary>
+        bool AllowAccountUpdates { get; }
     }
 
     /// <summary>

@@ -104,7 +104,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Must liquidate before reversing position
         /// </summary>
-        //todo: implement transaction limits in brokerage model
         protected virtual void Long(string symbol = btcusd)
         {
             if (Portfolio[symbol].IsShort)
@@ -117,7 +116,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Must liquidate before reversing position
         /// </summary>
-        //todo: implement transaction limits in brokerage model
         protected virtual void Short(string symbol = btcusd)
         {
             if (Portfolio[symbol].IsLong)

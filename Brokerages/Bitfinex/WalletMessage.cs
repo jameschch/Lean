@@ -38,6 +38,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <param name="values"></param>
         public WalletMessage(string[] values) : base(values)
         {
+            WLT_NAME = AllValues[_wlt_name];
             WLT_BALANCE = GetDecimal(_wlt_balance);
             WLT_CURRENCY = AllValues[_wlt_currency];
         }

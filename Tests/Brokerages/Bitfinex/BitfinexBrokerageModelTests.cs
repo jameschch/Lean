@@ -14,7 +14,6 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
         BitfinexBrokerageModel unit = new BitfinexBrokerageModel(AccountType.Margin);
 
-        //todo: remove cast to int
         [Test()]
         public void CanSubmitOrderTest()
         {
@@ -25,18 +24,17 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             var actual = unit.CanSubmitOrder(security, order, out message);
             Assert.IsTrue(actual);
 
-            order.Quantity = (int)0.1m;
+            order.Quantity = 1m;
             actual = unit.CanSubmitOrder(security, order, out message);
             Assert.IsTrue(actual);
 
-            order.Quantity = (int)0.01m;
+            order.Quantity = 0.01m;
             actual = unit.CanSubmitOrder(security, order, out message);
             Assert.IsTrue(actual);
 
-            //todo: should fail for decimal
-            order.Quantity = (int)0.001m;
+            order.Quantity = 0.001m;
             actual = unit.CanSubmitOrder(security, order, out message);
-            Assert.IsTrue(actual);
+            Assert.IsFalse(actual);
         }
     }
 }

@@ -338,9 +338,9 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
                 if (e.Status == Orders.OrderStatus.Filled)
                 {
-                    raised.Set();
                     Assert.AreEqual(expectedQuantity, actualQuantity);
                     Assert.AreEqual(expectedFee, Math.Round(actualFee, 8));
+                    raised.Set();
                 }
             };
 
@@ -350,6 +350,25 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             }
             Assert.IsTrue(raised.WaitOne(1000));
 
+        }
+
+        //todo: check json sample
+        [Test()]
+        public void OnMessageWalletTest()
+        {
+            string json = "[0,\"ws\", [\"trading\",\"btc\",\"123.456789\",\"99.99\"]]";
+
+            ManualResetEvent raised = new ManualResetEvent(false);
+
+            unit.AccountChanged += (s, e) =>
+            {
+                Assert.AreEqual("BTC", e.CurrencySymbol);
+                Assert.AreEqual(12345.6789, e.CashBalance);
+                raised.Set();
+            };
+
+            unit.OnMessage(unit, GetArgs(json));
+            Assert.IsTrue(raised.WaitOne(2000));
         }
 
         [DebuggerStepThrough]

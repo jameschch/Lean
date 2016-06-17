@@ -314,5 +314,13 @@ namespace QuantConnect.Brokerages
             return BitConverter.GetBytes(decimal.GetBits(quantity)[3])[2];
         }
 
+        /// <summary>
+        /// Allows the brokerage to push cashbook updates. This is disabled by default.
+        /// </summary>
+        public virtual bool AllowAccountUpdates
+        {
+            get { return false; }
+        }
+
     }
 }

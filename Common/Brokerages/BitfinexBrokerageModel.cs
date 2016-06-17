@@ -88,7 +88,6 @@ namespace QuantConnect.Brokerages
             return new BitfinexSlippageModel();
         }
 
-        //todo: check minimum trade limits
         /// <summary>
         /// Validates pending orders based on currency pair, order amount, security type
         /// </summary>
@@ -99,8 +98,8 @@ namespace QuantConnect.Brokerages
         public override bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
             message = null;
-            Dictionary<string, int> symbol = new Dictionary<string,int> { {"BTCUSD", 2}, {"ETHUSD", 2}, {"ETHBTC", 4}, {"LTCUSD", 2}, {"LTCBTC", 4} };
-            
+            Dictionary<string, int> symbol = new Dictionary<string, int> { { "BTCUSD", 2 }, { "ETHUSD", 2 }, { "ETHBTC", 4 }, { "LTCUSD", 2 }, { "LTCBTC", 4 } };
+
             var securityType = order.SecurityType;
             if (securityType != SecurityType.Forex || !symbol.ContainsKey(order.Symbol.Value))
             {
@@ -112,7 +111,7 @@ namespace QuantConnect.Brokerages
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported", string.Format("Exceeded {0} decimal places for currency pair {1}.",
                     symbol[security.Symbol.Value].ToString(), order.Symbol.Value));
-                return false;            
+                return false;
             }
 
             return true;
@@ -121,6 +120,14 @@ namespace QuantConnect.Brokerages
         private int NumberOfDecimals(decimal quantity)
         {
             return BitConverter.GetBytes(decimal.GetBits(quantity)[3])[2];
+        }
+
+        /// <summary>
+        /// Allows the brokerage to push cashbook updates. This is disabled by default.
+        /// </summary>
+        public override bool AllowAccountUpdates
+        {
+            get { return true; }
         }
 
     }

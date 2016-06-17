@@ -77,7 +77,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     else if (term == "ws")
                     {
                         //wallet
-                        var data = raw[2].ToObject(typeof(string[][]));
+                        var data = raw[2].ToObject(typeof(string[]));
                         PopulateWallet(data);
                     }
                 }
@@ -172,20 +172,12 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         }
 
-        //todo: Currently populated but not used
-        private void PopulateWallet(string[][] data)
+        private void PopulateWallet(string[] data)
         {
-            if (data.Length > 0)
+            var msg = new WalletMessage(data);
+            if (msg.WLT_NAME == this.Wallet)
             {
-                lock (_cashLock)
-                {
-                    _cash.Clear();
-                    for (int i = 0; i < data.Length; i++)
-                    {
-                        var msg = new WalletMessage(data[i]);
-                        _cash.Add(new Securities.Cash(msg.WLT_CURRENCY, msg.WLT_BALANCE, 1));
-                    }
-                }
+                this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE * ScaleFactor));
             }
         }
 
@@ -247,15 +239,20 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected override void Authenticate()
         {
-            string key = ApiKey;
-            string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
-            _webSocket.Send(JsonConvert.SerializeObject(new
+            //prevent attempting auth more than every 10 seconds
+            if (DateTime.Now > previousAuthentication.AddSeconds(10))
             {
-                @event = "auth",
-                apiKey = key,
-                authSig = GetHexHashSignature(payload, ApiSecret),
-                authPayload = payload
-            }));
+                string key = ApiKey;
+                string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
+                _webSocket.Send(JsonConvert.SerializeObject(new
+                {
+                    @event = "auth",
+                    apiKey = key,
+                    authSig = GetHexHashSignature(payload, ApiSecret),
+                    authPayload = payload
+                }));
+                previousAuthentication = DateTime.Now;
+            }
         }
 
         private void UnAuthenticate()
