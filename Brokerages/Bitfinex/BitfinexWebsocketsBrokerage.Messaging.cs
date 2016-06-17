@@ -77,7 +77,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     else if (term == "ws")
                     {
                         //wallet
-                        var data = raw[2].ToObject(typeof(string[]));
+                        var data = raw[2].ToObject(typeof(string[][]));
                         PopulateWallet(data);
                     }
                 }
@@ -110,6 +110,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 }
                 else if (raw.@event == "info" && raw.code == "20061")
                 {
+                    this._checkConnectionTask.Wait(30);
                     //soft reset
                     UnAuthenticate();
 
@@ -172,12 +173,15 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         }
 
-        private void PopulateWallet(string[] data)
+        private void PopulateWallet(string[][] data)
         {
-            var msg = new WalletMessage(data);
-            if (msg.WLT_NAME == this.Wallet)
+            foreach (var item in data)
             {
-                this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE * ScaleFactor));
+                var msg = new WalletMessage(item);
+                if (msg.WLT_NAME == this.Wallet)
+                {
+                    this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE * ScaleFactor));
+                }
             }
         }
 
