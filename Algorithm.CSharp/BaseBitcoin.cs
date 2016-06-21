@@ -95,9 +95,9 @@ namespace QuantConnect.Algorithm.CSharp
 
         public abstract void OnData(Tick data);
 
-        protected virtual void Output(string title)
+        protected virtual void Output(string title, string symbol = btcusd)
         {
-            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Math.Round(Portfolio[BTCUSD].LastTradeProfit, 2)
+            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[symbol].Price.ToString() + " Trade:" + Math.Round(Portfolio[symbol].LastTradeProfit, 2)
                 + " Total:" + Portfolio.TotalPortfolioValue);
         }
 
@@ -131,7 +131,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (strategy == StopLossStrategy.TotalPortfolioValue)
                 {
-                    if (Portfolio[BTCUSD].TotalCloseProfit() / Portfolio.TotalPortfolioValue < -StopLoss)
+                    if (Portfolio[symbol].TotalCloseProfit() / Portfolio.TotalPortfolioValue < -StopLoss)
                     {
                         Liquidate();
                         Output("stop");
@@ -147,7 +147,7 @@ namespace QuantConnect.Algorithm.CSharp
                 }
                 else if (strategy == StopLossStrategy.AverageTrueRange)
                 {
-                    decimal atrLimit = Portfolio[BTCUSD].AbsoluteHoldingsCost * atr * AtrScale;
+                    decimal atrLimit = Portfolio[symbol].AbsoluteHoldingsCost * atr * AtrScale;
                     if (Portfolio.TotalUnrealisedProfit < -atrLimit)
                     {
                         Liquidate();
@@ -163,7 +163,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 if (strategy == TakeProfitStrategy.TotalPortfolioValue)
                 {
-                    if (Portfolio[BTCUSD].TotalCloseProfit() / Portfolio.TotalPortfolioValue > TakeProfit)
+                    if (Portfolio[symbol].TotalCloseProfit() / Portfolio.TotalPortfolioValue > TakeProfit)
                     {
                         Liquidate();
                         Output("take");
@@ -179,7 +179,7 @@ namespace QuantConnect.Algorithm.CSharp
                 }
                 else if (strategy == TakeProfitStrategy.AverageTrueRange)
                 {
-                    decimal atrLimit = Portfolio[BTCUSD].AbsoluteHoldingsCost * atr * AtrScale;
+                    decimal atrLimit = Portfolio[symbol].AbsoluteHoldingsCost * atr * AtrScale;
                     if (Portfolio.TotalUnrealisedProfit > atrLimit)
                     {
                         Liquidate();
