@@ -95,9 +95,9 @@ namespace QuantConnect.Algorithm.CSharp
 
         public abstract void OnData(Tick data);
 
-        protected virtual void Output(string title, string symbol = btcusd)
+        protected virtual void Output(string title)
         {
-            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[symbol].Price.ToString() + " Trade:" + Math.Round(Portfolio[symbol].LastTradeProfit, 2)
+            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Math.Round(Portfolio[BTCUSD].LastTradeProfit, 2)
                 + " Total:" + Portfolio.TotalPortfolioValue);
         }
 
