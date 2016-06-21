@@ -188,8 +188,8 @@ namespace QuantConnect.Algorithm.CSharp
                 }
                 else if (strategy == TakeProfitStrategy.UntilReversal)
                 {
-                    unrealizedProfit.Add(Math.Round(Portfolio[symbol].UnrealizedProfitPercent, 1));
-                    if (unrealizedProfit[0] > 0 && unrealizedProfit.IsReady && unrealizedProfit[0] < unrealizedProfit[1])
+                    unrealizedProfit.Add(Portfolio[symbol].UnrealizedProfitPercent);
+                    if (unrealizedProfit[0] > 0 && unrealizedProfit.IsReady && unrealizedProfit[1] - unrealizedProfit[0] > 0.005m)
                     {
                         Liquidate();
                         Output("take");
