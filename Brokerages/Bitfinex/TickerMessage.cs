@@ -47,63 +47,63 @@ namespace QuantConnect.Brokerages.Bitfinex
         public TickerMessage(string[] values)
             : base(values)
         {
-            CHANNEL_ID = GetInt(_channel_id);
-            BID = GetDecimal(_bid);
-            BID_SIZE = TryGetDecimal(_bid_size);
-            ASK = GetDecimal(_ask);
-            ASK_SIZE = TryGetDecimal(_ask_size);
-            DAILY_CHANGE = TryGetDecimal(_daily_change);
-            DAILY_CHANGE_PERC = TryGetDecimal(_daily_change_perc);
-            LAST_PRICE = GetDecimal(_last_price);
-            VOLUME = GetDecimal(_volume);
-            HIGH = GetDecimal(_high);
-            LOW = GetDecimal(_low);
+            ChannelId = GetInt(_channel_id);
+            Bid = GetDecimal(_bid);
+            BidSize = TryGetDecimal(_bid_size);
+            Ask = GetDecimal(_ask);
+            AskSize = TryGetDecimal(_ask_size);
+            DailyChange = TryGetDecimal(_daily_change);
+            DailyChangePerc = TryGetDecimal(_daily_change_perc);
+            LastPrice = GetDecimal(_last_price);
+            Volume = GetDecimal(_volume);
+            High = GetDecimal(_high);
+            Low = GetDecimal(_low);
         }
 
         /// <summary>
         /// Channel Id
         /// </summary>
-        public int CHANNEL_ID { get; set; }
+        public int ChannelId { get; set; }
         /// <summary>
         /// Bid
         /// </summary>
-        public decimal BID { get; set; }
+        public decimal Bid { get; set; }
         /// <summary>
         /// Bid Size
         /// </summary>
-        public decimal BID_SIZE { get; set; }
+        public decimal BidSize { get; set; }
         /// <summary>
         /// Ask
         /// </summary>
-        public decimal ASK { get; set; }
+        public decimal Ask { get; set; }
         /// <summary>
         /// Ask Size
         /// </summary>
-        public decimal ASK_SIZE { get; set; }
+        public decimal AskSize { get; set; }
         /// <summary>
         /// Daily Change
         /// </summary>
-        public decimal DAILY_CHANGE { get; set; }
+        public decimal DailyChange { get; set; }
         /// <summary>
         /// Daily Change %
         /// </summary>
-        public decimal DAILY_CHANGE_PERC { get; set; }
+        public decimal DailyChangePerc { get; set; }
         /// <summary>
         /// Last Price
         /// </summary>
-        public decimal LAST_PRICE { get; set; }
+        public decimal LastPrice { get; set; }
         /// <summary>
         /// Volume
         /// </summary>
-        public decimal VOLUME { get; set; }
+        public decimal Volume { get; set; }
         /// <summary>
         /// High
         /// </summary>
-        public decimal HIGH { get; set; }
+        public decimal High { get; set; }
         /// <summary>
         /// Low
         /// </summary>
-        public decimal LOW { get; set; }
+        public decimal Low { get; set; }
 
     }
 }

@@ -61,9 +61,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public bool Add(TradeMessage msg)
         {
-            if (!messages.ContainsKey(msg.TRD_ID))
+            if (!messages.ContainsKey(msg.TrdId))
             {
-                messages.Add(msg.TRD_ID, msg);
+                messages.Add(msg.TrdId, msg);
                 return true;
             }
             return false;
@@ -75,7 +75,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public bool IsCompleted()
         {
-            decimal quantity = messages.Sum(m => m.Value.TRD_AMOUNT_EXECUTED) * _scaleFactor;
+            decimal quantity = messages.Sum(m => m.Value.TrdAmountExecuted) * _scaleFactor;
             return quantity >= _order.Quantity;
         }
 
@@ -85,7 +85,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public decimal TotalFee()
         {
-            return messages.Sum(m => m.Value.FEE);
+            return messages.Sum(m => m.Value.Fee);
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public decimal TotalQuantity()
         {
-            return messages.Sum(m => m.Value.TRD_AMOUNT_EXECUTED);
+            return messages.Sum(m => m.Value.TrdAmountExecuted);
         }
 
 

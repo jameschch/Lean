@@ -73,66 +73,66 @@ namespace QuantConnect.Brokerages.Bitfinex
                 _ord_price = 7;
             }
 
-            TRD_SEQ = AllValues[_trd_seq];
-            TRD_PAIR = AllValues[_trd_pair];
-            TRD_TIMESTAMP = GetDateTime(_trd_timestamp);
-            TRD_ORD_ID = GetInt(_trd_ord_id);
-            TRD_AMOUNT_EXECUTED = GetDecimal(_trd_amount_executed);
-            TRD_PRICE_EXECUTED = GetDecimal(_trd_price_executed);
-            ORD_TYPE = AllValues[_ord_type];
-            ORD_PRICE = TryGetDecimal(_ord_price);
+            TrdSeq = AllValues[_trd_seq];
+            TrdPair = AllValues[_trd_pair];
+            TrdTimestamp = GetDateTime(_trd_timestamp);
+            TrdOrdId = GetInt(_trd_ord_id);
+            TrdAmountExecuted = GetDecimal(_trd_amount_executed);
+            TrdPriceExecuted = GetDecimal(_trd_price_executed);
+            OrdType = AllValues[_ord_type];
+            OrdPrice = TryGetDecimal(_ord_price);
             if (AllValues.Length == 11)
             {
-                TRD_ID = TryGetInt(_trd_id);
-                FEE = TryGetDecimal(_fee);
-                FEE_CURRENCY = AllValues[_fee_currency];
+                TrdId = TryGetInt(_trd_id);
+                Fee = TryGetDecimal(_fee);
+                FeeCurrency = AllValues[_fee_currency];
             }
         }
 
         /// <summary>
         /// Trade sequence
         /// </summary>
-        public string TRD_SEQ { get; set; }
+        public string TrdSeq { get; set; }
         /// <summary>
         /// Trade Id
         /// </summary>
-        public int TRD_ID { get; set; }
+        public int TrdId { get; set; }
         /// <summary>
         /// Currency Pair
         /// </summary>
-        public string TRD_PAIR { get; set; }
+        public string TrdPair { get; set; }
         /// <summary>
         /// Timestamp
         /// </summary>
-        public DateTime TRD_TIMESTAMP { get; set; }
+        public DateTime TrdTimestamp { get; set; }
         /// <summary>
         /// Order Id
         /// </summary>
-        public int TRD_ORD_ID { get; set; }
+        public int TrdOrdId { get; set; }
         /// <summary>
         /// Amount Executed
         /// </summary>
-        public decimal TRD_AMOUNT_EXECUTED { get; set; }
+        public decimal TrdAmountExecuted { get; set; }
         /// <summary>
         /// Price Executed
         /// </summary>
-        public decimal TRD_PRICE_EXECUTED { get; set; }
+        public decimal TrdPriceExecuted { get; set; }
         /// <summary>
         /// Order type
         /// </summary>
-        public string ORD_TYPE { get; set; }
+        public string OrdType { get; set; }
         /// <summary>
         /// Order Price
         /// </summary>
-        public decimal ORD_PRICE { get; set; }
+        public decimal OrdPrice { get; set; }
         /// <summary>
         /// Fee
         /// </summary>
-        public decimal FEE { get; set; }
+        public decimal Fee { get; set; }
         /// <summary>
         /// Fee Currency
         /// </summary>
-        public string FEE_CURRENCY { get; set; }
+        public string FeeCurrency { get; set; }
 
     }
 }

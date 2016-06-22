@@ -42,42 +42,42 @@ namespace QuantConnect.Brokerages.Bitfinex
         public TradeTickerMessage(string[] values)
             : base(values)
         {
-            CHANNEL_ID = GetInt(_channel_id);
-            TERM = values[_term];
-            SEQ = values[_seq];
-            TIMESTAMP = GetInt(_timestamp);
-            PRICE = TryGetDecimal(_price);
-            AMOUNT = TryGetDecimal(_amount);
+            ChannelId = GetInt(_channel_id);
+            Term = values[_term];
+            Seq = values[_seq];
+            Timestamp = GetInt(_timestamp);
+            Price = TryGetDecimal(_price);
+            Amount = TryGetDecimal(_amount);
         }
 
         /// <summary>
         /// Channel Id
         /// </summary>
-        public int CHANNEL_ID { get; set; }
+        public int ChannelId { get; set; }
         /// <summary>
         /// te or tu
         /// </summary>
-        public string TERM { get; set; }
+        public string Term { get; set; }
         /// <summary>
-        /// sequqnce number
+        /// sequence number
         /// </summary>
-        public string SEQ { get; set; }
+        public string Seq { get; set; }
         /// <summary>
         /// Id
         /// </summary>
-        public int ID { get; set; }
+        public int Id { get; set; }
         /// <summary>
         /// Timestamp
         /// </summary>
-        public int TIMESTAMP { get; set; }
+        public int Timestamp { get; set; }
         /// <summary>
         /// Price
         /// </summary>
-        public decimal PRICE { get; set; }
+        public decimal Price { get; set; }
         /// <summary>
         /// Amount
         /// </summary>
-        public decimal AMOUNT { get; set; }
+        public decimal Amount { get; set; }
 
     }
 }
