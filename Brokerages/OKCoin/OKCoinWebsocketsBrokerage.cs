@@ -430,15 +430,14 @@ namespace QuantConnect.Brokerages.OKCoin
 
         private decimal GetConversionRate(string symbol)
         {
-            if (_baseCurrency == symbol.ToLower())
+            if (symbol.ToLower() == "USD")
             {
                 return 1m;
             }
 
-
-            //todo: Why is this needed? Only one of these base currencies is active
+            //todo: This may be needed if LEAN account currency must be USD
             string url;
-            if (symbol == "USD" || symbol == "CNY")
+            if (symbol == "CNY")
             {
                 url = @"http://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22"
                     + symbol + _baseCurrency + "%22)&env=store://datatables.org/alltableswithkeys";
@@ -455,7 +454,6 @@ namespace QuantConnect.Brokerages.OKCoin
             }
         }
 
-        //todo:
         /// <summary>
         /// Retreive holdings from exchange
         /// </summary>
