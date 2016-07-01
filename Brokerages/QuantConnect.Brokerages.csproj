@@ -261,7 +261,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="OneBroker\1BrokerApi.Net.dll" />
-    <Content Include="OneBroker\1BrokerApi.Net.pdb" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

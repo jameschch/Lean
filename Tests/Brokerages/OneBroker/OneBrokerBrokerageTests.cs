@@ -1,4 +1,7 @@
-﻿using NUnit.Framework;
+﻿using Jojatekok.OneBrokerAPI;
+using Jojatekok.OneBrokerAPI.JsonObjects;
+using Moq;
+using NUnit.Framework;
 using QuantConnect.Brokerages.OneBroker;
 using System;
 using System.Collections.Generic;
@@ -11,8 +14,14 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
     [TestFixture()]
     public class OneBrokerBrokerageTests
     {
+        Mock<OneBrokerClient> mockClient;
+        OneBrokerBrokerage unit;
 
-        OneBrokerBrokerage unit = new OneBrokerBrokerage("apitoken");
+        public OneBrokerBrokerageTests()
+        {
+            mockClient = new Mock<OneBrokerClient>(It.IsAny<string>());
+            unit = new OneBrokerBrokerage(mockClient.Object);
+        }
 
         [Test()]
         public void OneBrokerBrokerageTest()
@@ -29,7 +38,13 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
         [Test()]
         public void GetCashBalanceTest()
         {
-            Assert.Fail();
+            decimal expected = 123.456m;
+            var info = new Mock<AccountInfo>();
+            info.Setup(i => i.BalanceInBitcoins).Returns(expected.ToString());
+            mockClient.Setup(c => c.Account.GetAccountInfo()).Returns(info.Object);
+            var actual = unit.GetCashBalance();
+
+            Assert.AreEqual(expected, actual.Where(a => a.Symbol == "BTC").Single().Amount);
         }
 
         [Test()]

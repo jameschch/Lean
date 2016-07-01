@@ -28,9 +28,9 @@ namespace QuantConnect.Brokerages.OneBroker
         /// 
         /// </summary>
         /// <param name="apiToken"></param>
-        public OneBrokerBrokerage(string apiToken) : base("1Broker")
+        public OneBrokerBrokerage(OneBrokerClient client) : base("1Broker")
         {
-            this._client = new OneBrokerClient(apiToken);
+            this._client = client;
         }
 
         public override bool IsConnected
