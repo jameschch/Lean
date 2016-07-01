@@ -11,6 +11,7 @@ using QuantConnect.Packets;
 using Jojatekok.OneBrokerAPI;
 using QuantConnect.Data.Market;
 using System.Threading;
+using System.Collections.Concurrent;
 
 namespace QuantConnect.Brokerages.OneBroker
 {
@@ -23,6 +24,10 @@ namespace QuantConnect.Brokerages.OneBroker
         /// </summary>
         protected List<Tick> Ticks = new List<Tick>();
         CancellationTokenSource _tickerToken;
+        /// <summary>
+        /// List of known orders
+        /// </summary>
+        public ConcurrentDictionary<int, Order> CachedOrderIDs = new ConcurrentDictionary<int, Order>();
 
         /// <summary>
         /// 
@@ -35,12 +40,8 @@ namespace QuantConnect.Brokerages.OneBroker
 
         public override bool IsConnected
         {
-            get
-            {
-                throw new NotImplementedException();
-            }
+            get { return this._tickerToken != null && !this._tickerToken.IsCancellationRequested; }
         }
-
 
         public override List<Holding> GetAccountHoldings()
         {
@@ -60,9 +61,48 @@ namespace QuantConnect.Brokerages.OneBroker
             throw new NotImplementedException();
         }
 
+        //todo: symbol mapper.
+        //todo: check cross zero orders
         public override bool PlaceOrder(Order order)
         {
-            throw new NotImplementedException();
+            decimal price = -1;
+            Jojatekok.OneBrokerAPI.OrderType type = Jojatekok.OneBrokerAPI.OrderType.Market;
+            decimal? stopPrice = null;
+
+            if (order.Type == Orders.OrderType.Limit)
+            {
+                price = ((LimitOrder)order).LimitPrice;
+                type = Jojatekok.OneBrokerAPI.OrderType.Limit;
+            }
+            else if (order.Type == Orders.OrderType.StopLimit)
+            {
+                price = ((StopLimitOrder)order).LimitPrice;
+                type = Jojatekok.OneBrokerAPI.OrderType.Limit;
+                stopPrice = ((StopLimitOrder)order).StopPrice;
+            }
+
+            var response = _client.Orders.PostOrder(new Jojatekok.OneBrokerAPI.JsonObjects.Order
+            (
+                 order.Symbol,
+                 order.AbsoluteQuantity,
+                 order.Direction == OrderDirection.Buy ? TradeDirection.Long : TradeDirection.Short,
+                 /*todo: leverage is separate. Can this be ommitted? Otherwise we have to recalculate here from quantity and cash balance.*/
+                 0,
+                 type,
+                 price,
+                 /*stop looks like a trailing stop (offset from price) rather than a stop limit price. Check this*/
+                 stopPrice
+            ));
+
+            if (response == null || response.Id == 0)
+            {
+                return false;
+            }
+
+            order.BrokerId.Add(response.Id.ToString());
+            CachedOrderIDs.AddOrUpdate(order.Id, order);
+
+            return true;
         }
 
         public override bool UpdateOrder(Order order)
@@ -102,12 +142,15 @@ namespace QuantConnect.Brokerages.OneBroker
 
         public override void Connect()
         {
-            throw new NotImplementedException();
+            _tickerToken = new CancellationTokenSource();
         }
 
         public override void Disconnect()
         {
-            throw new NotImplementedException();
+            if (this._tickerToken != null)
+            {
+                this._tickerToken.Cancel();
+            }
         }
 
         //todo: support multiple subscriptions
@@ -119,11 +162,10 @@ namespace QuantConnect.Brokerages.OneBroker
             {
                 Ticks.Add(new Tick
                 {
-                    //todo: "monetary" amounts should be decimal
-                    AskPrice = (decimal)response.MarketAsk,
-                    BidPrice = (decimal)response.MarketBid,
+                    AskPrice = response.MarketAsk,
+                    BidPrice = response.MarketBid,
                     Time = response.TimeUpdated,
-                    Value = (decimal)((response.MarketAsk + response.MarketBid) / 2),
+                    Value = ((response.MarketAsk + response.MarketBid) / 2),
                     TickType = TickType.Quote,
                     Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OneBroker),
                     DataType = MarketDataType.Tick

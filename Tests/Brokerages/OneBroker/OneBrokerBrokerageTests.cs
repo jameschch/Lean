@@ -54,7 +54,40 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
         }
 
         [Test()]
-        public void PlaceOrderTest()
+        public void PlaceOrderMarketTest()
+        {
+            var order = new Orders.MarketOrder
+            {
+                Id = 1,
+                Price = 123,
+                Quantity = 456,
+                Status = Orders.OrderStatus.New,
+                Symbol = "BTCUSD"
+            };
+
+            int brokerId = 123;
+            Order brokerOrder = null;
+            mockClient.Setup(c => c.Orders.PostOrder(It.IsAny<Order>())).Callback<Order>((o) =>
+            {
+                brokerOrder = o;
+                o.Id = (ulong)brokerId;
+            }).Returns<Order>(o => o);
+
+            unit.PlaceOrder(order);
+
+            Assert.IsTrue(unit.CachedOrderIDs[1].BrokerId.Contains(brokerId.ToString()));
+            Assert.AreEqual(order.AbsoluteQuantity, brokerOrder.AmountMargin);
+
+        }
+
+        [Test()]
+        public void PlaceOrderLimitTest()
+        {
+            Assert.Fail();
+        }
+
+        [Test()]
+        public void PlaceOrderStopTest()
         {
             Assert.Fail();
         }
