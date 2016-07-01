@@ -37,6 +37,10 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="1BrokerApi.Net, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>OneBroker\1BrokerApi.Net.dll</HintPath>
+    </Reference>
     <Reference Include="IKVM.OpenJDK.Beans, Version=7.2.4630.5, Culture=neutral, PublicKeyToken=13235d27fcbfff58, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\IKVM-WithExes.7.3.4830.1\tools\IKVM.OpenJDK.Beans.dll</HintPath>
@@ -209,6 +213,7 @@
     <Compile Include="Oanda\Session\EventsSession.cs" />
     <Compile Include="Oanda\Session\RatesSession.cs" />
     <Compile Include="Oanda\Session\StreamSession.cs" />
+    <Compile Include="OneBroker\OneBrokerBrokerage.cs" />
     <Compile Include="Paper\PaperBrokerage.cs" />
     <Compile Include="Paper\PaperBrokerageFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -253,6 +258,10 @@
     <None Include="Fxcm\QuantConnect.Fxcm.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="OneBroker\1BrokerApi.Net.dll" />
+    <Content Include="OneBroker\1BrokerApi.Net.pdb" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
