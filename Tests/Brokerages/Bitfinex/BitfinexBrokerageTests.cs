@@ -39,7 +39,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal HighPrice
         {
-            get { return 20m; }
+            get { return 2000m; }
         }
 
         /// <summary>
@@ -47,7 +47,12 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal LowPrice
         {
-            get { return 1m; }
+            get { return 100m; }
+        }
+
+        protected override decimal GetDefaultQuantity()
+        {
+            return 0.01m;
         }
         #endregion
 
@@ -56,7 +61,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             string apiSecret = Config.Get("bitfinex-api-secret");
             string apiKey = Config.Get("bitfinex-api-key");
             string wallet = Config.Get("bitfinex-wallet");
-            decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor", "100"));
+            decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor", "1"));
             string url = Config.Get("bitfinex-wss", "wss://api2.bitfinex.com:3000/ws");
             var restClient = new BitfinexApi(apiSecret, apiKey);
             var webSocketClient = new WebSocketWrapper();

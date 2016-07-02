@@ -83,9 +83,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected ISecurityProvider SecurityProvider;
 
-        const string _exchangeMarket  = "exchange market";
+        const string _exchangeMarket = "exchange market";
         const string _exchangeLimit = "exchange limit";
-        const string _exchangeStop = "exchange stop"  ;     
+        const string _exchangeStop = "exchange stop";
         const string _market = "market";
         const string _limit = "limit";
         const string _stop = "stop";
@@ -142,6 +142,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             Authenticate();
 
             decimal quantity = SecurityProvider.GetHoldingsQuantity(order.Symbol);
+            order.PriceCurrency = order.Symbol.Value.Substring(3,3);
             Orders.Order crossOrder = null;
             if (OrderCrossesZero(order, quantity))
             {
