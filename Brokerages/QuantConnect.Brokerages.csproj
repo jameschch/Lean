@@ -214,6 +214,8 @@
     <Compile Include="Oanda\Session\RatesSession.cs" />
     <Compile Include="Oanda\Session\StreamSession.cs" />
     <Compile Include="OneBroker\OneBrokerBrokerage.cs" />
+    <Compile Include="OneBroker\OneBrokerSymbol.cs" />
+    <Compile Include="OneBroker\OneBrokerSymbolMapper.cs" />
     <Compile Include="Paper\PaperBrokerage.cs" />
     <Compile Include="Paper\PaperBrokerageFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -28,11 +28,12 @@ namespace QuantConnect.Brokerages.OneBroker
         /// List of known orders
         /// </summary>
         public ConcurrentDictionary<int, Order> CachedOrderIDs = new ConcurrentDictionary<int, Order>();
+        private OneBrokerSymbolMapper _symbolMapper = new OneBrokerSymbolMapper();
 
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="apiToken"></param>
+        /// <param name="client"></param>
         public OneBrokerBrokerage(OneBrokerClient client) : base("1Broker")
         {
             this._client = client;
@@ -43,15 +44,36 @@ namespace QuantConnect.Brokerages.OneBroker
             get { return this._tickerToken != null && !this._tickerToken.IsCancellationRequested; }
         }
 
+
         public override List<Holding> GetAccountHoldings()
         {
-            throw new NotImplementedException();
+            var list = new List<Holding>();
+
+            var response = _client.Positions.GetOpenPositions();
+            foreach (var item in response)
+            {
+                var securityType = _symbolMapper.GetSecurityType(item.Symbol);
+
+                list.Add(new Holding
+                {
+                    Symbol = _symbolMapper.GetLeanSymbol(item.Symbol, securityType, Market.OneBroker),                     
+                    AveragePrice = item.PriceEntry,
+                    Quantity = item.AmountMargin,
+                    //todo: do we need amount*leverage to get absolute holding?
+                    MarketPrice = (item.SymbolMarketAsk + item.SymbolMarketBid) / 2,
+                    //todo: USD conversion rate
+                    //ConversionRate
+                    Type = securityType                     
+                });
+            }
+            return list;
+
         }
 
         public override List<Cash> GetCashBalance()
         {
             //todo: get btcusd rate
-            decimal conversionRate = 1;
+            decimal conversionRate = 420;
             var response = _client.Account.GetAccountInfo();
             return new List<Cash> { new Cash("BTC", decimal.Parse(response.BalanceInBitcoins), conversionRate) };
         }
@@ -61,7 +83,6 @@ namespace QuantConnect.Brokerages.OneBroker
             throw new NotImplementedException();
         }
 
-        //todo: symbol mapper.
         //todo: check cross zero orders
         public override bool PlaceOrder(Order order)
         {
@@ -83,14 +104,14 @@ namespace QuantConnect.Brokerages.OneBroker
 
             var response = _client.Orders.PostOrder(new Jojatekok.OneBrokerAPI.JsonObjects.Order
             (
-                 order.Symbol,
+                 _symbolMapper.GetBrokerageSymbol(order.Symbol),
                  order.AbsoluteQuantity,
                  order.Direction == OrderDirection.Buy ? TradeDirection.Long : TradeDirection.Short,
                  /*todo: leverage is separate. Can this be ommitted? Otherwise we have to recalculate here from quantity and cash balance.*/
                  0,
                  type,
                  price,
-                 /*stop looks like a trailing stop (offset from price) rather than a stop limit price. Check this*/
+                 /*todo: stop looks like a trailing stop (offset from price) rather than a stop limit price. Check this*/
                  stopPrice
             ));
 

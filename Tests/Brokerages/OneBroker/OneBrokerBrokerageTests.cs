@@ -56,16 +56,17 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
         [Test()]
         public void PlaceOrderMarketTest()
         {
+            int id = 1;
             var order = new Orders.MarketOrder
             {
-                Id = 1,
+                Id = id,
                 Price = 123,
                 Quantity = 456,
                 Status = Orders.OrderStatus.New,
-                Symbol = "BTCUSD"
+                Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OneBroker)
             };
 
-            int brokerId = 123;
+            int brokerId = 789;
             Order brokerOrder = null;
             mockClient.Setup(c => c.Orders.PostOrder(It.IsAny<Order>())).Callback<Order>((o) =>
             {
@@ -75,21 +76,68 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
 
             unit.PlaceOrder(order);
 
-            Assert.IsTrue(unit.CachedOrderIDs[1].BrokerId.Contains(brokerId.ToString()));
+            Assert.IsTrue(unit.CachedOrderIDs[id].BrokerId.Contains(brokerId.ToString()));
             Assert.AreEqual(order.AbsoluteQuantity, brokerOrder.AmountMargin);
-
         }
 
         [Test()]
         public void PlaceOrderLimitTest()
         {
-            Assert.Fail();
+            int id = 2;
+            var order = new Orders.LimitOrder
+            {
+                Id = id,
+                Price = 123,
+                LimitPrice = 321,
+                Quantity = 456,
+                Status = Orders.OrderStatus.New,
+                Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OneBroker)
+            };
+
+            int brokerId = 789;
+            Order brokerOrder = null;
+            mockClient.Setup(c => c.Orders.PostOrder(It.IsAny<Order>())).Callback<Order>((o) =>
+            {
+                brokerOrder = o;
+                o.Id = (ulong)brokerId;
+            }).Returns<Order>(o => o);
+
+            unit.PlaceOrder(order);
+
+            Assert.IsTrue(unit.CachedOrderIDs[id].BrokerId.Contains(brokerId.ToString()));
+            Assert.AreEqual(order.AbsoluteQuantity, brokerOrder.AmountMargin);
+            Assert.AreEqual(order.LimitPrice, brokerOrder.TypeParameter);
         }
 
         [Test()]
         public void PlaceOrderStopTest()
         {
-            Assert.Fail();
+            int id = 3;
+            var order = new Orders.StopLimitOrder
+            {
+                Id = id,
+                Price = 123,
+                LimitPrice = 321,
+                StopPrice = 654,
+                Quantity = 456,
+                Status = Orders.OrderStatus.New,
+                Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OneBroker)
+            };
+
+            int brokerId = 789;
+            Order brokerOrder = null;
+            mockClient.Setup(c => c.Orders.PostOrder(It.IsAny<Order>())).Callback<Order>((o) =>
+            {
+                brokerOrder = o;
+                o.Id = (ulong)brokerId;
+            }).Returns<Order>(o => o);
+
+            unit.PlaceOrder(order);
+
+            Assert.IsTrue(unit.CachedOrderIDs[id].BrokerId.Contains(brokerId.ToString()));
+            Assert.AreEqual(order.AbsoluteQuantity, brokerOrder.AmountMargin);
+            Assert.AreEqual(order.LimitPrice, brokerOrder.TypeParameter);
+            Assert.AreEqual(order.StopPrice, brokerOrder.StopLoss);
         }
 
         [Test()]
