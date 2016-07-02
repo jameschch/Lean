@@ -17,12 +17,12 @@ using Moq;
 namespace QuantConnect.Tests.Brokerages.Bitfinex
 {
     [TestFixture, Ignore("This test requires a configured and active account")]
-    public class BitfinexBrokerageLitecoinTests : BitfinexBrokerageTests
+    public class BitfinexBrokerageEthereumTests : BitfinexBrokerageTests
     {
 
         protected override Symbol Symbol
         {
-            get { return Symbol.Create("LTCBTC", SecurityType.Forex, Market.Bitfinex); }
+            get { return Symbol.Create("ETHBTC", SecurityType.Forex, Market.Bitfinex); }
         }
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal HighPrice
         {
-            get { return 0.009m; }
+            get { return 0.03m; }
         }
 
         /// <summary>
@@ -38,12 +38,12 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
         /// </summary>
         protected override decimal LowPrice
         {
-            get { return 0.001m; }
+            get { return 0.01m; }
         }
 
-        protected override int GetDefaultQuantity()
+        protected override decimal GetDefaultQuantity()
         {
-            return 10;
+            return 0.1m;
         }
 
 
