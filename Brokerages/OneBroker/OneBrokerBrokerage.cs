@@ -56,14 +56,14 @@ namespace QuantConnect.Brokerages.OneBroker
 
                 list.Add(new Holding
                 {
-                    Symbol = _symbolMapper.GetLeanSymbol(item.Symbol, securityType, Market.OneBroker),                     
+                    Symbol = _symbolMapper.GetLeanSymbol(item.Symbol),
                     AveragePrice = item.PriceEntry,
                     Quantity = item.AmountMargin,
-                    //todo: do we need amount*leverage to get absolute holding?
+                    //todo: do we need amount*leverage to get total holding?
                     MarketPrice = (item.SymbolMarketAsk + item.SymbolMarketBid) / 2,
                     //todo: USD conversion rate
                     //ConversionRate
-                    Type = securityType                     
+                    Type = securityType
                 });
             }
             return list;
@@ -101,6 +101,9 @@ namespace QuantConnect.Brokerages.OneBroker
                 type = Jojatekok.OneBrokerAPI.OrderType.Limit;
                 stopPrice = ((StopLimitOrder)order).StopPrice;
             }
+
+            //todo: confirm all prices quoted in usd
+            order.PriceCurrency = order.SecurityType == SecurityType.Forex ? order.Symbol.Value.Substring(3, 3) : "USD";
 
             var response = _client.Orders.PostOrder(new Jojatekok.OneBrokerAPI.JsonObjects.Order
             (
@@ -178,19 +181,21 @@ namespace QuantConnect.Brokerages.OneBroker
         private async Task RequestTicker()
         {
 
-            var response = _client.Markets.GetQuotes(new string[] { "BTCUSD" }).First();
-            lock (Ticks)
+            foreach (var item in _client.Markets.GetQuotes(new string[] { "BTCUSD" }))
             {
-                Ticks.Add(new Tick
+                lock (Ticks)
                 {
-                    AskPrice = response.MarketAsk,
-                    BidPrice = response.MarketBid,
-                    Time = response.TimeUpdated,
-                    Value = ((response.MarketAsk + response.MarketBid) / 2),
-                    TickType = TickType.Quote,
-                    Symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OneBroker),
-                    DataType = MarketDataType.Tick
-                });
+                    Ticks.Add(new Tick
+                    {
+                        AskPrice = item.MarketAsk,
+                        BidPrice = item.MarketBid,
+                        Time = item.TimeUpdated,
+                        Value = ((item.MarketAsk + item.MarketBid) / 2),
+                        TickType = TickType.Quote,
+                        Symbol = _symbolMapper.GetLeanSymbol(item.Symbol),
+                        DataType = MarketDataType.Tick
+                    });
+                }
             }
             if (!_tickerToken.IsCancellationRequested)
             {

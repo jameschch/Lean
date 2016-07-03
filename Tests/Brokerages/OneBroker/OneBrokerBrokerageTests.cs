@@ -1,13 +1,16 @@
 ﻿using Jojatekok.OneBrokerAPI;
 using Jojatekok.OneBrokerAPI.JsonObjects;
 using Moq;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using QuantConnect.Brokerages.OneBroker;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Jojatekok.OneBrokerAPI;
 
 namespace QuantConnect.Brokerages.OneBroker.Tests
 {
@@ -16,6 +19,12 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
     {
         Mock<OneBrokerClient> mockClient;
         OneBrokerBrokerage unit;
+
+        private static readonly JsonSerializer JsonSerializer = new JsonSerializer
+        {
+            DateFormatHandling = DateFormatHandling.IsoDateFormat,
+            DateTimeZoneHandling = DateTimeZoneHandling.Utc
+        };
 
         public OneBrokerBrokerageTests()
         {
@@ -32,7 +41,15 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
         [Test()]
         public void GetAccountHoldingsTest()
         {
-            Assert.Fail();
+            var data = GetJsonData<JsonResponse<IList<Position>>>("TestData\\test_1Broker_positions_list_open.txt");
+
+            mockClient.Setup(c => c.Positions.GetOpenPositions()).Returns(data.Result);
+
+            var actual = unit.GetAccountHoldings().First();
+
+            Assert.AreEqual("GOLD", actual.Symbol.Value);
+            Assert.AreEqual(1000, actual.AveragePrice);
+            Assert.AreEqual(10, actual.Quantity);
         }
 
         [Test()]
@@ -181,5 +198,18 @@ namespace QuantConnect.Brokerages.OneBroker.Tests
         {
             Assert.Fail();
         }
+
+        private T GetJsonData<T>(string path)
+        {
+            using (var stringReader = new StringReader(File.ReadAllText(path)))
+            {
+                using (var jsonTextReader = new JsonTextReader(stringReader))
+                {
+                    return (T)JsonSerializer.Deserialize(jsonTextReader, typeof(T));
+                }
+            }
+
+        }
+
     }
 }

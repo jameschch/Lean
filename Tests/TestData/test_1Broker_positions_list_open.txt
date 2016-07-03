@@ -1,0 +1,21 @@
+﻿{
+    "response": [
+        {
+            "position_id": "1031546",
+            "order_id": "3055507",
+            "status": "open",
+            "symbol": "GOLD",
+            "margin": "10",
+            "leverage": "1",
+            "direction": "long",
+            "entry_price": "1000",
+            "current_bid": "1077",
+            "current_ask": "1078",
+            "profit_loss": "0.77",
+            "profit_loss_percent": "7.7",
+            "market_close": false,
+            "stop_loss": "932",
+            "take_profit": null
+        },
+    ]
+}

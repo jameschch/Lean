@@ -21,6 +21,12 @@ namespace QuantConnect.Brokerages.OneBroker
             return _symbolList.Where(s => s.BrokerSymbol == brokerSymbol).Single().SecurityType;
         }
 
+        public Symbol GetLeanSymbol(string brokerageSymbol)
+        {
+            var match = _symbolList.Where(s => s.BrokerSymbol == brokerageSymbol).Single();
+            return Symbol.Create(match.Symbol, match.SecurityType, Market.OneBroker);
+        }
+
         public Symbol GetLeanSymbol(string brokerageSymbol, SecurityType securityType, string market)
         {
             return Symbol.Create(_symbolList.Where(s => s.BrokerSymbol == brokerageSymbol).Single().Symbol, securityType, market);
@@ -31,7 +37,12 @@ namespace QuantConnect.Brokerages.OneBroker
             new OneBrokerSymbol
             {
                  BrokerSymbol = "BTCUSD", Symbol = "BTCUSD", Leverage = 5, Maximum = 20, SecurityType = SecurityType.Forex
+            },
+            new OneBrokerSymbol
+            {
+                 BrokerSymbol = "GOLD", Symbol = "GOLD", Leverage = 50, Maximum = 300, SecurityType = SecurityType.Base
             }
+
         };
 
     }
