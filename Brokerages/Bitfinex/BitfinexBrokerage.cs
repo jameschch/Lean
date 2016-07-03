@@ -413,10 +413,10 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex.ToString()),
                     Quantity = decimal.Parse(item.Amount) * ScaleFactor,
                     Type = SecurityType.Forex,
-                    CurrencySymbol = item.Symbol.Substring(0, 3).ToUpper(),
+                    CurrencySymbol = item.Symbol.Substring(0, 3).ToUpper(),                     
                     ConversionRate = (conversionRate / ScaleFactor),
                     MarketPrice = (decimal.Parse(ticker.Mid) / ScaleFactor),
-                    AveragePrice = (decimal.Parse(item.Base) / ScaleFactor),
+                    AveragePrice = (decimal.Parse(item.Base) / ScaleFactor),                    
                 });
             }
             return list;
