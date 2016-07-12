@@ -92,11 +92,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Total amount executed across all fills
         /// </summary>
         /// <returns></returns>
-        public decimal TotalQuantity()
+        public decimal TotalQuantity
         {
-            return messages.Sum(m => m.Value.TrdAmountExecuted);
+            get { return _order.Quantity; }
         }
-
 
     }
 }

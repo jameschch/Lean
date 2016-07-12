@@ -91,7 +91,10 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                     foreach (var item in removing)
                     {
-                        this._channelId.Remove(item);
+                        if (item != chanId)
+                        {
+                            this._channelId.Remove(item);
+                        }
                     }
                     this._channelId[chanId] = new Channel { Name = channel, Symbol = raw.pair };
                 }
@@ -110,14 +113,18 @@ namespace QuantConnect.Brokerages.Bitfinex
                 }
                 else if (raw.@event == "info" && raw.code == "20061")
                 {
-                    this._checkConnectionTask.Wait(30);
                     //soft reset
-                    UnAuthenticate();
-
-                    var subscribed = GetSubscribed();
-                    Unsubscribe();
-                    Subscribe(null, subscribed);
-                    Authenticate();
+                    if (!_isReconnecting)
+                    {
+                        _isReconnecting = true;
+                        this._checkConnectionTask.Wait(30);
+                        UnAuthenticate();
+                        var subscribed = GetSubscribed();
+                        Unsubscribe();
+                        Subscribe(null, subscribed);
+                        Authenticate();
+                        _isReconnecting = false;
+                    }
                 }
 
                 Log.Trace("BitfinexWebsocketsBrokerage.OnMessage(): " + e.Data);
@@ -221,7 +228,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     fill.Status = OrderStatus.Filled;
                     fill.OrderFee = Math.Abs(split.TotalFee());
-                    fill.FillQuantity = split.TotalQuantity() * ScaleFactor;
+                    fill.FillQuantity = split.TotalQuantity * ScaleFactor;
                     FilledOrderIDs.Add(cached.First().Key);
 
                     Order outOrder = cached.First().Value;

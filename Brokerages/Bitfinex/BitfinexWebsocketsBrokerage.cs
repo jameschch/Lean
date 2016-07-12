@@ -52,6 +52,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             FloatParseHandling = FloatParseHandling.Decimal
         };
         DateTime previousAuthentication = DateTime.Now.AddSeconds(-10);
+        bool _isReconnecting = false;
         #endregion
 
         /// <summary>
@@ -104,9 +105,12 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             foreach (var item in symbols)
             {
-                foreach (var channel in _channelId.Where(c => c.Value.Symbol == item.ToString()))
+                lock (_channelId)
                 {
-                    Unsubscribe(channel.Key);
+                    foreach (var channel in _channelId.Where(c => c.Value.Symbol == item.ToString()))
+                    {
+                        Unsubscribe(channel.Key);
+                    }
                 }
             }
         }
@@ -188,18 +192,16 @@ namespace QuantConnect.Brokerages.Bitfinex
                 if (!this.IsConnected || (DateTime.UtcNow - _heartbeatCounter).TotalSeconds > _heartBeatTimeout)
                 {
                     Log.Trace("BitfinexWebsocketsBrokerage.CheckConnection(): Heartbeat timeout. Reconnecting");
-                    Reconnect(false);
+                    Reconnect();
                 }
                 await Task.Delay(TimeSpan.FromSeconds(10), _checkConnectionToken.Token);
             }
         }
 
-        private void Reconnect(bool wait = true)
+        private void Reconnect()
         {
-            if (wait)
-            {
-                this._checkConnectionTask.Wait(30);
-            }
+            this._checkConnectionTask.Wait(30);
+
             var subscribed = GetSubscribed();
             //try to clean up state
             try
@@ -224,10 +226,12 @@ namespace QuantConnect.Brokerages.Bitfinex
         private IList<Symbol> GetSubscribed()
         {
             IList<Symbol> list = new List<Symbol>();
-
-            foreach (var item in _channelId)
+            lock (_channelId)
             {
-                list.Add(Symbol.Create(item.Value.Symbol, SecurityType.Forex, Market.Bitfinex));
+                foreach (var item in _channelId)
+                {
+                    list.Add(Symbol.Create(item.Value.Symbol, SecurityType.Forex, Market.Bitfinex));
+                }
             }
             return list;
         }

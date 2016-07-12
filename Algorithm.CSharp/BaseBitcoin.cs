@@ -63,8 +63,8 @@ namespace QuantConnect.Algorithm.CSharp
             //Non default brokerage for Forex. Cash or Margin accounts are supported
             SetBrokerageModel(BrokerageName.BitfinexBrokerage, AccountType.Margin);
             SetTimeZone(DateTimeZone.Utc);
-            //Can be slow to fill. 20 second timeout should be adequate in most conditions
-            Transactions.MarketOrderFillTimeout = new TimeSpan(0, 0, 20);
+            //Can be slow to fill. 60 second timeout should be adequate in most conditions
+            Transactions.MarketOrderFillTimeout = new TimeSpan(0, 0, 60);
             Portfolio.MarginCallModel = new BitfinexMarginCallModel(Portfolio);
         }
 
