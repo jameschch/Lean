@@ -116,14 +116,20 @@ namespace QuantConnect.Brokerages.Bitfinex
                     //soft reset
                     if (!_isReconnecting)
                     {
-                        _isReconnecting = true;
-                        this._checkConnectionTask.Wait(30);
-                        UnAuthenticate();
-                        var subscribed = GetSubscribed();
-                        Unsubscribe();
-                        Subscribe(null, subscribed);
-                        Authenticate();
-                        _isReconnecting = false;
+                        try
+                        {
+                            _isReconnecting = true;
+                            this._checkConnectionTask.Wait(30);
+                            UnAuthenticate();
+                            var subscribed = GetSubscribed();
+                            Unsubscribe();
+                            Subscribe(null, subscribed);
+                            Authenticate();
+                        }
+                        finally
+                        {
+                            _isReconnecting = false;
+                        }
                     }
                 }
 
