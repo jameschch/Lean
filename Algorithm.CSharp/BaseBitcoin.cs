@@ -38,7 +38,7 @@ namespace QuantConnect.Algorithm.CSharp
         protected virtual decimal TakeProfit { get { return 0.1m; } }
         protected virtual decimal AtrScale { get { return 2m; } }
         protected string BTCUSD { get { return btcusd; } }
-        RollingWindow<decimal> unrealizedProfit = new RollingWindow<decimal>(2);
+        decimal unrealizedProfit;
 
         public enum StopLossStrategy
         {
@@ -70,8 +70,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2016, 1, 12);
-            SetEndDate(2016, 6, 20);
+            SetStartDate(2016, 2, 1);
+            SetEndDate(2016, 7, 16);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
             if (LiveMode)
@@ -188,12 +188,21 @@ namespace QuantConnect.Algorithm.CSharp
                 }
                 else if (strategy == TakeProfitStrategy.UntilReversal)
                 {
-                    unrealizedProfit.Add(Portfolio[symbol].UnrealizedProfitPercent);
-                    if (unrealizedProfit[0] > 0 && unrealizedProfit.IsReady && unrealizedProfit[1] - unrealizedProfit[0] > 0.005m)
+                    if (Portfolio[symbol].UnrealizedProfitPercent > unrealizedProfit)
                     {
+                        unrealizedProfit = Portfolio[symbol].UnrealizedProfitPercent;
+                    }
+                    if (unrealizedProfit > 0 && Portfolio[symbol].UnrealizedProfitPercent > 0 
+                        && unrealizedProfit - Portfolio[symbol].UnrealizedProfitPercent > 0.01m)
+                    {
+                        unrealizedProfit = 0;
                         Liquidate();
                         Output("take");
                     }
+                }
+                else if (unrealizedProfit > 0)
+                {
+                    unrealizedProfit = 0;
                 }
             }
         }

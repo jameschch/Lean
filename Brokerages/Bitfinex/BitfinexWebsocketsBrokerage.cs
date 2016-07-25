@@ -45,13 +45,13 @@ namespace QuantConnect.Brokerages.Bitfinex
         Task _checkConnectionTask = null;
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
-        const int _heartBeatTimeout = 30;
+        const int _heartBeatTimeout = 90;
         IWebSocket _webSocket;
         JsonSerializerSettings settings = new JsonSerializerSettings
         {
             FloatParseHandling = FloatParseHandling.Decimal
         };
-        DateTime previousAuthentication = DateTime.Now.AddSeconds(-10);
+        DateTime _previousAuthentication = DateTime.Now.AddSeconds(-10);
         bool _isReconnecting = false;
         #endregion
 
@@ -144,13 +144,13 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         public override void Connect()
         {
+            _webSocket.OnMessage(OnMessage);
             _webSocket.Connect();
             if (this._checkConnectionTask == null || this._checkConnectionTask.IsFaulted || this._checkConnectionTask.IsCanceled || this._checkConnectionTask.IsCompleted)
             {
                 this._checkConnectionTask = Task.Run(() => CheckConnection());
                 this._checkConnectionToken = new CancellationTokenSource();
             }
-            _webSocket.OnMessage(OnMessage);
             this.Authenticate();
         }
 
@@ -179,7 +179,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public override bool PlaceOrder(Order order)
         {
+            decimal quantity = order.Quantity;
             var result = base.PlaceOrder(order);
+            order.Quantity = quantity;
             this.FillSplit.TryAdd(order.Id, new BitfinexFill(order, ScaleFactor));
             return result;
         }
@@ -194,13 +196,13 @@ namespace QuantConnect.Brokerages.Bitfinex
                     Log.Trace("BitfinexWebsocketsBrokerage.CheckConnection(): Heartbeat timeout. Reconnecting");
                     Reconnect();
                 }
-                await Task.Delay(TimeSpan.FromSeconds(10), _checkConnectionToken.Token);
+                await Task.Delay(TimeSpan.FromSeconds(30), _checkConnectionToken.Token);
             }
         }
 
         private void Reconnect()
         {
-            this._checkConnectionTask.Wait(30);
+            this._checkConnectionTask.Wait(60);
 
             var subscribed = GetSubscribed();
             //try to clean up state

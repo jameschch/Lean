@@ -25,9 +25,9 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
         public static void AddOrder(BitfinexBrokerage unit, int id, string brokerId, decimal scaleFactor, int quantity)
         {
-            var order = new Orders.MarketOrder { BrokerId = new List<string> { brokerId }, Quantity = quantity };
+            var order = new Orders.MarketOrder { BrokerId = new List<string> { brokerId }, Quantity = quantity, Id = id };
             unit.CachedOrderIDs.TryAdd(1, order);
-            unit.FillSplit.TryAdd(1, new BitfinexFill(order, scaleFactor));
+            unit.FillSplit.TryAdd(id, new BitfinexFill(order, scaleFactor));
         }
 
     }

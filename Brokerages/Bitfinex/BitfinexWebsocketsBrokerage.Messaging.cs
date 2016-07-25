@@ -119,7 +119,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                         try
                         {
                             _isReconnecting = true;
-                            this._checkConnectionTask.Wait(30);
+                            this._checkConnectionTask.Wait(60);
                             UnAuthenticate();
                             var subscribed = GetSubscribed();
                             Unsubscribe();
@@ -257,7 +257,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         protected override void Authenticate()
         {
             //prevent attempting auth more than every 10 seconds
-            if (DateTime.Now > previousAuthentication.AddSeconds(10))
+            if (DateTime.Now > _previousAuthentication.AddSeconds(10))
             {
                 string key = ApiKey;
                 string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
@@ -268,7 +268,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     authSig = GetHexHashSignature(payload, ApiSecret),
                     authPayload = payload
                 }));
-                previousAuthentication = DateTime.Now;
+                _previousAuthentication = DateTime.Now;
             }
         }
 
