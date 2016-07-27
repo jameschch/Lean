@@ -1074,6 +1074,14 @@ namespace QuantConnect.Algorithm
             return uni;
         }
 
+        public MamaFama MAMAFAMA(Symbol symbol, double slow, double fast, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
+        {
+            string name = CreateIndicatorName(symbol, "MAMAFAMA" + slow + " " + fast, resolution);
+            var mamafama = new MamaFama(name, slow, fast);
+            RegisterIndicator(symbol, mamafama, resolution, selector);
+            return mamafama;
+        }
+
         /// <summary>
         /// Creates and registers a new consolidator to receive automatic updates at the specified resolution as well as configures
         /// the indicator to receive updates from the consolidator.

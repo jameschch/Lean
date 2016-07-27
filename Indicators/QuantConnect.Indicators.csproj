@@ -120,6 +120,7 @@
     <Compile Include="DonchianChannel.cs" />
     <Compile Include="DoubleExponentialMovingAverage.cs" />
     <Compile Include="EmpiricalModeDecomposition.cs" />
+    <Compile Include="MamaFama.cs" />
     <Compile Include="FractalAdaptiveMovingAverage.cs" />
     <Compile Include="SwissArmyKnife.cs" />
     <Compile Include="UniversalOscillator.cs" />
