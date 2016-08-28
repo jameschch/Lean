@@ -61,5 +61,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         bool IsAlive { get; }
 
+        /// <summary>
+        /// Returns wrapped instance
+        /// </summary>
+        WebSocket Instance { get; }
+
     }
 }

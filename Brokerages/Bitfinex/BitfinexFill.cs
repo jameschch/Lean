@@ -66,6 +66,12 @@ namespace QuantConnect.Brokerages.Bitfinex
                 messages.Add(msg.TrdId, msg);
                 return true;
             }
+            else if (msg.IsTradeUpdate)
+            {
+                messages[msg.TrdId] = msg;
+                return true;
+            }
+
             return false;
         }
 

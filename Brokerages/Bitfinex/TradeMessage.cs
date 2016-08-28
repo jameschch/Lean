@@ -44,7 +44,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Constructor for Trade Message
         /// </summary>
         /// <param name="values"></param>
-        public TradeMessage(string[] values)
+        public TradeMessage(string term, string[] values)
             : base(values)
         {
 
@@ -87,6 +87,8 @@ namespace QuantConnect.Brokerages.Bitfinex
                 Fee = TryGetDecimal(_fee);
                 FeeCurrency = AllValues[_fee_currency];
             }
+
+            IsTradeUpdate = term == "tu";
         }
 
         /// <summary>
@@ -133,6 +135,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Fee Currency
         /// </summary>
         public string FeeCurrency { get; set; }
+        /// <summary>
+        /// Execution or update
+        /// </summary>
+        public bool IsTradeUpdate { get; set; }
 
     }
 }

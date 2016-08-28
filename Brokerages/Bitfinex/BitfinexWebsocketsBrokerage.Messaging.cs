@@ -64,15 +64,15 @@ namespace QuantConnect.Brokerages.Bitfinex
                         {
                             return;
                         }
-                        //trade ticker
-                        PopulateTradeTicker(e.Data, _channelId[id].Symbol);
+                        //todo: optional trade ticker
+                        //PopulateTradeTicker(e.Data, _channelId[id].Symbol);
                         return;
                     }
-                    else if (id == 0 && term == "tu")
+                    else if (id == 0 && (term == "tu" || term == "te"))
                     {
                         //trade update
                         var data = raw[2].ToObject(typeof(string[]));
-                        PopulateTrade(data);
+                        PopulateTrade(term, data);
                     }
                     else if (term == "ws")
                     {
@@ -106,25 +106,15 @@ namespace QuantConnect.Brokerages.Bitfinex
                     }
                     Log.Trace("BitfinexWebsocketsBrokerage.OnMessage(): Successful wss auth");
                 }
-                else if (raw.@event == "info" && raw.code == "20051")
+                else if (raw.@event == "info" && (raw.code == "20051" || raw.code == "20061"))
                 {
                     //hard reset
-                    this.Reconnect();
-                }
-                else if (raw.@event == "info" && raw.code == "20061")
-                {
-                    //soft reset
                     if (!_isReconnecting)
                     {
                         try
                         {
                             _isReconnecting = true;
-                            this._checkConnectionTask.Wait(60);
-                            UnAuthenticate();
-                            var subscribed = GetSubscribed();
-                            Unsubscribe();
-                            Subscribe(null, subscribed);
-                            Authenticate();
+                            this.Reconnect();
                         }
                         finally
                         {
@@ -198,9 +188,9 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
 
-        private void PopulateTrade(string[] data)
+        private void PopulateTrade(string term, string[] data)
         {
-            var msg = new TradeMessage(data);
+            var msg = new TradeMessage(term, data);
             int brokerId = msg.TrdOrdId;
 
             var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(brokerId.ToString()));
@@ -212,12 +202,12 @@ namespace QuantConnect.Brokerages.Bitfinex
                     msg.Fee = msg.Fee * msg.TrdPriceExecuted;
                     msg.FeeCurrency = "USD";
                 }
-
                 var split = this.FillSplit[cached.First().Key];
                 bool added = split.Add(msg);
                 if (!added)
                 {
                     //ignore fill message duplicate
+                    Log.Trace("BitfinexWebsocketsBrokerage.TradeMessage:" + "Fill message duplicate:" + string.Join(",", data));
                     return;
                 }
 
@@ -239,7 +229,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                     Order outOrder = cached.First().Value;
                     CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
-                    FillSplit.TryRemove(split.OrderId, out split);
+                    //FillSplit.TryRemove(split.OrderId, out split);
                 }
 
                 OnOrderEvent(fill);

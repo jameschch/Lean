@@ -226,19 +226,19 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             {
                 Mid = "654.32",
             };
-            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.btcusd, It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(btcusdTicker);
+            mock.Setup(m => m.GetPublicTicker("btcusd", It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(btcusdTicker);
 
             var ethusdTicker = new BitfinexPublicTickerGet
             {
                 Mid = "123.45",
             };
-            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.ethusd, It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ethusdTicker);
+            mock.Setup(m => m.GetPublicTicker("ethusd", It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ethusdTicker);
 
             var ethbtcTicker = new BitfinexPublicTickerGet
             {
                 Mid = "98.76",
             };
-            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.ethbtc, It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ethbtcTicker);
+            mock.Setup(m => m.GetPublicTicker("ethbtc", It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ethbtcTicker);
 
             var actual = unit.GetAccountHoldings();
 
@@ -277,7 +277,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             {
                 Mid = "987.65"
             };
-            mock.Setup(m => m.GetPublicTicker(It.IsAny<BtcInfo.PairTypeEnum>(), It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ticker);
+            mock.Setup(m => m.GetPublicTicker(It.IsAny<string>(), It.IsAny<BtcInfo.BitfinexUnauthenicatedCallsEnum>())).Returns(ticker);
 
             mock.Setup(m => m.GetBalances()).Returns(expected);
 
@@ -306,7 +306,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 Timestamp = "7",
                 Volume = "8"
             };
-            mock.Setup(m => m.GetPublicTicker(BtcInfo.PairTypeEnum.btcusd, BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker)).Returns(response);
+            mock.Setup(m => m.GetPublicTicker("BTCUSD", BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker)).Returns(response);
             unit.Subscribe(null, null);
             System.Threading.Thread.Sleep(9000);
             var actual = unit.GetNextTicks();

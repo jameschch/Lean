@@ -68,9 +68,13 @@ namespace QuantConnect.Algorithm.CSharp
             Portfolio.MarginCallModel = new BitfinexMarginCallModel(Portfolio);
         }
 
+        //todo: this is temporary
+        public BaseBitcoin(bool isBitcoin)
+        { }
+
         public override void Initialize()
         {
-            SetStartDate(2016, 2, 1);
+            SetStartDate(2016, 1, 1);
             SetEndDate(2016, 7, 16);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
@@ -78,6 +82,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 AddSecurity(SecurityType.Forex, "ETHUSD", Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
                 AddSecurity(SecurityType.Forex, "LTCUSD", Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
+                AddSecurity(SecurityType.Forex, "BFXUSD", Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
             }
             SetBenchmark(security.Symbol);
         }
@@ -98,7 +103,7 @@ namespace QuantConnect.Algorithm.CSharp
         protected virtual void Output(string title)
         {
             Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Math.Round(Portfolio[BTCUSD].LastTradeProfit, 2)
-                + " Total:" + Portfolio.TotalPortfolioValue);
+                + " Total:" + Math.Round(Portfolio.TotalPortfolioValue, 2));
         }
 
         /// <summary>
@@ -106,10 +111,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         protected virtual void Long(string symbol = btcusd)
         {
-            if (Portfolio[symbol].IsShort)
-            {
-                Liquidate();
-            }
             SetHoldings(symbol, 3.0m);
         }
 
@@ -118,10 +119,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         protected virtual void Short(string symbol = btcusd)
         {
-            if (Portfolio[symbol].IsLong)
-            {
-                Liquidate();
-            }
             SetHoldings(symbol, -3.0m);
         }
 
@@ -192,7 +189,7 @@ namespace QuantConnect.Algorithm.CSharp
                     {
                         unrealizedProfit = Portfolio[symbol].UnrealizedProfitPercent;
                     }
-                    if (unrealizedProfit > 0 && Portfolio[symbol].UnrealizedProfitPercent > 0 
+                    if (unrealizedProfit > 0 && Portfolio[symbol].UnrealizedProfitPercent > 0
                         && unrealizedProfit - Portfolio[symbol].UnrealizedProfitPercent > 0.01m)
                     {
                         unrealizedProfit = 0;

@@ -40,7 +40,7 @@ namespace QuantConnect.Indicators
         public readonly RollingWindow<double> Fama = new RollingWindow<double>(2);
         #endregion
 
-        public MamaFama(string name, double slow, double fast)
+        public MamaFama(string name, double fast, double slow)
             : base(name)
         {
             _slow = slow;
@@ -62,8 +62,8 @@ namespace QuantConnect.Indicators
             }
         }
 
-        public MamaFama(double slow, double fast)
-            : this("MAMAFAMA" + slow + " " + fast, slow, fast)
+        public MamaFama(double fast, double slow)
+            : this("MAMAFAMA" + fast + " " + slow, fast, slow)
         {
         }
 
@@ -72,7 +72,7 @@ namespace QuantConnect.Indicators
         /// </summary>
         public override bool IsReady
         {
-            get { return Mama.IsReady; }
+            get { return Samples > 14; }
         }
 
         /// <summary>

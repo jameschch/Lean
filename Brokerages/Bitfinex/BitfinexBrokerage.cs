@@ -392,14 +392,13 @@ namespace QuantConnect.Brokerages.Bitfinex
             var response = _restClient.GetActivePositions();
             foreach (var item in response)
             {
-                var symbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol);
-                var ticker = _restClient.GetPublicTicker(symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+                var ticker = _restClient.GetPublicTicker(item.Symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
 
                 decimal conversionRate = 1m;
 
                 if (!item.Symbol.EndsWith(usd))
                 {
-                    var baseSymbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
+                    var baseSymbol = item.Symbol.Substring(0, 3) + usd;
                     var baseTicker = _restClient.GetPublicTicker(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
                     conversionRate = decimal.Parse(baseTicker.Mid);
                 }
@@ -442,7 +441,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     else
                     {
                         //todo: refactor to string symbol. merge to main repo
-                        var symbol = (TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Currency + usd);
+                        var symbol = item.Currency + usd;
                         var ticker = _restClient.GetPublicTicker(symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
                         list.Add(new Securities.Cash(item.Currency.ToUpper(), item.Amount * ScaleFactor, decimal.Parse(ticker.Mid) / ScaleFactor));
                     }

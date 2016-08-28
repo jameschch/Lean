@@ -53,6 +53,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         };
         DateTime _previousAuthentication = DateTime.Now.AddSeconds(-10);
         bool _isReconnecting = false;
+        string _url;
         #endregion
 
         /// <summary>
@@ -64,6 +65,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             _webSocket = websocket;
             _webSocket.Initialize(url);
+            _url = url;
         }
 
         /// <summary>
@@ -180,9 +182,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         public override bool PlaceOrder(Order order)
         {
             decimal quantity = order.Quantity;
+            this.FillSplit.TryAdd(order.Id, new BitfinexFill(order, ScaleFactor));
             var result = base.PlaceOrder(order);
             order.Quantity = quantity;
-            this.FillSplit.TryAdd(order.Id, new BitfinexFill(order, ScaleFactor));
             return result;
         }
 
@@ -204,6 +206,11 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             this._checkConnectionTask.Wait(60);
 
+            if (_webSocket.Instance == null)
+            {
+                _webSocket.Initialize(_url);
+            }
+
             var subscribed = GetSubscribed();
             //try to clean up state
             try
@@ -215,8 +222,11 @@ namespace QuantConnect.Brokerages.Bitfinex
             catch (Exception)
             {
             }
+            Log.Trace("Attempting Connect");
             _webSocket.Connect();
+            Log.Trace("Attempting Subscribe");
             this.Subscribe(null, subscribed);
+            Log.Trace("Attempting Auth");
             this.Authenticate();
         }
 

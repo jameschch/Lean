@@ -66,7 +66,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         //todo: support multiple currencies
         private async Task RequestTicker()
         {
-            var response = _restClient.GetPublicTicker(TradingApi.ModelObjects.BtcInfo.PairTypeEnum.btcusd, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+            var response = _restClient.GetPublicTicker("BTCUSD", TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
             lock (Ticks)
             {
                 Ticks.Add(new Tick

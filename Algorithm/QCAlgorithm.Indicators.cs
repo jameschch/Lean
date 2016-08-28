@@ -1074,10 +1074,10 @@ namespace QuantConnect.Algorithm
             return uni;
         }
 
-        public MamaFama MAMAFAMA(Symbol symbol, double slow, double fast, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
+        public MamaFama MAMAFAMA(Symbol symbol, double fast, double slow, Resolution? resolution = null, Func<BaseData, decimal> selector = null)
         {
-            string name = CreateIndicatorName(symbol, "MAMAFAMA" + slow + " " + fast, resolution);
-            var mamafama = new MamaFama(name, slow, fast);
+            string name = CreateIndicatorName(symbol, "MAMAFAMA" + fast + " " + slow, resolution);
+            var mamafama = new MamaFama(name, fast, slow);
             RegisterIndicator(symbol, mamafama, resolution, selector);
             return mamafama;
         }
