@@ -31,12 +31,12 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Average bid size
         /// </summary>
-        public long LastBidSize { get; set; }
+        public decimal LastBidSize { get; set; }
         
         /// <summary>
         /// Average ask size
         /// </summary>
-        public long LastAskSize { get; set; }
+        public decimal LastAskSize { get; set; }
 
         /// <summary>
         /// Bid OHLC
@@ -211,12 +211,12 @@ namespace QuantConnect.Data.Market
 
             if (bidSize > 0) 
             {
-                LastBidSize = (long) bidSize;
+                LastBidSize = bidSize;
             }
             
             if (askSize > 0)
             {
-                LastAskSize = (long) askSize;
+                LastAskSize = askSize;
             }
 
             // be prepared for updates without trades

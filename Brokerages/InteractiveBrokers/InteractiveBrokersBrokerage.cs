@@ -1409,13 +1409,15 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 securityType != SecurityType.Option)
                 return;
 
+            int quantity = (int)tick.Quantity;
+
             switch (e.TickType)
             {
                 case IB.TickType.BidPrice:
 
                     tick.TickType = TickType.Quote;
                     tick.BidPrice = e.Price;
-                    _lastBidSizes.TryGetValue(symbol, out tick.Quantity);
+                    _lastBidSizes.TryGetValue(symbol, out quantity);
                     _lastBidPrices[symbol] = e.Price;
                     break;
 
@@ -1423,7 +1425,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
                     tick.TickType = TickType.Quote;
                     tick.AskPrice = e.Price;
-                    _lastAskSizes.TryGetValue(symbol, out tick.Quantity);
+                    _lastAskSizes.TryGetValue(symbol, out quantity);
                     _lastAskPrices[symbol] = e.Price;
                     break;
 
@@ -1482,6 +1484,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
             if (tick.Quantity == 0) return;
 
+
             switch (e.TickType)
             { 
                 case IB.TickType.BidSize:
@@ -1489,7 +1492,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     tick.TickType = TickType.Quote;
 
                     _lastBidPrices.TryGetValue(symbol, out tick.BidPrice);
-                    _lastBidSizes[symbol] = tick.Quantity;
+                    _lastBidSizes[symbol] = (int)tick.Quantity;
 
                     tick.Value = tick.BidPrice;
                     break;
@@ -1499,7 +1502,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     tick.TickType = TickType.Quote;
 
                     _lastAskPrices.TryGetValue(symbol, out tick.AskPrice);
-                    _lastAskSizes[symbol] = tick.Quantity;
+                    _lastAskSizes[symbol] = (int)tick.Quantity;
 
                     tick.Value = tick.AskPrice;
                     break;
@@ -1510,7 +1513,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
                     decimal lastPrice;
                     _lastPrices.TryGetValue(symbol, out lastPrice);
-                    _lastVolumes[symbol] = tick.Quantity;
+                    _lastVolumes[symbol] = (int)tick.Quantity;
 
                     tick.Value = lastPrice;
                         

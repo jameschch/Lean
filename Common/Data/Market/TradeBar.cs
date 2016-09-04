@@ -39,7 +39,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Volume:
         /// </summary>
-        public long Volume { get; set; }
+        public decimal Volume { get; set; }
 
         /// <summary>
         /// Opening price of the bar: Defined as the price at the start of the time period.
@@ -157,7 +157,7 @@ namespace QuantConnect.Data.Market
         /// <param name="close">Decimal Close price of this bar</param>
         /// <param name="volume">Volume sum over day</param>
         /// <param name="period">The period of this bar, specify null for default of 1 minute</param>
-        public TradeBar(DateTime time, Symbol symbol, decimal open, decimal high, decimal low, decimal close, long volume, TimeSpan? period = null)
+        public TradeBar(DateTime time, Symbol symbol, decimal open, decimal high, decimal low, decimal close, decimal volume, TimeSpan? period = null)
         {
             Time = time;
             Symbol = symbol;
@@ -432,7 +432,7 @@ namespace QuantConnect.Data.Market
             if (lastTrade > High) High = lastTrade;
             if (lastTrade < Low) Low = lastTrade;
             //Volume is the total summed volume of trades in this bar:
-            Volume += Convert.ToInt32(volume);
+            Volume += Convert.ToDecimal(volume);
             //Always set the closing price;
             Close = lastTrade;
         }
