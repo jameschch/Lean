@@ -24,6 +24,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -88,14 +89,6 @@
       <Project>{39a81c16-a1e8-425e-a8f2-1433adb80228}</Project>
       <Name>QuantConnect.Algorithm.CSharp</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Algorithm.FSharp\QuantConnect.Algorithm.FSharp.fsproj">
-      <Project>{7702711a-0c09-40d4-b151-e308d1520738}</Project>
-      <Name>QuantConnect.Algorithm.FSharp</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\Algorithm.VisualBasic\QuantConnect.Algorithm.VisualBasic.vbproj">
-      <Project>{af8f124b-b441-4aa7-92b7-cea72bdb4118}</Project>
-      <Name>QuantConnect.Algorithm.VisualBasic</Name>
-    </ProjectReference>
     <ProjectReference Include="..\AlgorithmFactory\QuantConnect.AlgorithmFactory.csproj">
       <Project>{e99d056a-b6fb-48d2-9f7c-683c54cebbf9}</Project>
       <Name>QuantConnect.AlgorithmFactory</Name>
@@ -147,10 +140,6 @@
     <ProjectReference Include="..\ToolBox\QuantConnect.ToolBox.csproj">
       <Project>{ac9a142c-b485-44d7-91ff-015c22c43d05}</Project>
       <Name>QuantConnect.ToolBox</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\UserInterface\QuantConnect.Views.csproj">
-      <Project>{c68beeed-b0c0-4002-94d4-1e871133d02a}</Project>
-      <Name>QuantConnect.Views</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
