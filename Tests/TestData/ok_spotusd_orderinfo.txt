@@ -72,7 +72,20 @@
             "status": -1,
             "symbol": "btc_usd",
             "type": "buy_market"
-        }],
+        },
+		{
+            "amount": 0,
+            "avg_price": 0.008,
+            "create_date": 1422502117000,
+            "deal_amount": 56.78,
+            "order_id": 20914911,
+            "orders_id": 20914911,
+            "price": 0,
+            "status": 0,
+            "symbol": "btc_usd",
+            "type": "buy_market"
+        }
+		],
         "result": true
     }
 }]

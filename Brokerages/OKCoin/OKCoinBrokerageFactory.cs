@@ -62,7 +62,6 @@ namespace QuantConnect.Brokerages.OKCoin
                     {"wallet" ,Config.Get("okcoin-wallet", "123")},
                     {"url" , Config.Get("okcoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
                     {"url-international" , Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
-                    {"scaleFactor", Config.Get("okcoin-scale-factor", "1")},
                     {"spotOrFuture", Config.Get("okcoin-spotOrFuture", "spot")},
                     {"baseCurrency", Config.Get("okcoin-baseCurrency", "usd")}
                 };
@@ -86,8 +85,6 @@ namespace QuantConnect.Brokerages.OKCoin
         public override Interfaces.IBrokerage CreateBrokerage(Packets.LiveNodePacket job, Interfaces.IAlgorithm algorithm)
         {
 
-            //it's desirable to throw an exception here when failing parse
-            decimal scaleFactor = decimal.Parse(job.BrokerageData["scaleFactor"]);          
 
             if (string.IsNullOrEmpty(job.BrokerageData["apiSecret"]))
                 throw new Exception("Missing OKCoin-api-secret in config.json");
@@ -95,12 +92,10 @@ namespace QuantConnect.Brokerages.OKCoin
             if (string.IsNullOrEmpty(job.BrokerageData["apiKey"]))
                 throw new Exception("Missing OKCoin-api-key in config.json");
 
-
             var webSocketClient = new WebSocketWrapper();
-            var orderClient = new WebSocketWrapper();
 
-            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, orderClient, job.BrokerageData["baseCurrency"],
-                job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], scaleFactor, algorithm.Portfolio);
+            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, new OKCoinWebsocketsFactory(), job.BrokerageData["baseCurrency"],
+                job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);
 
             return brokerage;
