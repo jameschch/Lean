@@ -9,7 +9,7 @@
     "environment": "backtesting",
 
     // algorithm class selector
-    "algorithm-type-name": "Blackfish",
+    "algorithm-type-name": "",
 
     // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
     "algorithm-language": "CSharp",
@@ -86,6 +86,15 @@
     "bitfinex-api-key": "",
     "bitfinex-wss":  "wss://api2.bitfinex.com:3000/ws",
     "bitfinex-scale-factor":  "1",
+
+    "okcoin-wallet": "trading",
+    "okcoin-api-secret": "",
+    "okcoin-api-key": "",
+    "okcoin-wss": "wss://real.okcoin.cn:10440/websocket/okcoinapi",
+    "okcoin-wss-international": "wss://real.okcoin.com:10440/websocket/okcoinapi",
+    "okcoin-spotOrFuture": "spot",
+    "okcoin-baseCurrency": "usd",
+
 
     "environments": {
 

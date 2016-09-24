@@ -59,7 +59,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             string url = Config.Get("okcoin-wss", "wss://real.okcoin.com:10440/websocket/okcoinapi");
             var webSocketClient = new WebSocketWrapper();
             var orderSocketClient = new WebSocketWrapper();
-            return new OKCoinWebsocketsBrokerage(url, orderSocketClient, webSocketClient, "USD", apiKey, apiSecret, wallet, scaleFactor, securityProvider);
+            return new OKCoinWebsocketsBrokerage(url, orderSocketClient, webSocketClient, "USD", apiKey, apiSecret, wallet, securityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)

@@ -77,8 +77,8 @@ namespace QuantConnect.Brokerages.OKCoin
         /// Create Brokerage instance
         /// </summary>
         public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IWebSocket orderWebSocket, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture,
-            decimal scaleFactor, ISecurityProvider securityProvider)
-            : base(url, webSocket, apiKey, apiSecret, null, null, scaleFactor, securityProvider)
+            ISecurityProvider securityProvider)
+            : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
             _orderWebSocket = orderWebSocket;
