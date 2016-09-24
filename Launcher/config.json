@@ -95,7 +95,6 @@
     "okcoin-spotOrFuture": "spot",
     "okcoin-baseCurrency": "usd",
 
-
     "environments": {
 
         // defines the 'backtesting' environment

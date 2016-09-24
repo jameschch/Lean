@@ -62,7 +62,8 @@ namespace QuantConnect.Brokerages.OKCoin
                     {"url" , Config.Get("okcoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
                     {"url-international" , Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
                     {"spotOrFuture", Config.Get("okcoin-spotOrFuture", "spot")},
-                    {"baseCurrency", Config.Get("okcoin-baseCurrency", "usd")}
+                    {"baseCurrency", Config.Get("okcoin-baseCurrency", "usd")},
+                    {"isTradeTickerEnabled", Config.Get("okcoin-isTradeTickerEnabled", "false")}
                 };
             }
         }
@@ -92,8 +93,9 @@ namespace QuantConnect.Brokerages.OKCoin
 
             var webSocketClient = new WebSocketWrapper();
 
-            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, new OKCoinWebsocketsFactory(), job.BrokerageData["baseCurrency"],
-                job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], algorithm.Portfolio);
+            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
+                job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"],
+                bool.Parse(job.BrokerageData["isTradeTickerEnabled"]), algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);
 
             return brokerage;

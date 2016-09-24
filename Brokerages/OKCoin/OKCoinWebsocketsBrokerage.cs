@@ -87,13 +87,14 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture, ISecurityProvider securityProvider)
-            decimal scaleFactor, ISecurityProvider securityProvider)
+        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, string baseCurrency, 
+            string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
             _baseCurrency = baseCurrency;
             _websocketsFactory = websocketsFactory;
+            _isTradeTickerEnabled = isTradeTickerEnabled;
         }
 
         /// <summary>

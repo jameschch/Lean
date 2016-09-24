@@ -37,14 +37,15 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
                     {"url" , "wss://real.okcoin.cn:10440/websocket/okcoinapi"},
                     {"url-international" , "wss://real.okcoin.com:10440/websocket/okcoinapi"},
                     {"spotOrFuture", "spot"},
-                    {"baseCurrency", "usd"}
+                    {"baseCurrency", "usd"},
+                    {"isTradeTickerEnabled", "true"}
                 };
 
 
             live = (OKCoinWebsocketsBrokerage)factory.CreateBrokerage(new Packets.LiveNodePacket { BrokerageData = data },
                new Mock<Interfaces.IAlgorithm>().Object);
             mockFactory = new Mock<OKCoinMockWebsocketsFactory>();
-            mockWebsockets = new Mock<IWebSocket>(); 
+            mockWebsockets = new Mock<IWebSocket>();
             mockFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockWebsockets.Object);
         }
 
@@ -55,7 +56,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
 
-            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, mockFactory.Object, "usd", "", "abc123", "spot", new Mock<Securities.ISecurityProvider>().Object);
+            unit = new OKCoinWebsocketsBrokerage("", webSocket.Object, mockFactory.Object, "usd", "", "abc123", "spot", true, new Mock<Securities.ISecurityProvider>().Object);
 
             mock = new Mock<OKCoinWebsocketsBrokerage>(It.IsAny<string>(), It.IsAny<IWebSocket>(), It.IsAny<IWebSocket>(), It.IsAny<string>(), It.IsAny<string>(),
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IServiceProvider>());
@@ -123,7 +124,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
-            var cnyUnit = new OKCoinWebsocketsBrokerage("", webSocket.Object, mockFactory.Object, "cny", "", "", "spot", new Mock<Securities.ISecurityProvider>().Object);
+            var cnyUnit = new OKCoinWebsocketsBrokerage("", webSocket.Object, mockFactory.Object, "cny", "", "", "spot", false, new Mock<Securities.ISecurityProvider>().Object);
 
             var actual = cnyUnit.GetCashBalance();
 

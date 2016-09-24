@@ -58,7 +58,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             var webSocketClient = new WebSocketWrapper();
             var orderSocketClient = new WebSocketWrapper();
             var factory = new OKCoinWebsocketsFactory();
-            return new OKCoinWebsocketsBrokerage(url, webSocketClient, factory, "USD", apiKey, apiSecret, "spot", securityProvider);
+            return new OKCoinWebsocketsBrokerage(url, webSocketClient, factory, "USD", apiKey, apiSecret, "spot", false, securityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
