@@ -90,11 +90,9 @@ namespace QuantConnect.Brokerages.OKCoin
             if (string.IsNullOrEmpty(job.BrokerageData["apiKey"]))
                 throw new Exception("Missing OKCoin-api-key in config.json");
 
-
             var webSocketClient = new WebSocketWrapper();
-            var orderClient = new WebSocketWrapper();
 
-            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, orderClient, job.BrokerageData["baseCurrency"],
+            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, new OKCoinWebsocketsFactory(), job.BrokerageData["baseCurrency"],
                 job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);
 

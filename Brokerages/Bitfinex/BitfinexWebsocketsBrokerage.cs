@@ -53,6 +53,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             FloatParseHandling = FloatParseHandling.Decimal
         };
+        protected string Url { get; set; }
         #endregion
 
         /// <summary>
@@ -62,6 +63,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             decimal scaleFactor, ISecurityProvider securityProvider)
             : base(apiKey, apiSecret, wallet, restClient, scaleFactor, securityProvider)
         {
+            Url = url;
             WebSocket = websocket;
             WebSocket.Initialize(url);
         }
@@ -195,7 +197,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
 
-        private void Reconnect(bool wait = true)
+        protected virtual void Reconnect(bool wait = true)
         {
             if (wait)
             {
@@ -222,7 +224,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             this.Unsubscribe(null, GetSubscribed());
         }
 
-        private IList<Symbol> GetSubscribed()
+        protected virtual IList<Symbol> GetSubscribed()
         {
             IList<Symbol> list = new List<Symbol>();
 

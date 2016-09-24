@@ -68,22 +68,32 @@ namespace QuantConnect.Brokerages.OKCoin
         public ConcurrentDictionary<int, OKCoinFill> FillSplit { get; set; }
         string _baseCurrency = "usd";
         string _spotOrFuture = "spot";
-        IWebSocket _orderWebSocket;
         object _placeOrderLock = new object();
-        int _responseTimeout = 3000;
+        int _responseTimeout = 30000;
+        //todo: link to config
+        private bool _isTradeTickerEnabled;
+        IOKCoinWebsocketsFactory _websocketsFactory;
+
+        enum OKCoinOrderStatus
+        {
+            Cancelled = -1,
+            Unfilled = 0,
+            PartiallyFilled  =1,
+            FullyFilled = 2,
+            CancelRequestInProcess = 4 
+        }
         #endregion
 
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IWebSocket orderWebSocket, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture,
-            ISecurityProvider securityProvider)
+        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture, ISecurityProvider securityProvider)
+            decimal scaleFactor, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
-            _orderWebSocket = orderWebSocket;
-            _orderWebSocket.Initialize(url);
             _baseCurrency = baseCurrency;
+            _websocketsFactory = websocketsFactory;
         }
 
         /// <summary>
@@ -180,7 +190,13 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         public void Dispose()
         {
-            this.Disconnect();
+            try
+            {
+                this.Disconnect();
+            }
+            catch (Exception)
+            {
+            }
         }
 
 
@@ -208,7 +224,9 @@ namespace QuantConnect.Brokerages.OKCoin
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
-            _orderWebSocket.OnMessage += (sender, e) =>
+            IWebSocket orderWebSocket = _websocketsFactory.CreateInstance(Url);
+
+            orderWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
                 if (raw.data.result == "true")
@@ -219,20 +237,16 @@ namespace QuantConnect.Brokerages.OKCoin
                 }
             };
 
-            //wait for order respose before sending another
-            lock (_placeOrderLock)
+            CachedOrderIDs.AddOrUpdate(order.Id, order);
+            orderWebSocket.Send(JsonConvert.SerializeObject(new
             {
-                _orderWebSocket.Send(JsonConvert.SerializeObject(new
-                {
-                    @event = "addChannel",
-                    channel = "ok" + _spotOrFuture + _baseCurrency + "_trade",
-                    parameters = parameters
-                }));
+                @event = "addChannel",
+                channel = "ok" + _spotOrFuture + _baseCurrency + "_trade",
+                parameters = parameters
+            }));
 
-                tcs.Task.Wait(_responseTimeout);
-
-                CachedOrderIDs.AddOrUpdate(order.Id, order);
-            }
+            tcs.Task.Wait(_responseTimeout);
+            orderWebSocket.Close();
 
             return placed;
         }
@@ -274,21 +288,21 @@ namespace QuantConnect.Brokerages.OKCoin
                     Log.Trace("OKCoinWebsocketsBrokerage.CheckConnection(): Heartbeat timeout. Reconnecting");
                     Reconnect(false);
                 }
+                WebSocket.Send("{'event':'ping'}");
                 await Task.Delay(TimeSpan.FromSeconds(10), _checkConnectionToken.Token);
             }
         }
 
-        private void Reconnect(bool wait = true)
+        protected override void Reconnect(bool wait = true)
         {
             if (wait)
             {
-                this._checkConnectionTask.Wait(30);
+                this._checkConnectionTask.Wait(30000);
             }
             var subscribed = GetSubscribed();
             //try to clean up state
             try
             {
-                this.Unsubscribe();
                 WebSocket.Close();
             }
             catch (Exception)
@@ -298,12 +312,8 @@ namespace QuantConnect.Brokerages.OKCoin
             this.Subscribe(null, subscribed);
         }
 
-        private void Unsubscribe()
-        {
-            this.Unsubscribe(null, GetSubscribed());
-        }
 
-        private IList<Symbol> GetSubscribed()
+        protected override IList<Symbol> GetSubscribed()
         {
             IList<Symbol> list = new List<Symbol>();
 
@@ -392,10 +402,12 @@ namespace QuantConnect.Brokerages.OKCoin
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
-            _orderWebSocket.OnMessage += (sender, e) =>
+            IWebSocket cashWebSocket = _websocketsFactory.CreateInstance(Url);
+
+            cashWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
-
+                //todo: should include raw.data.info.funds.borrow?
                 if (raw.data.info.funds.free.btc != 0)
                 {
                     list.Add(new Cash("BTC", (decimal)raw.data.info.funds.free.btc, GetConversionRate("BTC" + _baseCurrency)));
@@ -416,7 +428,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 tcs.SetResult(true);
             };
 
-            _orderWebSocket.Send(JsonConvert.SerializeObject(new
+            cashWebSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "addChannel",
                 channel = "ok" + _spotOrFuture + _baseCurrency + "_userinfo",
@@ -424,6 +436,8 @@ namespace QuantConnect.Brokerages.OKCoin
             }));
 
             tcs.Task.Wait(_responseTimeout);
+
+            cashWebSocket.Close();
 
             return list;
         }
@@ -464,13 +478,15 @@ namespace QuantConnect.Brokerages.OKCoin
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
-            _orderWebSocket.OnMessage += (sender, e) =>
+            IWebSocket holdingsWebSocket = _websocketsFactory.CreateInstance(Url);
+
+            holdingsWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
 
                 foreach (var item in raw.data.orders)
                 {
-                    if ((int)item.status == 2 || (int)item.status == 1)
+                    if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
                     {
                         list.Add(new Holding
                         {
@@ -487,9 +503,11 @@ namespace QuantConnect.Brokerages.OKCoin
                 tcs.SetResult(true);
             };
 
-            GetOrders();
+            GetOrders(holdingsWebSocket);
 
             tcs.Task.Wait(_responseTimeout);
+
+            holdingsWebSocket.Close();
 
             return list;
         }
@@ -504,13 +522,15 @@ namespace QuantConnect.Brokerages.OKCoin
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
-            _orderWebSocket.OnMessage += (sender, e) =>
+            IWebSocket openOrdersWebSocket = _websocketsFactory.CreateInstance(Url);
+
+            openOrdersWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
 
                 foreach (var item in raw.data.orders)
                 {
-                    if ((int)item.status != 2)
+                    if (item.status == (int)OKCoinOrderStatus.PartiallyFilled || item.status == (int)OKCoinOrderStatus.Unfilled)
                     {
 
                         string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
@@ -532,14 +552,16 @@ namespace QuantConnect.Brokerages.OKCoin
                 tcs.SetResult(true);
             };
 
-            GetOrders();
+            GetOrders(openOrdersWebSocket);
+
+            openOrdersWebSocket.Close();
 
             tcs.Task.Wait(_responseTimeout);
 
             return list;
         }
 
-        private void GetOrders()
+        private void GetOrders(IWebSocket openOrdersWebSocket)
         {
             var parameters = new Dictionary<string, string>
             {
@@ -548,7 +570,7 @@ namespace QuantConnect.Brokerages.OKCoin
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
-            _orderWebSocket.Send(JsonConvert.SerializeObject(new
+            openOrdersWebSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "addChannel",
                 channel = "ok" + _spotOrFuture + _baseCurrency + "_orderinfo",

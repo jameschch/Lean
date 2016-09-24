@@ -59,9 +59,16 @@ namespace QuantConnect.Brokerages.OKCoin
                     }
                     else if (System.Text.RegularExpressions.Regex.IsMatch(((string)raw.channel), @"ok_sub_spot(usd|cny)_\w{3}_trades"))
                     {
-                        //trade update
-                        PopulateTradeTicker(raw);
+                        if (_isTradeTickerEnabled)
+                        {
+                            //trade ticker update
+                            PopulateTradeTicker(raw);
+                        }
                     }
+                }
+                else if (raw.@event = "pong")
+                {
+                    _heartbeatCounter = DateTime.UtcNow;
                 }
 
                 Log.Trace("OKCoinWebsocketsBrokerage.OnMessage(): " + e.Data);
