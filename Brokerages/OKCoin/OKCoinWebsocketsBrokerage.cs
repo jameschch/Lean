@@ -24,6 +24,7 @@ using QuantConnect.Util;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Configuration;
 using System.Linq;
 using System.Security.Cryptography;
@@ -78,21 +79,21 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             Cancelled = -1,
             Unfilled = 0,
-            PartiallyFilled  =1,
+            PartiallyFilled = 1,
             FullyFilled = 2,
-            CancelRequestInProcess = 4 
+            CancelRequestInProcess = 4
         }
         #endregion
 
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, string baseCurrency, 
+        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, string baseCurrency,
             string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
-            _baseCurrency = baseCurrency;
+            _baseCurrency = baseCurrency.ToLower();
             _websocketsFactory = websocketsFactory;
             _isTradeTickerEnabled = isTradeTickerEnabled;
         }
@@ -213,41 +214,58 @@ namespace QuantConnect.Brokerages.OKCoin
             var parameters = new Dictionary<string, string>
                 {
                     {"api_key" , ApiKey},
-                    {"symbol" , order.Symbol.Value.Substring(0, 3) + "_" + order.Symbol.Value.Substring(3, 3)},
+                    {"symbol" , order.Symbol.Value.Substring(0, 3).ToLower() + "_" + order.Symbol.Value.Substring(3, 3).ToLower()},
                     {"type" , MapOrderType(order.Type, order.Direction)},
-                    {"price" , order.Type == OrderType.Market ?  (order.Quantity * ScaleFactor).ToString() : (((LimitOrder)order).LimitPrice * ScaleFactor).ToString()},
-                    {"amount" , (order.Quantity * ScaleFactor).ToString()}
+                    {"amount" , (Math.Abs(order.Quantity)).ToString()}
                 };
 
-            var sign = BuildSign(parameters);
+            if (order.Type == OrderType.Limit)
+            {
+                parameters["price"] = ((LimitOrder)order).LimitPrice.ToString();
+            }
 
+            var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
             IWebSocket orderWebSocket = _websocketsFactory.CreateInstance(Url);
+            orderWebSocket.Connect();
+
+            CachedOrderIDs.AddOrUpdate(order.Id, order);
+            string json = JsonConvert.SerializeObject(new
+            {
+                @event = "addChannel",
+                channel = "ok_" + _spotOrFuture + _baseCurrency + "_trade",
+                parameters = parameters
+            });
 
             orderWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
-                if (raw.data.result == "true")
+                if (raw.data != null && raw.data.result != null && raw.data.result == "true")
                 {
                     order.BrokerId.Add((string)raw.data.order_id);
                     placed = true;
-                    tcs.SetResult(true);
                 }
+                tcs.SetResult(true);
             };
 
-            CachedOrderIDs.AddOrUpdate(order.Id, order);
-            orderWebSocket.Send(JsonConvert.SerializeObject(new
-            {
-                @event = "addChannel",
-                channel = "ok" + _spotOrFuture + _baseCurrency + "_trade",
-                parameters = parameters
-            }));
+            orderWebSocket.Send(json);
 
             tcs.Task.Wait(_responseTimeout);
             orderWebSocket.Close();
+
+            if (placed)
+            {
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Submitted });
+                Log.Trace("BitfinexBrokerage.PlaceOrder(): Order completed successfully orderid:" + order.Id.ToString());
+            }
+            else
+            {
+                OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Invalid });
+                Log.Trace("BitfinexBrokerage.PlaceOrder(): Failed to place order orderid:" + order.Id.ToString());
+            }
 
             return placed;
         }
@@ -351,7 +369,7 @@ namespace QuantConnect.Brokerages.OKCoin
                     WebSocket.Send(JsonConvert.SerializeObject(new
                     {
                         @event = "addChannel",
-                        channel = "ok" + _spotOrFuture + _baseCurrency + "_cancel_order",
+                        channel = "ok_" + _spotOrFuture + _baseCurrency + "_cancel_order",
                         parameters = parameters
                     }));
 
@@ -404,6 +422,7 @@ namespace QuantConnect.Brokerages.OKCoin
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
             IWebSocket cashWebSocket = _websocketsFactory.CreateInstance(Url);
+            cashWebSocket.Connect();
 
             cashWebSocket.OnMessage += (sender, e) =>
             {
@@ -432,7 +451,7 @@ namespace QuantConnect.Brokerages.OKCoin
             cashWebSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "addChannel",
-                channel = "ok" + _spotOrFuture + _baseCurrency + "_userinfo",
+                channel = "ok_" + _spotOrFuture + _baseCurrency + "_userinfo",
                 parameters = parameters
             }));
 
@@ -480,27 +499,32 @@ namespace QuantConnect.Brokerages.OKCoin
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
             IWebSocket holdingsWebSocket = _websocketsFactory.CreateInstance(Url);
+            holdingsWebSocket.Connect();
 
             holdingsWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
 
-                foreach (var item in raw.data.orders)
+                if (raw.data != null && raw.data.orders != null)
                 {
-                    if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
+
+                    foreach (var item in raw.data.orders)
                     {
-                        list.Add(new Holding
+                        if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
                         {
-                            AveragePrice = (decimal)item.avg_price,
-                            CurrencySymbol = ((string)item.symbol).Substring(0, 3).ToUpper(),
-                            Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
-                            Symbol = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
-                            Type = SecurityType.Forex,
-                        });
+                            list.Add(new Holding
+                            {
+                                AveragePrice = (decimal)item.avg_price,
+                                CurrencySymbol = ((string)item.symbol).Substring(0, 3).ToUpper(),
+                                Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                                Symbol = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
+                                Type = SecurityType.Forex,
+                            });
+                        }
+
                     }
 
                 }
-
                 tcs.SetResult(true);
             };
 
@@ -524,40 +548,45 @@ namespace QuantConnect.Brokerages.OKCoin
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
             IWebSocket openOrdersWebSocket = _websocketsFactory.CreateInstance(Url);
+            openOrdersWebSocket.Connect();
 
             openOrdersWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
 
-                foreach (var item in raw.data.orders)
+                if (raw.data != null && raw.data.orders != null)
                 {
-                    if (item.status == (int)OKCoinOrderStatus.PartiallyFilled || item.status == (int)OKCoinOrderStatus.Unfilled)
+
+                    foreach (var item in raw.data.orders)
                     {
-
-                        string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
-
-                        list.Add(new Orders.MarketOrder
+                        if (item.status == (int)OKCoinOrderStatus.PartiallyFilled || item.status == (int)OKCoinOrderStatus.Unfilled)
                         {
-                            Price = (decimal)item.price,
-                            BrokerId = new List<string> { (string)item.order_id },
-                            Quantity = (item.type == "buy_market" ? (decimal)item.deal_amount : -(decimal)item.deal_amount),
-                            Symbol = Symbol.Create(symbol, SecurityType.Forex, Market.Bitfinex.ToString()),
-                            PriceCurrency = symbol,
-                            Time = Time.UnixTimeStampToDateTime((double)item.create_date),
-                            Status = MapOrderStatus((int)item.status)
-                        });
+
+                            string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
+
+                            list.Add(new Orders.MarketOrder
+                            {
+                                Price = (decimal)item.price,
+                                BrokerId = new List<string> { (string)item.order_id },
+                                Quantity = (item.type == "buy_market" ? (decimal)item.deal_amount : -(decimal)item.deal_amount),
+                                Symbol = Symbol.Create(symbol, SecurityType.Forex, Market.Bitfinex.ToString()),
+                                PriceCurrency = symbol,
+                                Time = Time.UnixTimeStampToDateTime((double)item.create_date),
+                                Status = MapOrderStatus((int)item.status)
+                            });
+                        }
+
                     }
 
                 }
-
                 tcs.SetResult(true);
             };
 
             GetOrders(openOrdersWebSocket);
 
-            openOrdersWebSocket.Close();
-
             tcs.Task.Wait(_responseTimeout);
+
+            openOrdersWebSocket.Close();
 
             return list;
         }
@@ -571,12 +600,14 @@ namespace QuantConnect.Brokerages.OKCoin
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
-            openOrdersWebSocket.Send(JsonConvert.SerializeObject(new
+            var json = JsonConvert.SerializeObject(new
             {
                 @event = "addChannel",
-                channel = "ok" + _spotOrFuture + _baseCurrency + "_orderinfo",
+                channel = "ok_sub_" + _spotOrFuture + _baseCurrency + "_trades",
                 parameters = parameters
-            }));
+            });
+
+            openOrdersWebSocket.Send(json);
         }
 
         private OrderStatus MapOrderStatus(int status)
@@ -598,11 +629,11 @@ namespace QuantConnect.Brokerages.OKCoin
 
         public string BuildSign(Dictionary<string, string> data)
         {
-            var pairs = data.Keys.OrderBy(k => k).Select(k => k + "=" + data[k]);
+            var pairs = data.Keys.Where(p => p != "sign").OrderBy(k => k).Select(k => k + "=" + data[k]);
             string joined = string.Join("&", pairs.ToArray());
             joined += "&secret_key=" + this.ApiSecret;
 
-            return joined.ToMD5();
+            return joined.ToMD5().ToUpper();
         }
 
     }

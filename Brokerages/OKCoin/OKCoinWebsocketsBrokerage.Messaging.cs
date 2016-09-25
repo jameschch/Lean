@@ -66,7 +66,7 @@ namespace QuantConnect.Brokerages.OKCoin
                         }
                     }
                 }
-                else if (raw.@event = "pong")
+                else if (raw.@event == "pong")
                 {
                     _heartbeatCounter = DateTime.UtcNow;
                 }
