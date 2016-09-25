@@ -173,9 +173,9 @@ namespace QuantConnect.Tests.Common.Orders.Fills
                     return new OrderEvent(order, currentUtcTime, 0);
                 }
 
-                var remaining = (int)(ticket.Quantity - ticket.QuantityFilled);
+                var remaining = (ticket.Quantity - ticket.QuantityFilled);
                 var fill = base.MarketFill(asset, order);
-                var filledThisTime = Math.Min(remaining, (int)(_percent * order.Quantity));
+                var filledThisTime = Math.Min(remaining, (_percent * order.Quantity));
                 fill.FillQuantity = filledThisTime;
 
                 // only mark it as filled if there is zero quantity remaining

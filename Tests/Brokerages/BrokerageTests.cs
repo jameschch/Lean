@@ -224,7 +224,7 @@ namespace QuantConnect.Tests.Brokerages
             {
                 if (holding.Quantity == 0) continue;
                 Log.Trace("Liquidating: " + holding);
-                var order = new MarketOrder(holding.Symbol, (int)-holding.Quantity, DateTime.Now);
+                var order = new MarketOrder(holding.Symbol, -holding.Quantity, DateTime.Now);
                 _orderProvider.Add(order);
                 PlaceOrderWaitForStatus(order, OrderStatus.Filled);
             }
@@ -273,7 +273,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <summary>
         /// Gets the default order quantity
         /// </summary>
-        protected virtual int GetDefaultQuantity()
+        protected virtual decimal GetDefaultQuantity()
         {
             return 1; 
         }
@@ -497,7 +497,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <param name="expectedStatus">The status to wait for</param>
         /// <param name="secondsTimeout">Maximum amount of time to wait for <paramref name="expectedStatus"/></param>
         /// <returns>The same order that was submitted.</returns>
-        protected Order PlaceOrderWaitForStatus(Order order, OrderStatus expectedStatus = OrderStatus.Filled, double secondsTimeout = 10.0, bool allowFailedSubmission = false)
+        protected Order PlaceOrderWaitForStatus(Order order, OrderStatus expectedStatus = OrderStatus.Filled, double secondsTimeout = 30.0, bool allowFailedSubmission = false)
         {
             var requiredStatusEvent = new ManualResetEvent(false);
             var desiredStatusEvent = new ManualResetEvent(false);

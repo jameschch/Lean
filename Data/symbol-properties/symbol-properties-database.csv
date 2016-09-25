@@ -4,9 +4,10 @@
 # Use # signs for comments
 bitfinex,BTCUSD,forex,BTCUSD,USD,1,0.01,0.01
 bitfinex,ETHUSD,forex,ETHUSD,USD,1,0.01,0.01
-bitfinex,ETHBTC,forex,ETHBTC,BTC,1,0.001,0.001
+bitfinex,ETHBTC,forex,ETHBTC,BTC,1,0.001,0.1
 bitfinex,LTCUSD,forex,LTCUSD,USD,1,0.01,0.01
-bitfinex,LTCBTC,forex,LTCBTC,BTC,1,0.001,0.001
+bitfinex,LTCBTC,forex,LTCBTC,BTC,1,0.001,0.1
+bitfinex,BFXUSD,forex,BFXUSD,USD,1,0.01,0.01
 
 fxcm,AU200AUD,cfd,S&P/ASX index of Australian listed shares,AUD,0.1,1
 fxcm,DE10YBEUR,cfd,Euro-Bund,EUR,10,0.01

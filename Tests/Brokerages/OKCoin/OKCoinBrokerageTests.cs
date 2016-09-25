@@ -15,7 +15,7 @@ using QuantConnect.Brokerages.Bitfinex;
 
 namespace QuantConnect.Tests.Brokerages.OKCoin
 {
-    [TestFixture, Ignore("This test requires a configured and active account")]
+    [TestFixture/*, Ignore("This test requires a configured and active account")*/]
     public class OKCoinBrokerageTests : BrokerageTests
     {
 
@@ -38,7 +38,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         /// </summary>
         protected override decimal HighPrice
         {
-            get { return 9000m; }
+            get { return 800m; }
         }
 
         /// <summary>
@@ -46,7 +46,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         /// </summary>
         protected override decimal LowPrice
         {
-            get { return 1000m; }
+            get { return 400m; }
         }
         #endregion
 
@@ -54,7 +54,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             string apiSecret = Config.Get("okcoin-api-secret");
             string apiKey = Config.Get("okcoin-api-key");
-            string url = Config.Get("okcoin-wss", "wss://real.okcoin.com:10440/websocket/okcoinapi");
+            string url = Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi");
             var webSocketClient = new WebSocketWrapper();
             var orderSocketClient = new WebSocketWrapper();
             var factory = new OKCoinWebsocketsFactory();
@@ -65,6 +65,12 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             return 0;
         }
+
+        protected override decimal GetDefaultQuantity()
+        {
+            return 0.01m;
+        }
+
 
         //no stop limit support
         public override TestCaseData[] OrderParameters

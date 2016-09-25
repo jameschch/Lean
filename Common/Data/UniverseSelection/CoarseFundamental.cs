@@ -37,7 +37,7 @@ namespace QuantConnect.Data.UniverseSelection
         /// <summary>
         /// Gets the day's total volume
         /// </summary>
-        public long Volume { get; set; }
+        public decimal Volume { get; set; }
 
         /// <summary>
         /// The end time of this data.
