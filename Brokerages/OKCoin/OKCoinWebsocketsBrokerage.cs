@@ -36,6 +36,7 @@ using WebSocketSharp;
 namespace QuantConnect.Brokerages.OKCoin
 {
 
+    //todo: try catch finally on tasks
     /// <summary>
     /// OKCoin WebSockets integration
     /// </summary>
@@ -214,7 +215,7 @@ namespace QuantConnect.Brokerages.OKCoin
             var parameters = new Dictionary<string, string>
                 {
                     {"api_key" , ApiKey},
-                    {"symbol" , order.Symbol.Value.Substring(0, 3).ToLower() + "_" + order.Symbol.Value.Substring(3, 3).ToLower()},
+                    {"symbol" , ConvertSymbol(order.Symbol) },
                     {"type" , MapOrderType(order.Type, order.Direction)},
                     {"amount" , (Math.Abs(order.Quantity)).ToString()}
                 };
@@ -224,8 +225,15 @@ namespace QuantConnect.Brokerages.OKCoin
                 parameters["price"] = ((LimitOrder)order).LimitPrice.ToString();
             }
 
+            if (order.Type == OrderType.Market && order.Direction == OrderDirection.Buy)
+            {
+                FixBrokenMarketBuyOrder(order, parameters);
+            }
+
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
+
+
 
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
 
@@ -239,6 +247,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 channel = "ok_" + _spotOrFuture + _baseCurrency + "_trade",
                 parameters = parameters
             });
+
 
             orderWebSocket.OnMessage += (sender, e) =>
             {
@@ -462,6 +471,8 @@ namespace QuantConnect.Brokerages.OKCoin
             return list;
         }
 
+        //todo: inject xml client
+        //todo: inject rest client
         private decimal GetConversionRate(string symbol)
         {
             if (symbol.ToLower() == "USD")
@@ -483,7 +494,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 using (System.Net.WebClient rest = new System.Net.WebClient())
                 {
                     var raw = JsonConvert.DeserializeObject<dynamic>(rest.DownloadString(url), settings);
-                    return ((decimal)raw.ticker.high + (decimal)raw.ticker.low) / 2;
+                    return ((decimal)raw.ticker.buy + (decimal)raw.ticker.sell) / 2;
                 }
             }
         }
@@ -634,6 +645,31 @@ namespace QuantConnect.Brokerages.OKCoin
             joined += "&secret_key=" + this.ApiSecret;
 
             return joined.ToMD5().ToUpper();
+        }
+
+        private string ConvertSymbol(Symbol symbol)
+        {
+            return symbol.Value.Substring(0, 3).ToLower() + "_" + symbol.Value.Substring(3, 3).ToLower();
+        }
+
+        //todo: inject rest client
+        //todo: configure rest url
+        /// <summary>
+        /// OKCoin API is broken for market_buy. Instead, use limit at best ask.
+        /// </summary>
+        /// <param name="order"></param>
+        /// <param name="parameters"></param>
+        private void FixBrokenMarketBuyOrder(Order order, Dictionary<string, string> parameters)
+        {
+            string tickerUrl = string.Format("https://www.okcoin.{0}/api/v1/ticker.do?symbol={1}", _baseCurrency == "usd" ? "com" : "cn", ConvertSymbol(order.Symbol));
+            using (System.Net.WebClient rest = new System.Net.WebClient())
+            {
+                var raw = JsonConvert.DeserializeObject<dynamic>(rest.DownloadString(tickerUrl), settings);
+                parameters["price"] = raw.ticker.sell;
+            }
+            parameters["amount"] = "1";
+            parameters["type"] = "buy";
+
         }
 
     }
