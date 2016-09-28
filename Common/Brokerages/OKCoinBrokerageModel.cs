@@ -75,7 +75,7 @@ namespace QuantConnect.Brokerages
         /// <returns></returns>
         public override IFeeModel GetFeeModel(Security security)
         {
-            return new BitfinexFeeModel();
+            return new OKCoinFeeModel();
         }
 
         /// <summary>

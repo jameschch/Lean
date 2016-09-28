@@ -52,7 +52,7 @@ namespace QuantConnect.Brokerages.OKCoin
                         PopulateTicker(raw);
                         return;
                     }
-                    else if (((string)raw.channel) == "ok_sub_spot" + _baseCurrency + "_trades")
+                    else if (((string)raw.channel) == "ok_sub_spot" + _baseCurrency + "_trades" && raw.data != null)
                     {
                         //trade update
                         PopulateTrade(raw);
@@ -69,6 +69,8 @@ namespace QuantConnect.Brokerages.OKCoin
                 else if (raw.@event == "pong")
                 {
                     _heartbeatCounter = DateTime.UtcNow;
+                    CheckUnknownForFills();
+                    return;
                 }
 
                 Log.Trace("OKCoinWebsocketsBrokerage.OnMessage(): " + e.Data);
@@ -108,7 +110,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             lock (Ticks)
             {
-                foreach(var item in raw.data)
+                foreach (var item in raw.data)
                 {
                     Ticks.Add(new Tick
                     {
@@ -128,25 +130,29 @@ namespace QuantConnect.Brokerages.OKCoin
         private void PopulateTrade(dynamic raw)
         {
             var msg = JsonConvert.DeserializeObject<TradeMessage>(raw.data.ToString(), settings);
+            PopulateTrade(msg);
+        }
+
+        private void PopulateTrade(TradeMessage msg)
+        {
             int brokerId = msg.Id;
 
             var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(brokerId.ToString()));
 
-            if (cached.Count() > 0 && cached.First().Value != null)
+            if (cached.Count() > 0 && cached.First().Value != null && this.FillSplit.ContainsKey(cached.First().Key))
             {
-
                 var split = this.FillSplit[cached.First().Key];
                 bool added = split.Add(msg);
                 if (!added)
                 {
                     //ignore fill message duplicate
-                    return;
+                    //return;
                 }
 
                 var fill = new OrderEvent
                 (
-                    cached.First().Key, Symbol.Create(msg.Symbol.Replace("_", ""), SecurityType.Forex, Market.OKCoin), Time.UnixTimeStampToDateTime(msg.CreatedDate),
-                    OrderStatus.PartiallyFilled, msg.TradeType.StartsWith("buy") ? OrderDirection.Buy : OrderDirection.Sell,
+                    cached.First().Key, Symbol.Create(msg.Symbol.Replace("_", ""), SecurityType.Forex, Market.OKCoin), DateTime.UtcNow,
+                    msg.CompletedTradeAmount != 0 ? OrderStatus.PartiallyFilled : OrderStatus.Submitted, msg.TradeType.StartsWith("buy") ? OrderDirection.Buy : OrderDirection.Sell,
                     msg.AveragePrice / ScaleFactor, msg.CompletedTradeAmount,
                     0, "OKCoin Fill Event"
                 );
@@ -159,15 +165,20 @@ namespace QuantConnect.Brokerages.OKCoin
                     FilledOrderIDs.Add(cached.First().Key);
 
                     Order outOrder = cached.First().Value;
-                    CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
+                    //CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
                     FillSplit.TryRemove(split.OrderId, out split);
+                }
+
+                if (UnknownOrders.ContainsKey(msg.Id.ToString()))
+                {
+                    UnknownOrders.TryRemove(msg.Id.ToString(), out msg);
                 }
 
                 OnOrderEvent(fill);
             }
-            else
+            else if (!UnknownOrders.ContainsKey(msg.Id.ToString()))
             {
-                UnknownOrderIDs.Add(brokerId);
+                UnknownOrders.AddOrUpdate(msg.Id.ToString(), msg);
             }
         }
 
@@ -175,6 +186,18 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             string channel = (string)raw.channel;
             return channel.Substring(15, 3).ToUpper() + channel.Substring(11, 3).ToUpper();
+        }
+
+        private void CheckUnknownForFills()
+        {
+            if (UnknownOrders.Count() > 10)
+            {
+                UnknownOrders = new System.Collections.Concurrent.ConcurrentDictionary<string, TradeMessage>(UnknownOrders.Take(5));
+            }
+            foreach (var item in UnknownOrders)
+            {
+                PopulateTrade(item.Value);
+            }
         }
 
     }

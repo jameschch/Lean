@@ -66,7 +66,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <summary>
         /// List of unknown orders
         /// </summary>
-        protected readonly FixedSizeHashQueue<int> UnknownOrderIDs = new FixedSizeHashQueue<int>(1000);
+        protected ConcurrentDictionary<string, TradeMessage> UnknownOrders = new ConcurrentDictionary<string, TradeMessage>();
         public ConcurrentDictionary<int, OKCoinFill> FillSplit { get; set; }
         string _baseCurrency = "usd";
         string _spotOrFuture = "spot";
@@ -97,6 +97,7 @@ namespace QuantConnect.Brokerages.OKCoin
             _baseCurrency = baseCurrency.ToLower();
             _websocketsFactory = websocketsFactory;
             _isTradeTickerEnabled = isTradeTickerEnabled;
+            FillSplit = new ConcurrentDictionary<int, OKCoinFill>();
         }
 
         /// <summary>
@@ -176,6 +177,21 @@ namespace QuantConnect.Brokerages.OKCoin
                 this._checkConnectionTask = Task.Run(() => CheckConnection());
                 this._checkConnectionToken = new CancellationTokenSource();
             }
+
+            var parameters = new Dictionary<string, string>
+            {
+                {"api_key" , ApiKey},
+            };
+            var sign = BuildSign(parameters);
+            parameters["sign"] = sign;
+
+            WebSocket.Send(JsonConvert.SerializeObject(new
+            {
+                @event = "addChannel",
+                channel = "ok_sub_" + _spotOrFuture + _baseCurrency + "_trades",
+                parameters = parameters
+            }));
+
             WebSocket.OnMessage += OnMessage;
         }
 
@@ -233,12 +249,7 @@ namespace QuantConnect.Brokerages.OKCoin
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
-
-
             TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-
-            IWebSocket orderWebSocket = _websocketsFactory.CreateInstance(Url);
-            orderWebSocket.Connect();
 
             CachedOrderIDs.AddOrUpdate(order.Id, order);
             string json = JsonConvert.SerializeObject(new
@@ -248,15 +259,18 @@ namespace QuantConnect.Brokerages.OKCoin
                 parameters = parameters
             });
 
-
+            IWebSocket orderWebSocket = _websocketsFactory.CreateInstance(Url);
+            orderWebSocket.Connect();
             orderWebSocket.OnMessage += (sender, e) =>
             {
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
                 if (raw.data != null && raw.data.result != null && raw.data.result == "true")
                 {
                     order.BrokerId.Add((string)raw.data.order_id);
+                    this.FillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
                     placed = true;
                 }
+                Log.Trace("BitfinexBrokerage.PlaceOrder(): Order response:" + raw.ToString());
                 tcs.SetResult(true);
             };
 
@@ -667,9 +681,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 var raw = JsonConvert.DeserializeObject<dynamic>(rest.DownloadString(tickerUrl), settings);
                 parameters["price"] = raw.ticker.sell;
             }
-            parameters["amount"] = "1";
             parameters["type"] = "buy";
-
         }
 
     }

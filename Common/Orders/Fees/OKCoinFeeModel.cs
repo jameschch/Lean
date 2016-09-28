@@ -24,9 +24,30 @@ namespace QuantConnect.Orders.Fees
     /// <summary>
     /// Provides an implementation of <see cref="IFeeModel"/> that models Bitfinex order fees
     /// </summary>
-    public class OKCoinFeeModel : BitfinexFeeModel
+    public class OKCoinFeeModel : IFeeModel
     {
 
-    
+        /// <summary>
+        /// Get the fee for this order
+        /// </summary>
+        /// <param name="security">The security matching the order</param>
+        /// <param name="order">The order to compute fees for</param>
+        /// <returns>The cost of the order in units of the account currency</returns>
+        public decimal GetOrderFee(Securities.Security security, Order order)
+        {
+            //todo: fee scaling with trade size
+            decimal divisor = 0.002m;
+
+            if (order.Type == OrderType.Limit && ((((LimitOrder)order).LimitPrice > security.Price && order.Direction == OrderDirection.Sell) ||
+            (((LimitOrder)order).LimitPrice < security.Price && order.Direction == OrderDirection.Buy)))
+            {
+                //0% maker fee
+                return 0;
+            }
+            decimal fee = security.Price * (order.Quantity < 0 ? (order.Quantity * -1) : order.Quantity) * divisor;
+            return fee;
+        }
+
+
     }
 }
