@@ -142,12 +142,7 @@ namespace QuantConnect.Brokerages.OKCoin
             if (cached.Count() > 0 && cached.First().Value != null && this.FillSplit.ContainsKey(cached.First().Key))
             {
                 var split = this.FillSplit[cached.First().Key];
-                bool added = split.Add(msg);
-                if (!added)
-                {
-                    //ignore fill message duplicate
-                    //return;
-                }
+                split.Add(msg);
 
                 var fill = new OrderEvent
                 (
@@ -160,11 +155,12 @@ namespace QuantConnect.Brokerages.OKCoin
 
                 if (split.IsCompleted())
                 {
+                    Order outOrder = cached.First().Value;
                     fill.Status = OrderStatus.Filled;
-                    fill.FillQuantity = split.TotalQuantity() * ScaleFactor;
+                    //todo:check values of tradeprice
+                    fill.FillQuantity = split.TotalQuantity();
                     FilledOrderIDs.Add(cached.First().Key);
 
-                    Order outOrder = cached.First().Value;
                     //CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
                     FillSplit.TryRemove(split.OrderId, out split);
                 }

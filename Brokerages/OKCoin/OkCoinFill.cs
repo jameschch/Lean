@@ -41,7 +41,7 @@ namespace QuantConnect.Brokerages.OKCoin
             }
         }
 
-        Dictionary<int, TradeMessage> messages = new Dictionary<int, TradeMessage>();
+        List<TradeMessage> messages = new List<TradeMessage>();
 
         /// <summary>
         /// Creates instance of BitfinexFill
@@ -59,14 +59,9 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         /// <param name="msg"></param>
         /// <returns></returns>
-        public bool Add(TradeMessage msg)
+        public void Add(TradeMessage msg)
         {
-            if (!messages.ContainsKey(msg.Id))
-            {
-                messages.Add(msg.Id, msg);
-                return true;
-            }
-            return false;
+            messages.Add(msg);
         }
 
         //todo: docs say tradeprice is filled amount. Check this
@@ -76,7 +71,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <returns></returns>
         public bool IsCompleted()
         {
-            decimal quantity = messages.Sum(m => m.Value.CompletedTradeAmount) * _scaleFactor;
+            decimal quantity = messages.Sum(m => m.CompletedTradeAmount) * _scaleFactor;
             return quantity >= _order.Quantity;
         }
 
@@ -87,7 +82,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <returns></returns>
         public decimal TotalQuantity()
         {
-            return messages.Sum(m => m.Value.TradePrice);
+            return messages.Sum(m => m.CompletedTradeAmount);
         }
 
 
