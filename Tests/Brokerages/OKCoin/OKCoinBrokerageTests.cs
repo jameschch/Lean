@@ -58,6 +58,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             var webSocketClient = new WebSocketWrapper();
             var orderSocketClient = new WebSocketWrapper();
             var factory = new OKCoinWebsocketsFactory();
+            var rest = new RestClient();
+            //todo: rest client
             return new OKCoinWebsocketsBrokerage(url, webSocketClient, factory, "USD", apiKey, apiSecret, "spot", false, securityProvider);
         }
 

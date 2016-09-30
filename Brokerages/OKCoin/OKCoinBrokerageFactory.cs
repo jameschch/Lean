@@ -21,6 +21,7 @@ using QuantConnect.Util;
 using QuantConnect.Interfaces;
 using QuantConnect.Configuration;
 using QuantConnect.Brokerages.Bitfinex;
+using RestSharp;
 
 namespace QuantConnect.Brokerages.OKCoin
 {
@@ -76,6 +77,7 @@ namespace QuantConnect.Brokerages.OKCoin
             get { return new OKCoinBrokerageModel(); }
         }
 
+        //todo rest client
         /// <summary>
         /// Create the Brokerage instance
         /// </summary>
@@ -94,6 +96,7 @@ namespace QuantConnect.Brokerages.OKCoin
             var webSocketClient = new WebSocketWrapper();
 
             var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
+                new RestClient(),
                 job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"],
                 bool.Parse(job.BrokerageData["isTradeTickerEnabled"]), algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

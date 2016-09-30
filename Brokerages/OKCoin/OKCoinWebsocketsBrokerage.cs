@@ -21,6 +21,7 @@ using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
 using QuantConnect.Util;
+using RestSharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -75,6 +76,7 @@ namespace QuantConnect.Brokerages.OKCoin
         //todo: link to config
         private bool _isTradeTickerEnabled;
         IOKCoinWebsocketsFactory _websocketsFactory;
+        IRestClient _rest;
 
         enum OKCoinOrderStatus
         {
@@ -89,7 +91,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, string baseCurrency,
+        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, string baseCurrency,
             string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
@@ -98,6 +100,7 @@ namespace QuantConnect.Brokerages.OKCoin
             _websocketsFactory = websocketsFactory;
             _isTradeTickerEnabled = isTradeTickerEnabled;
             FillSplit = new ConcurrentDictionary<int, OKCoinFill>();
+            _rest = rest;
         }
 
         /// <summary>
@@ -513,6 +516,8 @@ namespace QuantConnect.Brokerages.OKCoin
             }
         }
 
+
+        //todo: get conv rate
         /// <summary>
         /// Retreive holdings from exchange
         /// </summary>
@@ -520,44 +525,40 @@ namespace QuantConnect.Brokerages.OKCoin
         public override List<Holding> GetAccountHoldings()
         {
             var list = new List<Holding>();
+            var raw = GetOrders();
 
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-
-            IWebSocket holdingsWebSocket = _websocketsFactory.CreateInstance(Url);
-            holdingsWebSocket.Connect();
-
-            holdingsWebSocket.OnMessage += (sender, e) =>
+            if (raw.data != null && raw.data.orders != null)
             {
-                var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
-
-                if (raw.data != null && raw.data.orders != null)
+                foreach (var item in raw.data.orders)
                 {
-
-                    foreach (var item in raw.data.orders)
+                    if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
                     {
-                        if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
+                        decimal conversionRate = 1m;
+
+                        if (!item.Symbol.EndsWith(_baseCurrency))
                         {
-                            list.Add(new Holding
-                            {
-                                AveragePrice = (decimal)item.avg_price,
-                                CurrencySymbol = ((string)item.symbol).Substring(0, 3).ToUpper(),
-                                Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
-                                Symbol = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
-                                Type = SecurityType.Forex,
-                            });
+                            var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
+                            //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+                           // conversionRate = decimal.Parse(baseTicker.Mid);
+                        }
+                        else
+                        {
+                           // conversionRate = decimal.Parse(ticker.Mid);
                         }
 
+
+                        list.Add(new Holding
+                        {
+                            AveragePrice = (decimal)item.avg_price,
+                            CurrencySymbol = ((string)item.symbol).Substring(0, 3).ToUpper(),
+                            Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                            Symbol = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
+                            Type = SecurityType.Forex,
+                            ConversionRate = GetConversionRate(item.symbol.SubString(0, 3) + "usd")
+                        });
                     }
-
                 }
-                tcs.SetResult(true);
-            };
-
-            GetOrders(holdingsWebSocket);
-
-            tcs.Task.Wait(_responseTimeout);
-
-            holdingsWebSocket.Close();
+            }
 
             return list;
         }
@@ -570,53 +571,36 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             var list = new List<Order>();
 
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
+            var raw = GetOrders();
 
-            IWebSocket openOrdersWebSocket = _websocketsFactory.CreateInstance(Url);
-            openOrdersWebSocket.Connect();
-
-            openOrdersWebSocket.OnMessage += (sender, e) =>
+            if (raw.data != null && raw.data.orders != null)
             {
-                var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
 
-                if (raw.data != null && raw.data.orders != null)
+                foreach (var item in raw.data.orders)
                 {
-
-                    foreach (var item in raw.data.orders)
+                    if (item.status == (int)OKCoinOrderStatus.PartiallyFilled || item.status == (int)OKCoinOrderStatus.Unfilled)
                     {
-                        if (item.status == (int)OKCoinOrderStatus.PartiallyFilled || item.status == (int)OKCoinOrderStatus.Unfilled)
+                        string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
+
+                        list.Add(new Orders.MarketOrder
                         {
-
-                            string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
-
-                            list.Add(new Orders.MarketOrder
-                            {
-                                Price = (decimal)item.price,
-                                BrokerId = new List<string> { (string)item.order_id },
-                                Quantity = (item.type == "buy_market" ? (decimal)item.deal_amount : -(decimal)item.deal_amount),
-                                Symbol = Symbol.Create(symbol, SecurityType.Forex, Market.Bitfinex.ToString()),
-                                PriceCurrency = symbol,
-                                Time = Time.UnixTimeStampToDateTime((double)item.create_date),
-                                Status = MapOrderStatus((int)item.status)
-                            });
-                        }
-
+                            Price = (decimal)item.price,
+                            BrokerId = new List<string> { (string)item.order_id },
+                            Quantity = (item.type == "buy_market" ? (decimal)item.deal_amount : -(decimal)item.deal_amount),
+                            Symbol = Symbol.Create(symbol, SecurityType.Forex, Market.Bitfinex.ToString()),
+                            PriceCurrency = symbol,
+                            Time = DateTime.UtcNow,
+                            Status = MapOrderStatus((int)item.status)
+                        });
                     }
-
                 }
-                tcs.SetResult(true);
-            };
-
-            GetOrders(openOrdersWebSocket);
-
-            tcs.Task.Wait(_responseTimeout);
-
-            openOrdersWebSocket.Close();
+            }
 
             return list;
+
         }
 
-        private void GetOrders(IWebSocket openOrdersWebSocket)
+        private dynamic GetOrders()
         {
             var parameters = new Dictionary<string, string>
             {
@@ -632,7 +616,13 @@ namespace QuantConnect.Brokerages.OKCoin
                 parameters = parameters
             });
 
-            openOrdersWebSocket.Send(json);
+            var request = new RestRequest("orders_info.do", Method.POST);
+            request.RequestFormat = DataFormat.Json;
+
+            var response = _rest.Execute(request);
+            var raw = JsonConvert.DeserializeObject<dynamic>(response.Content, settings);
+
+            return raw;
         }
 
         private OrderStatus MapOrderStatus(int status)
