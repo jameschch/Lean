@@ -1,4 +1,4 @@
-[{
+{
     "channel": "ok_spotusd_orderinfo",
     "data": {
         "orders": [{
@@ -88,4 +88,4 @@
 		],
         "result": true
     }
-}]
+}

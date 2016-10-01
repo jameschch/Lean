@@ -534,8 +534,10 @@ namespace QuantConnect.Brokerages.OKCoin
                     if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
                     {
                         decimal conversionRate = 1m;
+                        //todo: conversion rate
+                        string itemSymbol = (string)item.symbol;
 
-                        if (!item.Symbol.EndsWith(_baseCurrency))
+                        if (!itemSymbol.EndsWith(_baseCurrency))
                         {
                             var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
                             //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
@@ -550,11 +552,11 @@ namespace QuantConnect.Brokerages.OKCoin
                         list.Add(new Holding
                         {
                             AveragePrice = (decimal)item.avg_price,
-                            CurrencySymbol = ((string)item.symbol).Substring(0, 3).ToUpper(),
+                            CurrencySymbol = itemSymbol.Substring(0, 3).ToUpper(),
                             Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
-                            Symbol = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
+                            Symbol = Symbol.Create(itemSymbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
                             Type = SecurityType.Forex,
-                            ConversionRate = GetConversionRate(item.symbol.SubString(0, 3) + "usd")
+                            ConversionRate = GetConversionRate(itemSymbol.Substring(0, 3) + "usd")
                         });
                     }
                 }

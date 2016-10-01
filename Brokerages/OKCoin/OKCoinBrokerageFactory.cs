@@ -60,8 +60,10 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     {"apiSecret" ,Config.Get("okcoin-api-secret")},
                     {"apiKey" ,Config.Get("okcoin-api-key")},
-                    {"url" , Config.Get("okcoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
-                    {"url-international" , Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
+                    {"wss" , Config.Get("okcoin-wss", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
+                    {"wss-international" , Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
+                    {"rest" , Config.Get("okcoin-rest", "wss://real.okcoin.cn:10440/websocket/okcoinapi")},
+                    {"rest-international" , Config.Get("okcoin-rest-international", "wss://real.okcoin.com:10440/websocket/okcoinapi")},
                     {"spotOrFuture", Config.Get("okcoin-spotOrFuture", "spot")},
                     {"baseCurrency", Config.Get("okcoin-baseCurrency", "usd")},
                     {"isTradeTickerEnabled", Config.Get("okcoin-isTradeTickerEnabled", "false")}
@@ -95,10 +97,10 @@ namespace QuantConnect.Brokerages.OKCoin
 
             var webSocketClient = new WebSocketWrapper();
 
-            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["url-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
-                new RestClient(),
-                job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"],
-                bool.Parse(job.BrokerageData["isTradeTickerEnabled"]), algorithm.Portfolio);
+            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["wss-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
+                new RestClient(job.BrokerageData["rest-international"]), job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], 
+                job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], bool.Parse(job.BrokerageData["isTradeTickerEnabled"]), 
+                algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);
 
             return brokerage;

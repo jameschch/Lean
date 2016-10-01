@@ -12,6 +12,7 @@ using QuantConnect.Orders;
 using System.Reflection;
 using Moq;
 using QuantConnect.Brokerages.Bitfinex;
+using RestSharp;
 
 namespace QuantConnect.Tests.Brokerages.OKCoin
 {
@@ -55,12 +56,13 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             string apiSecret = Config.Get("okcoin-api-secret");
             string apiKey = Config.Get("okcoin-api-key");
             string url = Config.Get("okcoin-wss-international", "wss://real.okcoin.com:10440/websocket/okcoinapi");
+            string restUrl = Config.Get("okcoin-rest-international", "https://www.okcoin.com/api/v1");
             var webSocketClient = new WebSocketWrapper();
             var orderSocketClient = new WebSocketWrapper();
             var factory = new OKCoinWebsocketsFactory();
-            var rest = new RestClient();
+            var rest = new RestClient(restUrl);
             //todo: rest client
-            return new OKCoinWebsocketsBrokerage(url, webSocketClient, factory, "USD", apiKey, apiSecret, "spot", false, securityProvider);
+            return new OKCoinWebsocketsBrokerage(url, webSocketClient, factory, rest, "USD", apiKey, apiSecret, "spot", false, securityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
