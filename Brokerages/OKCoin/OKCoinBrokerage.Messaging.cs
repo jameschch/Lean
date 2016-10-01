@@ -28,7 +28,7 @@ using WebSocketSharp;
 
 namespace QuantConnect.Brokerages.OKCoin
 {
-    public partial class OKCoinWebsocketsBrokerage
+    public partial class OKCoinBrokerage
     {
 
         /// <summary>
@@ -89,19 +89,22 @@ namespace QuantConnect.Brokerages.OKCoin
             string channel = (string)raw.channel;
             this._channelId[channel] = new Channel { Name = channel, Symbol = pair };
 
-            lock (Ticks)
+            if (raw.data != null)
             {
-                Ticks.Add(new Tick
+                lock (Ticks)
                 {
-                    AskPrice = (decimal)raw.data.sell / ScaleFactor,
-                    BidPrice = (decimal)raw.data.buy / ScaleFactor,
-                    Time = DateTime.UtcNow,
-                    Value = (((decimal)raw.data.sell + (decimal)raw.data.buy) / 2m) / ScaleFactor,
-                    TickType = TickType.Quote,
-                    Symbol = Symbol.Create(pair.ToUpper(), SecurityType.Forex, Market.OKCoin),
-                    DataType = MarketDataType.Tick
-                });
-            }
+                    Ticks.Add(new Tick
+                    {
+                        AskPrice = (decimal)raw.data.sell / ScaleFactor,
+                        BidPrice = (decimal)raw.data.buy / ScaleFactor,
+                        Time = DateTime.UtcNow,
+                        Value = (((decimal)raw.data.sell + (decimal)raw.data.buy) / 2m) / ScaleFactor,
+                        TickType = TickType.Quote,
+                        Symbol = Symbol.Create(pair.ToUpper(), SecurityType.Forex, Market.OKCoin),
+                        DataType = MarketDataType.Tick
+                    });
+
+                }            }
         }
 
         private void PopulateTradeTicker(dynamic raw)

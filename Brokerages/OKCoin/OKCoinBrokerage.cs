@@ -41,7 +41,7 @@ namespace QuantConnect.Brokerages.OKCoin
     /// <summary>
     /// OKCoin WebSockets integration
     /// </summary>
-    public partial class OKCoinWebsocketsBrokerage : BitfinexWebsocketsBrokerage
+    public partial class OKCoinBrokerage : BitfinexWebsocketsBrokerage
     {
 
         #region Declarations
@@ -91,7 +91,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinWebsocketsBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, string baseCurrency,
+        public OKCoinBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, string baseCurrency,
             string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
@@ -122,7 +122,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 WebSocket.Send(JsonConvert.SerializeObject(new
                 {
                     @event = "addChannel",
-                    channel = string.Format("ok_sub_{0}{1}_{2}_ticker", _spotOrFuture, item.ToString().Substring(3, 3), item.ToString().Substring(0, 3))
+                    channel = string.Format("ok_sub_{0}{1}_{2}_ticker", _spotOrFuture, item.ToString().Substring(3, 3).ToLower(), item.ToString().Substring(0, 3).ToLower())
                 }));
 
                 //trade fills
@@ -441,7 +441,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     list.Add(new Cash("BTC", (decimal)raw.data.info.funds.free.btc, GetConversionRate("BTC" + _baseCurrency)));
                 }
-                if (raw.data.info.funds.free.usd != 0)
+                if (raw.data.info.funds.free.usd != null && raw.data.info.funds.free.usd != 0)
                 {
                     list.Add(new Cash("USD", (decimal)raw.data.info.funds.free.usd, GetConversionRate("USD")));
                 }
@@ -449,7 +449,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     list.Add(new Cash("LTC", (decimal)raw.data.info.funds.free.ltc, GetConversionRate("LTC" + _baseCurrency)));
                 }
-                if (raw.data.info.funds.free.cny != 0)
+                if (raw.data.info.funds.free.cny != null && raw.data.info.funds.free.cny != 0)
                 {
                     list.Add(new Cash("CNY", (decimal)raw.data.info.funds.free.cny, GetConversionRate("CNY")));
                 }

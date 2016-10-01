@@ -36,7 +36,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// Factory constructor
         /// </summary>
         public OKCoinBrokerageFactory()
-            : base(typeof(OKCoinWebsocketsBrokerage))
+            : base(typeof(OKCoinBrokerage))
         {
         }
 
@@ -97,7 +97,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             var webSocketClient = new WebSocketWrapper();
 
-            var brokerage = new OKCoinWebsocketsBrokerage(job.BrokerageData["wss-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
+            var brokerage = new OKCoinBrokerage(job.BrokerageData["wss-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
                 new RestClient(job.BrokerageData["rest-international"]), job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], 
                 job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], bool.Parse(job.BrokerageData["isTradeTickerEnabled"]), 
                 algorithm.Portfolio);

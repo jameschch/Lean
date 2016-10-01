@@ -240,8 +240,8 @@
     <Compile Include="OKCoin\IOKCoinWebsocketsFactory.cs" />
     <Compile Include="OKCoin\OKCoinFill.cs" />
     <Compile Include="OKCoin\OKCoinBrokerageFactory.cs" />
-    <Compile Include="OKCoin\OKCoinWebsocketsBrokerage.cs" />
-    <Compile Include="OKCoin\OKCoinWebsocketsBrokerage.Messaging.cs" />
+    <Compile Include="OKCoin\OKCoinBrokerage.cs" />
+    <Compile Include="OKCoin\OKCoinBrokerage.Messaging.cs" />
     <Compile Include="OKCoin\OKCoinWebsocketsFactory.cs" />
     <Compile Include="OKCoin\rest\rest\HttpUtilManager.cs" />
     <Compile Include="OKCoin\TickerMessage.cs" />

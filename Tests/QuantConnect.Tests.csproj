@@ -253,7 +253,7 @@
     <Compile Include="Indicators\RateOfChangePercentTests.cs" />
     <Compile Include="Indicators\RateOfChangeTests.cs" />
     <Compile Include="Indicators\StochasticTests.cs" />
-    <Compile Include="Brokerages\OKCoin\OKCoinWebsocketsBrokerageTests.cs" />
+    <Compile Include="Brokerages\OKCoin\OKCoinMockBrokerageTests.cs" />
     <Compile Include="Queues\FileCommandQueueHandlerTests.cs" />
     <Compile Include="RegressionTests.cs" />
     <Compile Include="Symbols.cs" />
