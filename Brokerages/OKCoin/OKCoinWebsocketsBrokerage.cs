@@ -252,35 +252,18 @@ namespace QuantConnect.Brokerages.OKCoin
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
-            TaskCompletionSource<bool> tcs = new TaskCompletionSource<bool>();
-
             CachedOrderIDs.AddOrUpdate(order.Id, order);
-            string json = JsonConvert.SerializeObject(new
+
+            string response = com.okcoin.rest.HttpUtilManager.getInstance().requestHttpPost("https://www.okcoin.com/api/v1/", "trade.do", parameters);
+
+            var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
+            if (raw != null && raw.result == "true")
             {
-                @event = "addChannel",
-                channel = "ok_" + _spotOrFuture + _baseCurrency + "_trade",
-                parameters = parameters
-            });
-
-            IWebSocket orderWebSocket = _websocketsFactory.CreateInstance(Url);
-            orderWebSocket.Connect();
-            orderWebSocket.OnMessage += (sender, e) =>
-            {
-                var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings)[0];
-                if (raw.data != null && raw.data.result != null && raw.data.result == "true")
-                {
-                    order.BrokerId.Add((string)raw.data.order_id);
-                    this.FillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
-                    placed = true;
-                }
-                Log.Trace("BitfinexBrokerage.PlaceOrder(): Order response:" + raw.ToString());
-                tcs.SetResult(true);
-            };
-
-            orderWebSocket.Send(json);
-
-            tcs.Task.Wait(_responseTimeout);
-            orderWebSocket.Close();
+                order.BrokerId.Add((string)raw.order_id);
+                this.FillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
+                placed = true;
+            }
+            Log.Trace("BitfinexBrokerage.PlaceOrder(): Order response:" + raw.ToString());
 
             if (placed)
             {
@@ -384,9 +367,9 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     var parameters = new Dictionary<string, string>
                     {
-                        {"api_key" , ApiKey},
-                        {"sign" , ApiSecret},
-                        {"symbol" , order.Symbol.Value.Substring(0, 3) + "_" + order.Symbol.Value.Substring(3, 3)},
+                        {"api_key", ApiKey},
+                        {"sign", ""},
+                        {"symbol", ConvertSymbol(order.Symbol)},
                         {"order_id" , id.ToString()}
                     };
                     var sign = BuildSign(parameters);
@@ -525,42 +508,41 @@ namespace QuantConnect.Brokerages.OKCoin
         public override List<Holding> GetAccountHoldings()
         {
             var list = new List<Holding>();
-            var raw = GetOrders();
+            //foreach (string symbol in new[] { "btsd_usd", "ltc_usd" })
+            //{
+            //    var raw = GetOrders(symbol, OKCoinOrderStatus.PartiallyFilled);
 
-            if (raw.data != null && raw.data.orders != null)
-            {
-                foreach (var item in raw.data.orders)
-                {
-                    if (item.status == (int)OKCoinOrderStatus.FullyFilled || item.status == OKCoinOrderStatus.PartiallyFilled)
-                    {
-                        decimal conversionRate = 1m;
-                        //todo: conversion rate
-                        string itemSymbol = (string)item.symbol;
+            //    if (raw.data != null && raw.data.orders != null)
+            //    {
+            //        foreach (var item in raw.data.orders)
+            //        {
+            //            decimal conversionRate = 1m;
+            //            //todo: conversion rate
+            //            string itemSymbol = (string)item.symbol;
 
-                        if (!itemSymbol.EndsWith(_baseCurrency))
-                        {
-                            var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
-                            //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
-                           // conversionRate = decimal.Parse(baseTicker.Mid);
-                        }
-                        else
-                        {
-                           // conversionRate = decimal.Parse(ticker.Mid);
-                        }
+            //            if (!itemSymbol.EndsWith(_baseCurrency))
+            //            {
+            //                var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
+            //                                    //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+            //                                    // conversionRate = decimal.Parse(baseTicker.Mid);
+            //            }
+            //            else
+            //            {
+            //                // conversionRate = decimal.Parse(ticker.Mid);
+            //            }
 
-
-                        list.Add(new Holding
-                        {
-                            AveragePrice = (decimal)item.avg_price,
-                            CurrencySymbol = itemSymbol.Substring(0, 3).ToUpper(),
-                            Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
-                            Symbol = Symbol.Create(itemSymbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
-                            Type = SecurityType.Forex,
-                            ConversionRate = GetConversionRate(itemSymbol.Substring(0, 3) + "usd")
-                        });
-                    }
-                }
-            }
+            //            list.Add(new Holding
+            //            {
+            //                AveragePrice = (decimal)item.avg_price,
+            //                CurrencySymbol = itemSymbol.Substring(0, 3).ToUpper(),
+            //                Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
+            //                Symbol = Symbol.Create(itemSymbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
+            //                Type = SecurityType.Forex,
+            //                ConversionRate = GetConversionRate(itemSymbol.Substring(0, 3) + "usd")
+            //            });
+            //        }
+            //    }
+            //}
 
             return list;
         }
@@ -573,56 +555,51 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             var list = new List<Order>();
 
-            var raw = GetOrders();
-
-            if (raw.data != null && raw.data.orders != null)
+            foreach (string symbol in new[] { "btc_usd", "ltc_usd" })
             {
 
-                foreach (var item in raw.data.orders)
-                {
-                    if (item.status == (int)OKCoinOrderStatus.PartiallyFilled || item.status == (int)OKCoinOrderStatus.Unfilled)
-                    {
-                        string symbol = ((string)item.symbol).ToUpper().Replace("_", "");
+                var raw = GetOrders(symbol, OKCoinOrderStatus.Unfilled);
 
+                if (raw != null && raw.orders != null)
+                {
+
+                    foreach (var item in raw.orders)
+                    {
+                        var mapped = Symbol.Create(symbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString());
                         list.Add(new Orders.MarketOrder
                         {
                             Price = (decimal)item.price,
                             BrokerId = new List<string> { (string)item.order_id },
-                            Quantity = (item.type == "buy_market" ? (decimal)item.deal_amount : -(decimal)item.deal_amount),
-                            Symbol = Symbol.Create(symbol, SecurityType.Forex, Market.Bitfinex.ToString()),
-                            PriceCurrency = symbol,
+                            Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
+                            Symbol = mapped,
+                            PriceCurrency = _baseCurrency,
                             Time = DateTime.UtcNow,
                             Status = MapOrderStatus((int)item.status)
                         });
                     }
                 }
-            }
 
+            }
             return list;
 
         }
 
-        private dynamic GetOrders()
+        private dynamic GetOrders(string symbol, OKCoinOrderStatus status)
         {
             var parameters = new Dictionary<string, string>
             {
-                {"api_key" , ApiKey},
+                {"api_key", ApiKey},
+                {"symbol", symbol},
+                {"status", ((int)status).ToString()},
+                {"current_page", "1"},
+                {"page_length", "200"},
+                {"sign", ""}
             };
+
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
-
-            var json = JsonConvert.SerializeObject(new
-            {
-                @event = "addChannel",
-                channel = "ok_sub_" + _spotOrFuture + _baseCurrency + "_trades",
-                parameters = parameters
-            });
-
-            var request = new RestRequest("orders_info.do", Method.POST);
-            request.RequestFormat = DataFormat.Json;
-
-            var response = _rest.Execute(request);
-            var raw = JsonConvert.DeserializeObject<dynamic>(response.Content, settings);
+            string response = com.okcoin.rest.HttpUtilManager.getInstance().requestHttpPost("https://www.okcoin.com/api/v1/", "order_history.do", parameters);
+            var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
 
             return raw;
         }

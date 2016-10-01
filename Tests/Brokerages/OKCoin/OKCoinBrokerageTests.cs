@@ -85,7 +85,6 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
                 {                    
                     new TestCaseData(new MarketOrderTestParameters(Symbol)).SetName("MarketOrder"),
                     new TestCaseData(new LimitOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("LimitOrder"),
-                    new TestCaseData(new StopMarketOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("StopMarketOrder"),
                 };
             }
         }

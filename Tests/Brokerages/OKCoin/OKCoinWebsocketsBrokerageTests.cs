@@ -39,8 +39,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
                     {"apiKey" ,"456"},
                     {"wss" , "wss://real.okcoin.cn:10440/websocket/okcoinapi"},
                     {"wss-international" , "wss://real.okcoin.com:10440/websocket/okcoinapi"},
-                    {"rest" , "wss://real.okcoin.cn:10440/websocket/okcoinapi" },
-                    {"rest-international" ,  "wss://real.okcoin.com:10440/websocket/okcoinapi"},
+                    {"rest" , "https://www.okcoin.cn/api/v1" },
+                    {"rest-international" ,  "https://www.okcoin.cn/api/v1"},
                     {"spotOrFuture", "spot"},
                     {"baseCurrency", "usd"},
                     {"isTradeTickerEnabled", "true"}

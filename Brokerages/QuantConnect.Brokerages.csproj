@@ -243,6 +243,7 @@
     <Compile Include="OKCoin\OKCoinWebsocketsBrokerage.cs" />
     <Compile Include="OKCoin\OKCoinWebsocketsBrokerage.Messaging.cs" />
     <Compile Include="OKCoin\OKCoinWebsocketsFactory.cs" />
+    <Compile Include="OKCoin\rest\rest\HttpUtilManager.cs" />
     <Compile Include="OKCoin\TickerMessage.cs" />
     <Compile Include="OKCoin\TradeMessage.cs" />
     <Compile Include="Paper\PaperBrokerage.cs" />
@@ -294,6 +295,7 @@
     <Content Include="Bitfinex\TradingApi.Bitfinex.dll" />
     <Content Include="Bitfinex\TradingApi.ModelObjects.dll" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
