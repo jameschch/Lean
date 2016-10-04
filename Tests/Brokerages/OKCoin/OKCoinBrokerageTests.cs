@@ -49,6 +49,14 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             get { return 400m; }
         }
+
+        protected virtual string SpotOrFuture
+        {
+            get
+            {
+                return "spot";
+            }
+        }
         #endregion
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
@@ -62,7 +70,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             var factory = new OKCoinWebsocketsFactory();
             var rest = new RestClient(restUrl);
             //todo: rest client
-            return new OKCoinBrokerage(url, webSocketClient, factory, rest, "USD", apiKey, apiSecret, "spot", false, securityProvider);
+            return new OKCoinBrokerage(url, webSocketClient, factory, rest, "USD", apiKey, apiSecret, SpotOrFuture, false, securityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
@@ -82,7 +90,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             get
             {
                 return new[]
-                {                    
+                {
                     new TestCaseData(new MarketOrderTestParameters(Symbol)).SetName("MarketOrder"),
                     new TestCaseData(new LimitOrderTestParameters(Symbol, HighPrice, LowPrice)).SetName("LimitOrder"),
                 };

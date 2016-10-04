@@ -221,7 +221,6 @@ namespace QuantConnect.Brokerages.OKCoin
             }
         }
 
-
         /// <summary>
         /// Add OKCoin order and prepare for fill message
         /// </summary>

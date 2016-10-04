@@ -37,7 +37,7 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                 Console.WriteLine("TODATE = yyyymmdd");
                 //Environment.Exit(1);
                 //useful detault params
-                args = new string[] { "20160323", DateTime.UtcNow.ToString("yyyyMMdd"), "bitfinex", "BTCUSD" };
+                args = new string[] { "20150222", DateTime.UtcNow.ToString("yyyyMMdd"), "okcoin", "BTCUSD" };
 
             }
 
@@ -52,7 +52,7 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                 var scaleFactor = Config.GetValue("bitfinex-scale-factor", 1m);
 
                 // Create an instance of the downloader
-                const string market = Market.Bitfinex;
+                string market = args[2];
                 var downloader = new CryptoiqDownloader(args[2], scaleFactor);
 
                 // Download the data

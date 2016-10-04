@@ -48,14 +48,6 @@ namespace QuantConnect.Brokerages
         public OKCoinBrokerageModel(AccountType accountType = AccountType.Margin)
             : base(accountType)
         {
-            _wallet = Config.Get("OKCoin-wallet");
-
-            if (_wallet == "exchange" && accountType == AccountType.Margin)
-            {
-                accountType = AccountType.Cash;
-                Log.Trace("Exchange wallet does not allow margin trades. Defaulting to cash");
-            }
-
         }
 
         /// <summary>
@@ -65,7 +57,7 @@ namespace QuantConnect.Brokerages
         /// <returns></returns>
         public override decimal GetLeverage(Security security)
         {
-            return this.AccountType == AccountType.Margin ? 3.3m : 1;
+            return this.AccountType == AccountType.Margin ? 20m : 1;
         }
 
         /// <summary>
