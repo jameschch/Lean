@@ -118,35 +118,25 @@ namespace QuantConnect.Brokerages.OKCoin
             foreach (var item in symbols)
             {
 
+                string lowered = item.ToString().ToLower();
+                string reversed = lowered.Substring(3, 3) + "_" + lowered.Substring(0, 3);
+
                 //ticker
                 WebSocket.Send(JsonConvert.SerializeObject(new
                 {
                     @event = "addChannel",
-                    channel = string.Format("ok_sub_{0}{1}_{2}_ticker", _spotOrFuture, item.ToString().Substring(3, 3).ToLower(), item.ToString().Substring(0, 3).ToLower())
-                }));
-
-                //trade fills
-                var parameters = new Dictionary<string, string>
-                {
-                    {"api_key" , ApiKey},
-                    {"sign" , ApiSecret},
-                };
-
-                var sign = BuildSign(parameters);
-                parameters["sign"] = sign;
-                WebSocket.Send(JsonConvert.SerializeObject(new
-                {
-                    @event = "addChannel",
-                    channel = string.Format("ok_sub{0}{1}_trades", _spotOrFuture, item.ToString().Substring(3, 3)),
-                    parameters = parameters
+                    channel = string.Format("ok_sub_{0}{1}_ticker", _spotOrFuture, reversed)
                 }));
 
                 //trade ticker
-                WebSocket.Send(JsonConvert.SerializeObject(new
+                if (_isTradeTickerEnabled)
                 {
-                    @event = "addChannel",
-                    channel = string.Format("ok_sub{0}{1}_{2}_trades", _spotOrFuture, item.ToString().Substring(3, 3), item.ToString().Substring(0, 3))
-                }));
+                    WebSocket.Send(JsonConvert.SerializeObject(new
+                    {
+                        @event = "addChannel",
+                        channel = string.Format("ok_sub_{0}{1}_trades", _spotOrFuture, reversed)
+                    }));
+                }
 
             }
         }

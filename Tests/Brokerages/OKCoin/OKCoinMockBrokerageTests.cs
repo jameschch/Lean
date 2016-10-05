@@ -20,7 +20,6 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
         #region Declarations
         OKCoinBrokerageFactory factory;
-        OKCoinBrokerage live;
         OKCoinBrokerage unit;
         Mock<IWebSocket> webSocket;
         Mock<IRestClient> rest;
@@ -47,8 +46,6 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
                 };
 
 
-            live = (OKCoinBrokerage)factory.CreateBrokerage(new Packets.LiveNodePacket { BrokerageData = data },
-               new Mock<Interfaces.IAlgorithm>().Object);
             mockFactory = new Mock<OKCoinMockWebsocketsFactory>();
             mockWebsockets = new Mock<IWebSocket>();
             rest = new Mock<IRestClient>();
@@ -70,10 +67,17 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         [Test()]
         public void SubscribeTest()
         {
+            List<string> actual = new List<string>();
+
+            webSocket.Setup(w => w.IsAlive).Returns(true);
+
+            webSocket.Setup(w => w.Send(It.IsAny<string>())).Callback<string>((arg) => { actual.Add(arg); });
 
             var symbol = new List<Symbol> { Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin) };
-            live.Subscribe(null, symbol);
+            unit.Subscribe(null, symbol);
 
+            Assert.IsTrue(actual[0].Contains("ok_sub_spotusd_btc_ticker"));
+            Assert.IsTrue(actual[1].Contains("ok_sub_spotusd_btc_trades"));
         }
 
         [Test()]
