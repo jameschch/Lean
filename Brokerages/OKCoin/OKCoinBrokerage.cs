@@ -77,6 +77,7 @@ namespace QuantConnect.Brokerages.OKCoin
         private bool _isTradeTickerEnabled;
         IOKCoinWebsocketsFactory _websocketsFactory;
         IRestClient _rest;
+        IOKCoinRestFactory _restFactory;
 
         enum OKCoinOrderStatus
         {
@@ -91,8 +92,8 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <summary>
         /// Create Brokerage instance
         /// </summary>
-        public OKCoinBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, string baseCurrency,
-            string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
+        public OKCoinBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, IOKCoinRestFactory restFactory,
+            string baseCurrency, string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
@@ -101,6 +102,7 @@ namespace QuantConnect.Brokerages.OKCoin
             _isTradeTickerEnabled = isTradeTickerEnabled;
             FillSplit = new ConcurrentDictionary<int, OKCoinFill>();
             _rest = rest;
+            _restFactory = restFactory;
         }
 
         /// <summary>
@@ -470,16 +472,19 @@ namespace QuantConnect.Brokerages.OKCoin
             }
 
             //todo: This may be needed if LEAN account currency must be USD
-            string url;
             if (symbol == "CNY")
             {
-                url = @"http://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22"
-                    + symbol + _baseCurrency + "%22)&env=store://datatables.org/alltableswithkeys";
-                return decimal.Parse(new System.Xml.XPath.XPathDocument(url).CreateNavigator().SelectSingleNode("//Rate").InnerXml);
+                const string rateUrl = "https://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22cnyusd%22)&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys";
+                var _rateRest = _restFactory.CreateInstance(rateUrl);
+                var response = _rateRest.Execute(new RestRequest());
+                var raw = JsonConvert.DeserializeObject<dynamic>(response.Content);               
+
+                return decimal.Parse(raw.query.result.rate.Rate);
             }
             else
             {
-                url = string.Format("https://www.okcoin.{0}/api/v1/ticker.do?symbol={1}_{2}", _baseCurrency == "usd" ? "com" : "cn", symbol.Substring(0, 3), _baseCurrency);
+                string url = string.Format("ticker.do?symbol={1}_{2}", symbol.Substring(0, 3), _baseCurrency);
+                _rest.Execute(new RestRequest(url, Method.GET));
                 using (System.Net.WebClient rest = new System.Net.WebClient())
                 {
                     var raw = JsonConvert.DeserializeObject<dynamic>(rest.DownloadString(url), settings);

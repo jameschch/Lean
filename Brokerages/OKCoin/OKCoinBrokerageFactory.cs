@@ -98,7 +98,7 @@ namespace QuantConnect.Brokerages.OKCoin
             var webSocketClient = new WebSocketWrapper();
 
             var brokerage = new OKCoinBrokerage(job.BrokerageData["wss-international"], webSocketClient, new OKCoinWebsocketsFactory(), 
-                new RestClient(job.BrokerageData["rest-international"]), job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], 
+                new RestClient(job.BrokerageData["rest-international"]), new OKCoinRestFactory(), job.BrokerageData["baseCurrency"], job.BrokerageData["apiKey"], 
                 job.BrokerageData["apiSecret"], job.BrokerageData["spotOrFuture"], bool.Parse(job.BrokerageData["isTradeTickerEnabled"]), 
                 algorithm.Portfolio);
             Composer.Instance.AddPart<IDataQueueHandler>(brokerage);

@@ -113,7 +113,6 @@
     <Compile Include="Brokerages\Fxcm\FxcmSymbolMapperTests.cs" />
     <Compile Include="Brokerages\OKCoin\OKCoinBrokerageFuturesTests.cs" />
     <Compile Include="Brokerages\OKCoin\OKCoinBrokerageTests.cs" />
-    <Compile Include="Brokerages\OKCoin\OKCoinMockWebsocketsFactory.cs" />
     <Compile Include="Brokerages\SecurityProvider.cs" />
     <Compile Include="Brokerages\InteractiveBrokers\InteractiveBrokersBrokerageDataQueueHandlerTest.cs" />
     <Compile Include="Brokerages\InteractiveBrokers\InteractiveBrokersOrderTests.cs" />
