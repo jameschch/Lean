@@ -492,7 +492,7 @@ namespace QuantConnect.Brokerages.OKCoin
         }
 
 
-        //todo: get conv rate
+        //todo: gataccountholdings for futures
         /// <summary>
         /// Retreive holdings from exchange
         /// </summary>
@@ -500,41 +500,47 @@ namespace QuantConnect.Brokerages.OKCoin
         public override List<Holding> GetAccountHoldings()
         {
             var list = new List<Holding>();
-            //foreach (string symbol in new[] { "btsd_usd", "ltc_usd" })
-            //{
-            //    var raw = GetOrders(symbol, OKCoinOrderStatus.PartiallyFilled);
 
-            //    if (raw.data != null && raw.data.orders != null)
-            //    {
-            //        foreach (var item in raw.data.orders)
-            //        {
-            //            decimal conversionRate = 1m;
-            //            //todo: conversion rate
-            //            string itemSymbol = (string)item.symbol;
+            if (_spotOrFuture == "spot")
+            {
+                return list;
+            }
 
-            //            if (!itemSymbol.EndsWith(_baseCurrency))
-            //            {
-            //                var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
-            //                                    //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
-            //                                    // conversionRate = decimal.Parse(baseTicker.Mid);
-            //            }
-            //            else
-            //            {
-            //                // conversionRate = decimal.Parse(ticker.Mid);
-            //            }
+            foreach (string symbol in new[] { "btsd_usd", "ltc_usd" })
+            {
+                var raw = GetOrders(symbol, OKCoinOrderStatus.PartiallyFilled);
 
-            //            list.Add(new Holding
-            //            {
-            //                AveragePrice = (decimal)item.avg_price,
-            //                CurrencySymbol = itemSymbol.Substring(0, 3).ToUpper(),
-            //                Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
-            //                Symbol = Symbol.Create(itemSymbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
-            //                Type = SecurityType.Forex,
-            //                ConversionRate = GetConversionRate(itemSymbol.Substring(0, 3) + "usd")
-            //            });
-            //        }
-            //    }
-            //}
+                if (raw.data != null && raw.data.orders != null)
+                {
+                    foreach (var item in raw.data.orders)
+                    {
+                        decimal conversionRate = 1m;
+                        //todo: conversion rate
+                        string itemSymbol = (string)item.symbol;
+
+                        if (!itemSymbol.EndsWith(_baseCurrency))
+                        {
+                            var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
+                                                //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+                                                // conversionRate = decimal.Parse(baseTicker.Mid);
+                        }
+                        else
+                        {
+                            // conversionRate = decimal.Parse(ticker.Mid);
+                        }
+
+                        list.Add(new Holding
+                        {
+                            AveragePrice = (decimal)item.avg_price,
+                            CurrencySymbol = itemSymbol.Substring(0, 3).ToUpper(),
+                            Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
+                            Symbol = Symbol.Create(itemSymbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
+                            Type = SecurityType.Forex,
+                            ConversionRate = GetConversionRate(itemSymbol.Substring(0, 3) + "usd")
+                        });
+                    }
+                }
+            }
 
             return list;
         }
