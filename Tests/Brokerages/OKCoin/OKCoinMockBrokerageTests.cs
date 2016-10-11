@@ -105,7 +105,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             mockWebsockets.Reset();
             mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
-            
+
 
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
             unit.PlaceOrder(new Orders.LimitOrder { Id = 123, Quantity = 123, Symbol = symbol, LimitPrice = 123 });
@@ -118,10 +118,14 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         [Test()]
         public void GetCashBalanceUsdTest()
         {
-            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
             var response = new Mock<IRestResponse>();
+            string json = System.IO.File.ReadAllText("TestData\\ok_ticker.txt");
             response.Setup(r => r.Content).Returns(json);
             mockRest.Setup(o => o.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
+
+            json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+            mockWebsockets.Reset();
+            mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
             var actual = unit.GetCashBalance();
 
@@ -134,10 +138,21 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         [Test()]
         public void GetCashBalanceCnyTest()
         {
-            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+            string json = "{\"query\":{\"count\":1,\"created\":\"2016-10-08T10: 52:51Z\",\"lang\":\"en-us\",\"results\":{\"rate\":{\"Rate\":\"6.6684\"}}}}";
+            var cnyResponse = new Mock<IRestResponse>();
+            cnyResponse.Setup(r => r.Content).Returns(json);
+            var cnyRest = new Mock<IRestClient>();
+            cnyRest.Setup(c => c.Execute(It.IsAny<IRestRequest>())).Returns(cnyResponse.Object);
+            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(cnyRest.Object);
+
+            json = System.IO.File.ReadAllText("TestData\\ok_ticker.txt");
             var response = new Mock<IRestResponse>();
             response.Setup(r => r.Content).Returns(json);
             mockRest.Setup(o => o.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
+
+            json = System.IO.File.ReadAllText("TestData\\ok_spotusd_userinfo.txt");
+            mockWebsockets.Reset();
+            mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
             var cnyUnit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, "cny", "", "", "spot", false, new Mock<Securities.ISecurityProvider>().Object);
 

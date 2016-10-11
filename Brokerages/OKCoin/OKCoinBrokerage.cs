@@ -466,30 +466,28 @@ namespace QuantConnect.Brokerages.OKCoin
         //todo: inject rest client
         private decimal GetConversionRate(string symbol)
         {
-            if (symbol.ToLower() == "USD")
+            if (symbol.Equals("USD", StringComparison.CurrentCultureIgnoreCase))
             {
                 return 1m;
             }
 
             //todo: This may be needed if LEAN account currency must be USD
-            if (symbol == "CNY")
+            if (symbol.Equals("CNY", StringComparison.CurrentCultureIgnoreCase))
             {
-                const string rateUrl = "https://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22cnyusd%22)&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys";
+                const string rateUrl = "https://query.yahooapis.com/v1/public/yql?q=select%20Rate%20from%20yahoo.finance.xchange%20where%20pair%20in%20(%22USDCNY%22)&format=json&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys";
                 var _rateRest = _restFactory.CreateInstance(rateUrl);
                 var response = _rateRest.Execute(new RestRequest());
-                var raw = JsonConvert.DeserializeObject<dynamic>(response.Content);               
+                var raw = JsonConvert.DeserializeObject<dynamic>(response.Content);
 
-                return decimal.Parse(raw.query.result.rate.Rate);
+                return ((decimal)raw.query.results.rate.Rate) * 0.01m;
             }
             else
             {
-                string url = string.Format("ticker.do?symbol={1}_{2}", symbol.Substring(0, 3), _baseCurrency);
-                _rest.Execute(new RestRequest(url, Method.GET));
-                using (System.Net.WebClient rest = new System.Net.WebClient())
-                {
-                    var raw = JsonConvert.DeserializeObject<dynamic>(rest.DownloadString(url), settings);
-                    return ((decimal)raw.ticker.buy + (decimal)raw.ticker.sell) / 2;
-                }
+                string url = string.Format("ticker.do?symbol={0}_{1}", symbol.Substring(0, 3), _baseCurrency);
+                var response = _rest.Execute(new RestRequest(url, Method.GET));
+                var raw = JsonConvert.DeserializeObject<dynamic>(response.Content, settings);
+                return ((decimal)raw.ticker.buy + (decimal)raw.ticker.sell) / 2;
+
             }
         }
 
