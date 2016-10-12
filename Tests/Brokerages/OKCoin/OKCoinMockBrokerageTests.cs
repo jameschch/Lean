@@ -37,6 +37,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             mockRestFactory = new Mock<IOKCoinRestFactory>();
             mockWebsockets = new Mock<IWebSocket>();
             mockRest = new Mock<IRestClient>();
+            mockRest.Setup(m => m.BaseUrl).Returns(new Uri("http://localhost"));
+
             mockFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockWebsockets.Object);
             mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
         }
@@ -91,7 +93,6 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             string json = "[{\"channel\":\"ok_spotusd_trade\", \"data\":{ \"order_id\":\"125433029\",\"result\":\"true\"}}]";
             mockWebsockets.Reset();
             mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
-
 
 
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
@@ -170,15 +171,19 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         [Test()]
         public void GetOpenOrdersTest()
         {
-            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
+            string json = System.IO.File.ReadAllText("TestData\\ok_order_history.txt");
+
+            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
             var response = new Mock<IRestResponse>();
             response.Setup(r => r.Content).Returns(json);
+            mockRest.Setup(m => m.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
+            //mockRest.Setup(m => m.AddDefaultHeader(It.IsAny<string>(), It.IsAny<string>()));
 
             var actual = unit.GetOpenOrders();
 
-            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.PartiallyFilled).Quantity, 99);
-            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "LTCUSD").Quantity, -0.1);
-            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.Submitted).Quantity, 56.78);
+            Assert.AreEqual(99m, actual.First(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.PartiallyFilled).Quantity);
+            Assert.AreEqual(-0.1m, actual.First(a => a.Symbol.Value == "LTCUSD").Quantity);
+            Assert.AreEqual(56.78, actual.First(a => a.Symbol.Value == "BTCUSD" && a.Status == Orders.OrderStatus.Submitted).Quantity);
 
         }
 

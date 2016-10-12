@@ -245,7 +245,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             CachedOrderIDs.AddOrUpdate(order.Id, order);
 
-            string response = com.okcoin.rest.HttpUtilManager.getInstance().requestHttpPost("https://www.okcoin.com/api/v1/", "trade.do", parameters);
+            string response = PostForm("trade.do", parameters);
 
             var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
             if (raw != null && raw.result == "true")
@@ -254,17 +254,17 @@ namespace QuantConnect.Brokerages.OKCoin
                 this.FillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
                 placed = true;
             }
-            Log.Trace("BitfinexBrokerage.PlaceOrder(): Order response:" + raw.ToString());
+            Log.Trace("OKCoinBrokerage.PlaceOrder(): Order response:" + raw.ToString());
 
             if (placed)
             {
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Submitted });
-                Log.Trace("BitfinexBrokerage.PlaceOrder(): Order completed successfully orderid:" + order.Id.ToString());
+                Log.Trace("OKCoinBrokerage.PlaceOrder(): Order completed successfully orderid:" + order.Id.ToString());
             }
             else
             {
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Order Event") { Status = OrderStatus.Invalid });
-                Log.Trace("BitfinexBrokerage.PlaceOrder(): Failed to place order orderid:" + order.Id.ToString());
+                Log.Trace("OKCoinBrokerage.PlaceOrder(): Failed to place order orderid:" + order.Id.ToString());
             }
 
             return placed;
@@ -545,6 +545,7 @@ namespace QuantConnect.Brokerages.OKCoin
             return list;
         }
 
+        //todo: paging
         /// <summary>
         /// Retreive orders from exchange
         /// </summary>
@@ -556,24 +557,32 @@ namespace QuantConnect.Brokerages.OKCoin
             foreach (string symbol in new[] { "btc_usd", "ltc_usd" })
             {
 
-                var raw = GetOrders(symbol, OKCoinOrderStatus.Unfilled);
-
-                if (raw != null && raw.orders != null)
+                foreach (var status in new[] { OKCoinOrderStatus.Unfilled, OKCoinOrderStatus.PartiallyFilled })
                 {
+                    var raw = GetOrders(symbol, status);
 
-                    foreach (var item in raw.orders)
+                    if (raw != null && raw.orders != null)
                     {
-                        var mapped = Symbol.Create(symbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString());
-                        list.Add(new Orders.MarketOrder
+
+                        foreach (var item in raw.orders)
                         {
-                            Price = (decimal)item.price,
-                            BrokerId = new List<string> { (string)item.order_id },
-                            Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
-                            Symbol = mapped,
-                            PriceCurrency = _baseCurrency,
-                            Time = DateTime.UtcNow,
-                            Status = MapOrderStatus((int)item.status)
-                        });
+                            if (((int)item.status != 0 && (int)item.status != 1))
+                            {
+                                continue;
+                            }
+
+                            var mapped = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString());
+                            list.Add(new Orders.MarketOrder
+                            {
+                                Price = (decimal)item.price,
+                                BrokerId = new List<string> { (string)item.order_id },
+                                Quantity = (item.type == "buy" || item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                                Symbol = mapped,
+                                PriceCurrency = _baseCurrency,
+                                Time = DateTime.UtcNow,
+                                Status = MapOrderStatus((int)item.status)
+                            });
+                        }
                     }
                 }
 
@@ -596,7 +605,8 @@ namespace QuantConnect.Brokerages.OKCoin
 
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
-            string response = com.okcoin.rest.HttpUtilManager.getInstance().requestHttpPost("https://www.okcoin.com/api/v1/", "order_history.do", parameters);
+
+            string response = PostForm("order_history.do", parameters);
             var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
 
             return raw;
@@ -649,6 +659,34 @@ namespace QuantConnect.Brokerages.OKCoin
                 parameters["price"] = raw.ticker.sell;
             }
             parameters["type"] = "buy";
+        }
+
+        private string PostForm(string requestUrl, Dictionary<string, string> parameters)
+        {
+            var restForm = _restFactory.CreateInstance(_rest.BaseUrl.ToString());
+            var sign = BuildSign(parameters);
+            parameters["sign"] = sign;
+
+            //restForm.AddDefaultHeader("Content-Type", "application/x-www-form-urlencoded");
+
+            StringBuilder buffer = new StringBuilder();
+            foreach (string key in parameters.Keys)
+            {
+                if (buffer.Length > 0)
+                {
+                    buffer.AppendFormat("&{0}={1}", key, parameters[key]);
+                }
+                else
+                {
+                    buffer.AppendFormat("{0}={1}", key, parameters[key]);
+                }
+            }
+
+            var request = new RestRequest(requestUrl, Method.POST);
+            request.AddParameter(new Parameter { ContentType = "application/x-www-form-urlencoded", Value = buffer.ToString(), Name = "Body", Type = ParameterType.RequestBody });
+            var response = restForm.Execute(request);
+
+            return response.Content;
         }
 
     }

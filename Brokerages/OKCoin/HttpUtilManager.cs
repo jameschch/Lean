@@ -9,7 +9,7 @@ using System.IO;
 namespace com.okcoin.rest
 {
 
-    class HttpUtilManager
+    public class HttpUtilManager
     {
         private HttpUtilManager() { }
         private static HttpUtilManager instance = new HttpUtilManager();
