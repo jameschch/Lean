@@ -204,7 +204,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
 
             unit.CachedOrderIDs.AddOrUpdate(order.Id, order);
             unit.OKCoinFillSplit = new System.Collections.Concurrent.ConcurrentDictionary<int, OKCoinFill>();
-            unit.OKCoinFillSplit.TryAdd(order.Id, new OKCoinFill(order, 1));
+            unit.OKCoinFillSplit.TryAdd(order.Id, new OKCoinFill(order));
 
             ManualResetEvent raised = new ManualResetEvent(false);
 

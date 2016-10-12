@@ -37,7 +37,6 @@ namespace QuantConnect.Brokerages
     public class OKCoinBrokerageModel : DefaultBrokerageModel
     {
 
-        string _wallet;
         const string exchange = "exchange";
 
         /// <summary>

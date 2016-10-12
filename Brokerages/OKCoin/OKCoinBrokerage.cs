@@ -190,20 +190,6 @@ namespace QuantConnect.Brokerages.OKCoin
         }
 
         /// <summary>
-        /// Ensures any wss connection or authentication is closed
-        /// </summary>
-        public void Dispose()
-        {
-            try
-            {
-                this.Disconnect();
-            }
-            catch (Exception)
-            {
-            }
-        }
-
-        /// <summary>
         /// Add OKCoin order and prepare for fill message
         /// </summary>
         /// <param name="order"></param>
@@ -241,7 +227,7 @@ namespace QuantConnect.Brokerages.OKCoin
             if (raw != null && raw.result == "true")
             {
                 order.BrokerId.Add((string)raw.order_id);
-                this.OKCoinFillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
+                this.OKCoinFillSplit.TryAdd(order.Id, new OKCoinFill(order));
                 placed = true;
             }
             Log.Trace("OKCoinBrokerage.PlaceOrder(): Order response:" + raw.ToString());

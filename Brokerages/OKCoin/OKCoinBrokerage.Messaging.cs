@@ -95,10 +95,10 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     Ticks.Add(new Tick
                     {
-                        AskPrice = (decimal)raw.data.sell / ScaleFactor,
-                        BidPrice = (decimal)raw.data.buy / ScaleFactor,
+                        AskPrice = (decimal)raw.data.sell,
+                        BidPrice = (decimal)raw.data.buy,
                         Time = DateTime.UtcNow,
-                        Value = (((decimal)raw.data.sell + (decimal)raw.data.buy) / 2m) / ScaleFactor,
+                        Value = (((decimal)raw.data.sell + (decimal)raw.data.buy) / 2m),
                         TickType = TickType.Quote,
                         Symbol = Symbol.Create(pair.ToUpper(), SecurityType.Forex, Market.OKCoin),
                         DataType = MarketDataType.Tick
@@ -118,11 +118,11 @@ namespace QuantConnect.Brokerages.OKCoin
                     Ticks.Add(new Tick
                     {
                         Time = DateTime.UtcNow,
-                        Value = (decimal)item[1] / ScaleFactor,
+                        Value = (decimal)item[1],
                         TickType = TickType.Trade,
                         Symbol = Symbol.Create(pair.ToUpper(), SecurityType.Forex, Market.OKCoin),
                         DataType = MarketDataType.Tick,
-                        Quantity = (int)(Math.Round((decimal)item[2] * ScaleFactor))
+                        Quantity = (int)(Math.Round((decimal)item[2]))
                     });
                 }
 
@@ -151,10 +151,10 @@ namespace QuantConnect.Brokerages.OKCoin
                 (
                     cached.First().Key, Symbol.Create(msg.Symbol.Replace("_", ""), SecurityType.Forex, Market.OKCoin), DateTime.UtcNow,
                     msg.CompletedTradeAmount != 0 ? OrderStatus.PartiallyFilled : OrderStatus.Submitted, msg.TradeType.StartsWith("buy") ? OrderDirection.Buy : OrderDirection.Sell,
-                    msg.AveragePrice / ScaleFactor, msg.CompletedTradeAmount,
+                    msg.AveragePrice, msg.CompletedTradeAmount,
                     0, "OKCoin Fill Event"
                 );
-                fill.FillPrice = msg.AveragePrice / ScaleFactor;
+                fill.FillPrice = msg.AveragePrice;
 
                 if (split.IsCompleted())
                 {

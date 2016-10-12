@@ -28,7 +28,6 @@ namespace QuantConnect.Brokerages.OKCoin
     {
 
         Orders.Order _order;
-        decimal _scaleFactor;
 
         /// <summary>
         /// Lean orderId
@@ -47,11 +46,9 @@ namespace QuantConnect.Brokerages.OKCoin
         /// Creates instance of BitfinexFill
         /// </summary>
         /// <param name="order"></param>
-        /// <param name="scaleFactor"></param>
-        public OKCoinFill(Orders.Order order, decimal scaleFactor)
+        public OKCoinFill(Orders.Order order)
         {
             _order = order;
-            _scaleFactor = scaleFactor;
         }
 
         /// <summary>
@@ -71,7 +68,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// <returns></returns>
         public bool IsCompleted()
         {
-            decimal quantity = messages.Sum(m => m.CompletedTradeAmount) * _scaleFactor;
+            decimal quantity = messages.Sum(m => m.CompletedTradeAmount);
             return quantity >= _order.Quantity;
         }
 

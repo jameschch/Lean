@@ -49,6 +49,8 @@ namespace QuantConnect.Tests.Common.Orders.Fees
             sub = (SubscriptionDataConfig)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(SubscriptionDataConfig));
             security = new Mock<Security>(SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc), sub, new Cash("USD", 1, 1), new SymbolProperties("", "USD", 1, 1, 1));
             security.Setup(s => s.Price).Returns(price);
+            security.Setup(s => s.AskPrice).Returns(price + 2);
+            security.Setup(s => s.BidPrice).Returns(price - 2);
         }
 
         [Test()]
@@ -70,11 +72,21 @@ namespace QuantConnect.Tests.Common.Orders.Fees
             var order = new Mock<LimitOrder>();
             order.Setup(o => o.Type).Returns(OrderType.Limit);
             order.Object.Quantity = 10;
+            order.Object.LimitPrice = price + 1;
 
             decimal expected = 1m;
             var actual = unit.GetOrderFee(security.Object, order.Object);
 
             Assert.AreEqual(expected, actual);
+
+            order.Object.LimitPrice = price - 1;
+            order.Object.Quantity = -10;
+
+            expected = 1m;
+            actual = unit.GetOrderFee(security.Object, order.Object);
+
+            Assert.AreEqual(expected, actual);
+
         }
 
     }
