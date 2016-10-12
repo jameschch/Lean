@@ -75,31 +75,37 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         [Test()]
         public void PlaceOrderTest()
         {
-            string json = "[{\"channel\":\"ok_spotusd_trade\", \"data\":{ \"order_id\":\"125433029\",\"result\":\"true\"}}]";
+            unit.CachedOrderIDs.Clear();
+            string json = "{\"result\":true,\"order_id\":123456}";
 
-            mockWebsockets.Reset();
+            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
+            var response = new Mock<IRestResponse>();
+            response.Setup(r => r.Content).Returns(json);
+            mockRest.Setup(m => m.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
 
-            mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
             unit.PlaceOrder(new Orders.MarketOrder { Id = 123, Quantity = 123, Symbol = symbol });
 
             string actual = unit.CachedOrderIDs.First().Value.BrokerId.First();
-            Assert.IsFalse(string.IsNullOrEmpty(actual));
+            Assert.AreEqual("123456", actual);
         }
 
         [Test()]
         public void PlaceLimitOrderTest()
         {
-            string json = "[{\"channel\":\"ok_spotusd_trade\", \"data\":{ \"order_id\":\"125433029\",\"result\":\"true\"}}]";
-            mockWebsockets.Reset();
-            mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
+            unit.CachedOrderIDs.Clear();
+            string json = "{\"result\":true,\"order_id\":123456}";
 
+            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
+            var response = new Mock<IRestResponse>();
+            response.Setup(r => r.Content).Returns(json);
+            mockRest.Setup(m => m.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
 
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
             unit.PlaceOrder(new Orders.LimitOrder { Id = 123, Quantity = 123, Symbol = symbol, LimitPrice = 123 });
 
             string actual = unit.CachedOrderIDs.First().Value.BrokerId.First();
-            Assert.IsFalse(string.IsNullOrEmpty(actual));
+            Assert.AreEqual("123456", actual);
         }
 
 
@@ -150,22 +156,6 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             Assert.IsTrue(actual.Single(a => a.Symbol == "BTC").Amount > 0);
             Assert.IsTrue(actual.Single(a => a.Symbol == "LTC").Amount > 0);
             Assert.AreEqual(actual.Single(a => a.Symbol == "CNY").Amount, 246);
-        }
-
-        [Test()]
-        public void GetAccountHoldingsFuturesTest()
-        {
-            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
-
-            var response = new Mock<IRestResponse>();
-            response.Setup(r => r.Content).Returns(json);
-            mockRest.Setup(o => o.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
-
-            var actual = futuresUnit.GetAccountHoldings();
-
-            Assert.AreEqual(actual.Where(a => a.Symbol.Value == "BTCUSD").Sum(a => a.Quantity), 12.35);
-            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCCNY").Quantity, 12.34);
-            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "LTCUSD").Quantity, -12.34);
         }
 
         [Test()]
@@ -249,6 +239,22 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             var actual = unit.BuildSign(new Dictionary<string, string> { { "api_key", "abc123" }, { "symbol", "BCTUSD" } });
             Assert.AreEqual("eead4f2c8bb341a14fa3b26e8baca560", actual.ToLower());
+        }
+
+        [Test()]
+        public void GetAccountHoldingsFuturesTest()
+        {
+            string json = System.IO.File.ReadAllText("TestData\\ok_spotusd_orderinfo.txt");
+
+            var response = new Mock<IRestResponse>();
+            response.Setup(r => r.Content).Returns(json);
+            mockRest.Setup(o => o.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
+
+            var actual = futuresUnit.GetAccountHoldings();
+
+            Assert.AreEqual(actual.Where(a => a.Symbol.Value == "BTCUSD").Sum(a => a.Quantity), 12.35);
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "BTCCNY").Quantity, 12.34);
+            Assert.AreEqual(actual.Single(a => a.Symbol.Value == "LTCUSD").Quantity, -12.34);
         }
 
 
