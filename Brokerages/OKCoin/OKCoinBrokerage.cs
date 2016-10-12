@@ -56,19 +56,8 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             FloatParseHandling = FloatParseHandling.Decimal
         };
-        /// <summary>
-        /// List of known orders
-        /// </summary>
-        public ConcurrentDictionary<int, Order> CachedOrderIDs = new ConcurrentDictionary<int, Order>();
-        /// <summary>
-        /// List of filled orders
-        /// </summary>
-        protected readonly FixedSizeHashQueue<int> FilledOrderIDs = new FixedSizeHashQueue<int>(10000);
-        /// <summary>
-        /// List of unknown orders
-        /// </summary>
         protected ConcurrentDictionary<string, TradeMessage> UnknownOrders = new ConcurrentDictionary<string, TradeMessage>();
-        public ConcurrentDictionary<int, OKCoinFill> FillSplit { get; set; }
+        public ConcurrentDictionary<int, OKCoinFill> OKCoinFillSplit { get; set; }
         string _baseCurrency = "usd";
         string _spotOrFuture = "spot";
         object _placeOrderLock = new object();
@@ -100,7 +89,7 @@ namespace QuantConnect.Brokerages.OKCoin
             _baseCurrency = baseCurrency.ToLower();
             _websocketsFactory = websocketsFactory;
             _isTradeTickerEnabled = isTradeTickerEnabled;
-            FillSplit = new ConcurrentDictionary<int, OKCoinFill>();
+            OKCoinFillSplit = new ConcurrentDictionary<int, OKCoinFill>();
             _rest = rest;
             _restFactory = restFactory;
         }
@@ -188,6 +177,7 @@ namespace QuantConnect.Brokerages.OKCoin
             }));
 
             WebSocket.OnMessage += OnMessage;
+            WebSocket.OnError += OnError;
         }
 
         /// <summary>
@@ -251,7 +241,7 @@ namespace QuantConnect.Brokerages.OKCoin
             if (raw != null && raw.result == "true")
             {
                 order.BrokerId.Add((string)raw.order_id);
-                this.FillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
+                this.OKCoinFillSplit.TryAdd(order.Id, new OKCoinFill(order, ScaleFactor));
                 placed = true;
             }
             Log.Trace("OKCoinBrokerage.PlaceOrder(): Order response:" + raw.ToString());

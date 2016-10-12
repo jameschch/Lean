@@ -62,5 +62,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         event EventHandler<MessageEventArgs> OnMessage;
 
+        event EventHandler<ErrorEventArgs> OnError;
+
     }
 }

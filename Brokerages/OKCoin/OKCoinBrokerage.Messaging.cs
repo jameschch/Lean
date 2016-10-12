@@ -36,7 +36,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        public void OnMessage(object sender, MessageEventArgs e)
+        public override void OnMessage(object sender, MessageEventArgs e)
         {
             try
             {
@@ -142,9 +142,9 @@ namespace QuantConnect.Brokerages.OKCoin
 
             var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(brokerId.ToString()));
 
-            if (cached.Count() > 0 && cached.First().Value != null && this.FillSplit.ContainsKey(cached.First().Key))
+            if (cached.Count() > 0 && cached.First().Value != null && this.OKCoinFillSplit.ContainsKey(cached.First().Key))
             {
-                var split = this.FillSplit[cached.First().Key];
+                var split = this.OKCoinFillSplit[cached.First().Key];
                 split.Add(msg);
 
                 var fill = new OrderEvent
@@ -165,7 +165,7 @@ namespace QuantConnect.Brokerages.OKCoin
                     FilledOrderIDs.Add(cached.First().Key);
 
                     //CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
-                    FillSplit.TryRemove(split.OrderId, out split);
+                    OKCoinFillSplit.TryRemove(split.OrderId, out split);
                 }
 
                 if (UnknownOrders.ContainsKey(msg.Id.ToString()))

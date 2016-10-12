@@ -35,7 +35,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        public void OnMessage(object sender, MessageEventArgs e)
+        public virtual void OnMessage(object sender, MessageEventArgs e)
         {
             try
             {
@@ -261,6 +261,11 @@ namespace QuantConnect.Brokerages.Bitfinex
                 @event = "unauth"
             }));
             WebSocket.Close();
+        }
+
+        public void OnError(object sender, ErrorEventArgs e)
+        {
+            this.Reconnect();
         }
 
     }

@@ -150,6 +150,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 this._checkConnectionToken = new CancellationTokenSource();
             }
             WebSocket.OnMessage += OnMessage;
+            WebSocket.OnError += OnError;
             this.Authenticate();
         }
 

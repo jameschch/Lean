@@ -85,5 +85,12 @@ namespace QuantConnect.Brokerages.Bitfinex
             add { wrapped.OnMessage += value; }
             remove { wrapped.OnMessage -= value; }
         }
+
+        event EventHandler<ErrorEventArgs> IWebSocket.OnError
+        {
+            add { wrapped.OnError += value; }
+            remove { wrapped.OnError -= value; }
+        }
+
     }
 }
