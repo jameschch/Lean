@@ -237,6 +237,7 @@
     <Compile Include="Oanda\Session\RatesSession.cs" />
     <Compile Include="Oanda\Session\StreamSession.cs" />
     <Compile Include="OKCoin\BaseMessage.cs" />
+    <Compile Include="OKCoin\IOKCoinHttpClient.cs" />
     <Compile Include="OKCoin\IOKCoinRestFactory.cs" />
     <Compile Include="OKCoin\IOKCoinWebsocketsFactory.cs" />
     <Compile Include="OKCoin\OKCoinFill.cs" />
@@ -245,7 +246,7 @@
     <Compile Include="OKCoin\OKCoinBrokerage.Messaging.cs" />
     <Compile Include="OKCoin\OKCoinRestFactory.cs" />
     <Compile Include="OKCoin\OKCoinWebsocketsFactory.cs" />
-    <Compile Include="OKCoin\HttpUtilManager.cs" />
+    <Compile Include="OKCoin\OKCoinHttpClient.cs" />
     <Compile Include="OKCoin\TickerMessage.cs" />
     <Compile Include="OKCoin\TradeMessage.cs" />
     <Compile Include="Paper\PaperBrokerage.cs" />

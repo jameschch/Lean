@@ -67,6 +67,7 @@ namespace QuantConnect.Brokerages.OKCoin
         IOKCoinWebsocketsFactory _websocketsFactory;
         IRestClient _rest;
         IOKCoinRestFactory _restFactory;
+        IOKCoinHttpClient _httpClient;
 
         enum OKCoinOrderStatus
         {
@@ -82,7 +83,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// Create Brokerage instance
         /// </summary>
         public OKCoinBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, IOKCoinRestFactory restFactory,
-            string baseCurrency, string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
+        IOKCoinHttpClient httpClient, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
             : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
@@ -92,6 +93,7 @@ namespace QuantConnect.Brokerages.OKCoin
             OKCoinFillSplit = new ConcurrentDictionary<int, OKCoinFill>();
             _rest = rest;
             _restFactory = restFactory;
+            _httpClient = httpClient;
         }
 
         /// <summary>
@@ -221,7 +223,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             CachedOrderIDs.AddOrUpdate(order.Id, order);
 
-            string response = PostForm("trade.do", parameters);
+            string response = _httpClient.Post("trade.do", parameters);
 
             var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
             if (raw != null && raw.result == "true")
@@ -547,17 +549,35 @@ namespace QuantConnect.Brokerages.OKCoin
                                 continue;
                             }
 
-                            var mapped = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString());
-                            list.Add(new Orders.MarketOrder
+                            var mapped = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.OKCoin.ToString());
+                            if (((string)item.type).EndsWith("market"))
                             {
-                                Price = (decimal)item.price,
-                                BrokerId = new List<string> { (string)item.order_id },
-                                Quantity = (item.type == "buy" || item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
-                                Symbol = mapped,
-                                PriceCurrency = _baseCurrency,
-                                Time = DateTime.UtcNow,
-                                Status = MapOrderStatus((int)item.status)
-                            });
+                                list.Add(new Orders.MarketOrder
+                                {
+                                    Price = (decimal)item.price,
+                                    BrokerId = new List<string> { (string)item.order_id },
+                                    Quantity = (item.type == "buy" || item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                                    Symbol = mapped,
+                                    PriceCurrency = _baseCurrency,
+                                    Time = DateTime.UtcNow,
+                                    Status = MapOrderStatus((int)item.status),
+                                });
+                            }
+                            else
+                            {
+                                list.Add(new Orders.LimitOrder
+                                {
+                                    Price = (decimal)item.price,
+                                    BrokerId = new List<string> { (string)item.order_id },
+                                    Quantity = (item.type == "buy" || item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                                    Symbol = mapped,
+                                    PriceCurrency = _baseCurrency,
+                                    Time = DateTime.UtcNow,
+                                    Status = MapOrderStatus((int)item.status),
+                                    LimitPrice = item.price
+                                });
+                            }
+
                         }
                     }
                 }
@@ -573,16 +593,14 @@ namespace QuantConnect.Brokerages.OKCoin
             {
                 {"api_key", ApiKey},
                 {"symbol", symbol},
-                {"status", ((int)status).ToString()},
-                {"current_page", "1"},
-                {"page_length", "200"},
+                {"order_id", "-1"},
                 {"sign", ""}
             };
 
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
-            string response = PostForm("order_history.do", parameters);
+            string response = _httpClient.Post("order_info.do", parameters);
             var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
 
             return raw;
@@ -637,33 +655,6 @@ namespace QuantConnect.Brokerages.OKCoin
             parameters["type"] = "buy";
         }
 
-        private string PostForm(string requestUrl, Dictionary<string, string> parameters)
-        {
-            var restForm = _restFactory.CreateInstance(_rest.BaseUrl.ToString());
-            var sign = BuildSign(parameters);
-            parameters["sign"] = sign;
-
-            //restForm.AddDefaultHeader("Content-Type", "application/x-www-form-urlencoded");
-
-            StringBuilder buffer = new StringBuilder();
-            foreach (string key in parameters.Keys)
-            {
-                if (buffer.Length > 0)
-                {
-                    buffer.AppendFormat("&{0}={1}", key, parameters[key]);
-                }
-                else
-                {
-                    buffer.AppendFormat("{0}={1}", key, parameters[key]);
-                }
-            }
-
-            var request = new RestRequest(requestUrl, Method.POST);
-            request.AddParameter(new Parameter { ContentType = "application/x-www-form-urlencoded", Value = buffer.ToString(), Name = "Body", Type = ParameterType.RequestBody });
-            var response = restForm.Execute(request);
-
-            return response.Content;
-        }
 
     }
 }

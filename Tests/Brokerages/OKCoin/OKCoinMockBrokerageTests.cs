@@ -28,6 +28,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         Mock<IOKCoinWebsocketsFactory> mockFactory;
         Mock<IOKCoinRestFactory> mockRestFactory;
         Mock<IWebSocket> mockWebsockets;
+        Mock<IOKCoinHttpClient> mockHttp;
         #endregion
 
         public OKCoinMockBrokerageTests()
@@ -38,9 +39,9 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             mockWebsockets = new Mock<IWebSocket>();
             mockRest = new Mock<IRestClient>();
             mockRest.Setup(m => m.BaseUrl).Returns(new Uri("http://localhost"));
-
             mockFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockWebsockets.Object);
             mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
+            mockHttp = new Mock<IOKCoinHttpClient>();
         }
 
         [TestFixtureSetUp()]
@@ -49,11 +50,8 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             webSocket = new Mock<IWebSocket>();
             webSocket.Setup(w => w.Url).Returns(new Uri("wss://real.okcoin.com:10440/websocket/okcoinapi"));
 
-            unit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, "usd", "", "abc123", "spot", true, new Mock<Securities.ISecurityProvider>().Object);
-            futuresUnit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, "usd", "", "abc123", "future", true, new Mock<Securities.ISecurityProvider>().Object);
-
-            mock = new Mock<OKCoinBrokerage>(It.IsAny<string>(), It.IsAny<IWebSocket>(), It.IsAny<IWebSocket>(), It.IsAny<string>(), It.IsAny<string>(),
-                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IServiceProvider>());
+            unit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, mockHttp.Object, "usd", "", "abc123", "spot", true, new Mock<Securities.ISecurityProvider>().Object);
+            futuresUnit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, mockHttp.Object, "usd", "", "abc123", "future", true, new Mock<Securities.ISecurityProvider>().Object);
         }
 
         [Test()]
@@ -78,10 +76,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             unit.CachedOrderIDs.Clear();
             string json = "{\"result\":true,\"order_id\":123456}";
 
-            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
-            var response = new Mock<IRestResponse>();
-            response.Setup(r => r.Content).Returns(json);
-            mockRest.Setup(m => m.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
+            mockHttp.Setup(r => r.Post(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>())).Returns(json);
 
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
             unit.PlaceOrder(new Orders.MarketOrder { Id = 123, Quantity = 123, Symbol = symbol });
@@ -96,10 +91,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             unit.CachedOrderIDs.Clear();
             string json = "{\"result\":true,\"order_id\":123456}";
 
-            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
-            var response = new Mock<IRestResponse>();
-            response.Setup(r => r.Content).Returns(json);
-            mockRest.Setup(m => m.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
+            mockHttp.Setup(r => r.Post(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>())).Returns(json);
 
             var symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.OKCoin);
             unit.PlaceOrder(new Orders.LimitOrder { Id = 123, Quantity = 123, Symbol = symbol, LimitPrice = 123 });
@@ -148,7 +140,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
             mockWebsockets.Reset();
             mockWebsockets.Setup(o => o.Send(It.IsAny<string>())).Callback(() => { mockWebsockets.Raise(o => o.OnMessage += null, BitfinexTestsHelpers.GetArgs(json)); });
 
-            var cnyUnit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, "cny", "", "", "spot", false, new Mock<Securities.ISecurityProvider>().Object);
+            var cnyUnit = new OKCoinBrokerage("", webSocket.Object, mockFactory.Object, mockRest.Object, mockRestFactory.Object, mockHttp.Object, "cny", "", "", "spot", false, new Mock<Securities.ISecurityProvider>().Object);
 
             var actual = cnyUnit.GetCashBalance();
 
@@ -163,11 +155,7 @@ namespace QuantConnect.Tests.Brokerages.OKCoin
         {
             string json = System.IO.File.ReadAllText("TestData\\ok_order_history.txt");
 
-            mockRestFactory.Setup(m => m.CreateInstance(It.IsAny<string>())).Returns(mockRest.Object);
-            var response = new Mock<IRestResponse>();
-            response.Setup(r => r.Content).Returns(json);
-            mockRest.Setup(m => m.Execute(It.IsAny<IRestRequest>())).Returns(response.Object);
-            //mockRest.Setup(m => m.AddDefaultHeader(It.IsAny<string>(), It.IsAny<string>()));
+            mockHttp.Setup(r => r.Post(It.IsAny<string>(), It.IsAny<Dictionary<string, string>>())).Returns(json);
 
             var actual = unit.GetOpenOrders();
 
