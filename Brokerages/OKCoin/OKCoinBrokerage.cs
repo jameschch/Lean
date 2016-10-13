@@ -438,8 +438,6 @@ namespace QuantConnect.Brokerages.OKCoin
             return list;
         }
 
-        //todo: inject xml client
-        //todo: inject rest client
         private decimal GetConversionRate(string symbol)
         {
             if (symbol.Equals("USD", StringComparison.CurrentCultureIgnoreCase))
@@ -463,7 +461,6 @@ namespace QuantConnect.Brokerages.OKCoin
                 var response = _rest.Execute(new RestRequest(url, Method.GET));
                 var raw = JsonConvert.DeserializeObject<dynamic>(response.Content, settings);
                 return ((decimal)raw.ticker.buy + (decimal)raw.ticker.sell) / 2;
-
             }
         }
 
@@ -484,7 +481,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             foreach (string symbol in new[] { "btsd_usd", "ltc_usd" })
             {
-                var raw = GetOrders(symbol, OKCoinOrderStatus.PartiallyFilled);
+                var raw = GetOpenOrders(symbol);
 
                 if (raw.data != null && raw.data.orders != null)
                 {
@@ -512,7 +509,7 @@ namespace QuantConnect.Brokerages.OKCoin
                             Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
                             Symbol = Symbol.Create(itemSymbol.ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString()),
                             Type = SecurityType.Forex,
-                            ConversionRate = GetConversionRate(itemSymbol.Substring(0, 3) + "usd")
+                            ConversionRate = GetConversionRate(itemSymbol)
                         });
                     }
                 }
@@ -533,9 +530,8 @@ namespace QuantConnect.Brokerages.OKCoin
             foreach (string symbol in new[] { "btc_usd", "ltc_usd" })
             {
 
-                foreach (var status in new[] { OKCoinOrderStatus.Unfilled, OKCoinOrderStatus.PartiallyFilled })
-                {
-                    var raw = GetOrders(symbol, status);
+       
+                    var raw = GetOpenOrders(symbol);
 
                     if (raw != null && raw.orders != null)
                     {
@@ -548,6 +544,8 @@ namespace QuantConnect.Brokerages.OKCoin
                             }
 
                             var mapped = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.Bitfinex.ToString());
+                        if (((string)item.type).EndsWith("market"))
+                        {
                             list.Add(new Orders.MarketOrder
                             {
                                 Price = (decimal)item.price,
@@ -556,33 +554,51 @@ namespace QuantConnect.Brokerages.OKCoin
                                 Symbol = mapped,
                                 PriceCurrency = _baseCurrency,
                                 Time = DateTime.UtcNow,
-                                Status = MapOrderStatus((int)item.status)
+                                Status = MapOrderStatus((int)item.status),
+                            });
+
+                        }
+                        else
+                        {
+                            list.Add(new Orders.LimitOrder
+                            {
+                                Price = (decimal)item.price,
+                                BrokerId = new List<string> { (string)item.order_id },
+                                Quantity = (item.type == "buy" || item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                                Symbol = mapped,
+                                PriceCurrency = _baseCurrency,
+                                Time = DateTime.UtcNow,
+                                Status = MapOrderStatus((int)item.status),
+                                 
                             });
                         }
+
                     }
-                }
+                    }
+                
 
             }
             return list;
 
         }
 
-        private dynamic GetOrders(string symbol, OKCoinOrderStatus status)
+        private dynamic GetOpenOrders(string symbol)
         {
             var parameters = new Dictionary<string, string>
             {
                 {"api_key", ApiKey},
                 {"symbol", symbol},
-                {"status", ((int)status).ToString()},
-                {"current_page", "1"},
-                {"page_length", "200"},
-                {"sign", ""}
+                //{"status", ((int)status).ToString()},
+                //{"current_page", "1"},
+                //{"page_length", "200"},
+                {"order_id", "-1"},
+                { "sign", ""}
             };
 
             var sign = BuildSign(parameters);
             parameters["sign"] = sign;
 
-            string response = PostForm("order_history.do", parameters);
+            string response = PostForm("order_info.do", parameters);
             var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
 
             return raw;
