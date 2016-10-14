@@ -57,15 +57,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         }
 
         /// <summary>
-        /// Wraps message event handler setter
-        /// </summary>
-        /// <param name="handler"></param>
-        public void OnMessage(EventHandler<WebSocketSharp.MessageEventArgs> handler)
-        {
-            wrapped.OnMessage += handler;
-        }
-
-        /// <summary>
         /// Wraps Close method
         /// </summary>
         public void Close()
@@ -85,6 +76,26 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Returns wrapped instance
         /// </summary>
         public WebSocket Instance { get { return wrapped; } }
+
+		/// <summary>
+        /// Wraps Url
+        /// </summary>
+        public Uri Url
+        {
+            get { return wrapped.Url; }
+        }
+
+        event EventHandler<MessageEventArgs> IWebSocket.OnMessage
+        {
+            add { wrapped.OnMessage += value; }
+            remove { wrapped.OnMessage -= value; }
+        }
+
+        event EventHandler<ErrorEventArgs> IWebSocket.OnError
+        {
+            add { wrapped.OnError += value; }
+            remove { wrapped.OnError -= value; }
+        }
 
     }
 }

@@ -146,13 +146,14 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         public override void Connect()
         {
-            _webSocket.OnMessage(OnMessage);
             _webSocket.Connect();
             if (this._checkConnectionTask == null || this._checkConnectionTask.IsFaulted || this._checkConnectionTask.IsCanceled || this._checkConnectionTask.IsCompleted)
             {
                 this._checkConnectionTask = Task.Run(() => CheckConnection());
                 this._checkConnectionToken = new CancellationTokenSource();
             }
+            _webSocket.OnMessage += OnMessage;
+            _webSocket.OnError += OnError;
             this.Authenticate();
         }
 
@@ -204,7 +205,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         private void Reconnect()
         {
-            this._checkConnectionTask.Wait(60);
+            this._checkConnectionTask.Wait(60000);
 
             if (_webSocket.Instance == null)
             {

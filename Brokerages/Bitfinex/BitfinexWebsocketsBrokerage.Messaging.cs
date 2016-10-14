@@ -271,5 +271,10 @@ namespace QuantConnect.Brokerages.Bitfinex
             _webSocket.Close();
         }
 
+        public void OnError(object sender, ErrorEventArgs e)
+        {
+            this.Reconnect();
+        }
+
     }
 }

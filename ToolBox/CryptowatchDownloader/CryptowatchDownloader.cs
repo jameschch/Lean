@@ -19,26 +19,26 @@ using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using Newtonsoft.Json;
 using System.Linq;
+using System.IO.Compression;
+using System.IO;
+using Newtonsoft.Json.Linq;
 
-namespace QuantConnect.ToolBox.CryptoiqDownloader
+namespace QuantConnect.ToolBox.CryptowatchDownloader
 {
     /// <summary>
     /// Cryptoiq Data Downloader class 
     /// </summary>
-    public class CryptoiqDownloader : IDataDownloader
+    public class CryptowatchDownloader : IDataDownloader
     {
         private readonly string _exchange;
-        private readonly decimal _scaleFactor;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CryptoiqDownloader"/> class
         /// </summary>
         /// <param name="exchange">The bitcoin exchange</param>
-        /// <param name="scaleFactor">Scale factor used to scale the data, useful for changing the BTC units</param>
-        public CryptoiqDownloader(string exchange = "bitfinex", decimal scaleFactor = 1m)
+        public CryptowatchDownloader(string exchange)
         {
             _exchange = exchange;
-            _scaleFactor = scaleFactor;
         }
 
         /// <summary>
@@ -55,40 +55,35 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
             {
                 throw new ArgumentException("Only tick data is currently supported.");
             }
+            const string url = "https://cryptowat.ch/{0}/{1}.json";
 
-            var hour = 1;
-            var counter = startUtc;
-            const string url = "http://cryptoiq.io/api/marketdata/ticker/{0}/{1}/{2}/{3}";
-
-            while (counter <= endUtc)
+            using (var cl = new WebClient())
             {
-                while (hour < 24)
+                var request = string.Format(url, _exchange, symbol.Value);
+                var responseStream = new GZipStream(cl.OpenRead(request), CompressionMode.Decompress);
+                var reader = new StreamReader(responseStream);
+                var data = reader.ReadToEnd();
+
+                JObject raw = (JObject)JsonConvert.DeserializeObject(data);
+
+                foreach (var array in raw.First)
                 {
-                    using (var cl = new WebClient())
+                    foreach (var item in array)
                     {
+                        var split = item.Value<string>().Split(' ');
 
-                        var request = string.Format(url, _exchange, symbol.Value, counter.ToString("yyyy-MM-dd"), hour);
-                        var data = cl.DownloadString(request);
-
-                        var mbtc = JsonConvert.DeserializeObject<List<CryptoiqBitcoin>>(data);
-                        foreach (var item in mbtc.OrderBy(x => x.Time))
+                        yield return new Tick
                         {
-                            yield return new Tick
-                            {
-                                Time = item.Time,
-                                Symbol = symbol,
-                                Value = item.Last / _scaleFactor,
-                                AskPrice = item.Ask / _scaleFactor,
-                                BidPrice = item.Bid / _scaleFactor,
-                                TickType = TickType.Quote,
-                                Quantity = item.Volume * _scaleFactor
-                            };
-                        }
-                        hour++;
+                            Time = QuantConnect.Time.UnixTimeStampToDateTime(double.Parse(split[0])),
+                            Symbol = symbol,
+                            AskPrice = decimal.Parse(split[2]),
+                            BidPrice = decimal.Parse(split[3]),
+                            Value = decimal.Parse(split[4]),
+                            TickType = TickType.Quote,
+                            Quantity = decimal.Parse(split[2])
+                        };
                     }
                 }
-                counter = counter.AddDays(1);
-                hour = 0;
             }
         }
 

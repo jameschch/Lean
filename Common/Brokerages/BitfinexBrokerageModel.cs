@@ -127,7 +127,7 @@ namespace QuantConnect.Brokerages
         /// </summary>
         public override bool AllowAccountUpdates
         {
-            get { return true; }
+            get { return false; }
         }
 
     }

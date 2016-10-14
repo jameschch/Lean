@@ -64,7 +64,6 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         public void ConnectTest()
         {
             mock.Setup(m => m.Connect()).Verifiable();
-            mock.Setup(m => m.OnMessage(It.IsAny<EventHandler<WebSocketSharp.MessageEventArgs>>())).Verifiable();
 
             unit.Connect();
             mock.Verify();
