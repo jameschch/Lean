@@ -168,16 +168,16 @@ namespace QuantConnect.Brokerages.OKCoin
                     OKCoinFillSplit.TryRemove(split.OrderId, out split);
                 }
 
-                if (UnknownOrders.ContainsKey(msg.Id.ToString()))
+                if (_unknownOrders.ContainsKey(msg.Id.ToString()))
                 {
-                    UnknownOrders.TryRemove(msg.Id.ToString(), out msg);
+                    _unknownOrders.TryRemove(msg.Id.ToString(), out msg);
                 }
 
                 OnOrderEvent(fill);
             }
-            else if (!UnknownOrders.ContainsKey(msg.Id.ToString()))
+            else if (!_unknownOrders.ContainsKey(msg.Id.ToString()))
             {
-                UnknownOrders.AddOrUpdate(msg.Id.ToString(), msg);
+                _unknownOrders.AddOrUpdate(msg.Id.ToString(), msg);
             }
         }
 
@@ -189,11 +189,11 @@ namespace QuantConnect.Brokerages.OKCoin
 
         private void CheckUnknownForFills()
         {
-            if (UnknownOrders.Count() > 10)
+            if (_unknownOrders.Count() > 10)
             {
-                UnknownOrders = new System.Collections.Concurrent.ConcurrentDictionary<string, TradeMessage>(UnknownOrders.Take(5));
+                _unknownOrders = new System.Collections.Concurrent.ConcurrentDictionary<string, TradeMessage>(_unknownOrders.Take(5));
             }
-            foreach (var item in UnknownOrders)
+            foreach (var item in _unknownOrders)
             {
                 PopulateTrade(item.Value);
             }

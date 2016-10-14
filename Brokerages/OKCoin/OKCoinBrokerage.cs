@@ -56,7 +56,7 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             FloatParseHandling = FloatParseHandling.Decimal
         };
-        protected ConcurrentDictionary<string, TradeMessage> UnknownOrders = new ConcurrentDictionary<string, TradeMessage>();
+        ConcurrentDictionary<string, TradeMessage> _unknownOrders = new ConcurrentDictionary<string, TradeMessage>();
         public ConcurrentDictionary<int, OKCoinFill> OKCoinFillSplit { get; set; }
         string _baseCurrency = "usd";
         string _spotOrFuture = "spot";
@@ -76,6 +76,13 @@ namespace QuantConnect.Brokerages.OKCoin
             PartiallyFilled = 1,
             FullyFilled = 2,
             CancelRequestInProcess = 4
+        }
+
+        enum OKCoinContractType
+        {
+            this_week,
+            next_week,
+            quarter
         }
         #endregion
 
@@ -489,20 +496,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 {
                     foreach (var item in raw.data.orders)
                     {
-                        decimal conversionRate = 1m;
-                        //todo: conversion rate
                         string itemSymbol = (string)item.symbol;
-
-                        if (!itemSymbol.EndsWith(_baseCurrency))
-                        {
-                            var baseSymbol = "";//(TradingApi.ModelObjects.BtcInfo.PairTypeEnum)Enum.Parse(typeof(TradingApi.ModelObjects.BtcInfo.PairTypeEnum), item.Symbol.Substring(0, 3) + usd);
-                                                //var baseTicker = _rest.Get(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
-                                                // conversionRate = decimal.Parse(baseTicker.Mid);
-                        }
-                        else
-                        {
-                            // conversionRate = decimal.Parse(ticker.Mid);
-                        }
 
                         list.Add(new Holding
                         {
@@ -532,53 +526,63 @@ namespace QuantConnect.Brokerages.OKCoin
             foreach (string symbol in new[] { "btc_usd", "ltc_usd" })
             {
 
-       
-                    var raw = GetOpenOrders(symbol);
+                dynamic raw;
 
-                    if (raw != null && raw.orders != null)
-                    {
+                if (_spotOrFuture == "spot")
+                {
+                    raw = GetOpenOrders(symbol);
 
-                        foreach (var item in raw.orders)
-                        {
-                            if (((int)item.status != 0 && (int)item.status != 1))
-                            {
-                                continue;
-                            }
-
-                            var mapped = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.OKCoin.ToString());
-                            if (((string)item.type).EndsWith("market"))
-                            {
-                                list.Add(new Orders.MarketOrder
-                                {
-                                    Price = (decimal)item.price,
-                                    BrokerId = new List<string> { (string)item.order_id },
-                                    Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
-                                    Symbol = mapped,
-                                    PriceCurrency = _baseCurrency,
-                                    Time = DateTime.UtcNow,
-                                    Status = MapOrderStatus((int)item.status),
-                                });
-                            }
-                            else
-                            {
-                                list.Add(new Orders.LimitOrder
-                                {
-                                    Price = (decimal)item.price,
-                                    BrokerId = new List<string> { (string)item.order_id },
-                                    Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
-                                    Symbol = mapped,
-                                    PriceCurrency = _baseCurrency,
-                                    Time = DateTime.UtcNow,
-                                    Status = MapOrderStatus((int)item.status),
-                                    LimitPrice = item.price
-                                });
-                            }
-
-                        }
-                    }
+                }
+                else
+                {
+                    raw = GetOpenFuturesOrders(symbol, OKCoinContractType.next_week);
                 }
 
-            
+
+                if (raw != null && raw.orders != null)
+                {
+
+                    foreach (var item in raw.orders)
+                    {
+                        if (((int)item.status != 0 && (int)item.status != 1))
+                        {
+                            continue;
+                        }
+
+                        var mapped = Symbol.Create(((string)item.symbol).ToUpper().Replace("_", ""), SecurityType.Forex, Market.OKCoin.ToString());
+                        if (((string)item.type).EndsWith("market"))
+                        {
+                            list.Add(new Orders.MarketOrder
+                            {
+                                Price = (decimal)item.price,
+                                BrokerId = new List<string> { (string)item.order_id },
+                                Quantity = (item.type == "buy_market" ? (decimal)item.amount : -(decimal)item.amount),
+                                Symbol = mapped,
+                                PriceCurrency = _baseCurrency,
+                                Time = DateTime.UtcNow,
+                                Status = MapOrderStatus((int)item.status),
+                            });
+                        }
+                        else
+                        {
+                            list.Add(new Orders.LimitOrder
+                            {
+                                Price = (decimal)item.price,
+                                BrokerId = new List<string> { (string)item.order_id },
+                                Quantity = (item.type == "buy" ? (decimal)item.amount : -(decimal)item.amount),
+                                Symbol = mapped,
+                                PriceCurrency = _baseCurrency,
+                                Time = DateTime.UtcNow,
+                                Status = MapOrderStatus((int)item.status),
+                                LimitPrice = item.price
+                            });
+                        }
+
+                    }
+                }
+            }
+
+
             return list;
 
         }
@@ -597,6 +601,30 @@ namespace QuantConnect.Brokerages.OKCoin
             parameters["sign"] = sign;
 
             string response = _httpClient.Post("order_info.do", parameters);
+            var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
+
+            return raw;
+        }
+
+        //todo: paging 50+ open orders
+        private dynamic GetOpenFuturesOrders(string okcoinSymbol, OKCoinContractType type)
+        {
+            var parameters = new Dictionary<string, string>
+            {
+                {"api_key", ApiKey},
+                {"symbol", okcoinSymbol},
+                {"contract_type", type.ToString()},
+                {"sign", ""},
+                {"status", "1"},
+                {"order_id", "-1"},
+                {"current_page", "1"},
+                {"order_id", "50"},
+            };
+
+            var sign = BuildSign(parameters);
+            parameters["sign"] = sign;
+
+            string response = _httpClient.Post("future_order_info.do", parameters);
             var raw = JsonConvert.DeserializeObject<dynamic>(response, settings);
 
             return raw;
