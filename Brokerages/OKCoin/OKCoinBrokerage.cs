@@ -481,7 +481,7 @@ namespace QuantConnect.Brokerages.OKCoin
                 return list;
             }
 
-            foreach (string symbol in new[] { "btsd_usd", "ltc_usd" })
+            foreach (string symbol in new[] { "btc_usd", "ltc_usd" })
             {
                 var raw = GetOpenOrders(symbol);
 
@@ -578,17 +578,17 @@ namespace QuantConnect.Brokerages.OKCoin
                     }
                 }
 
-            }
+            
             return list;
 
         }
 
-        private dynamic GetOpenOrders(string symbol)
+        private dynamic GetOpenOrders(string okcoinSymbol)
         {
             var parameters = new Dictionary<string, string>
             {
                 {"api_key", ApiKey},
-                {"symbol", symbol},
+                {"symbol", okcoinSymbol},
                 {"order_id", "-1"},
                 {"sign", ""}
             };
