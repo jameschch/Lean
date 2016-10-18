@@ -490,7 +490,7 @@ namespace QuantConnect.Brokerages.OKCoin
 
             foreach (string symbol in new[] { "btc_usd", "ltc_usd" })
             {
-                var raw = GetOpenOrders(symbol);
+                var raw = GetOpenFuturesOrders(symbol, OKCoinContractType.next_week);
 
                 if (raw.data != null && raw.data.orders != null)
                 {

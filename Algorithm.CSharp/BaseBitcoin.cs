@@ -38,6 +38,7 @@ namespace QuantConnect.Algorithm.CSharp
         protected virtual decimal TakeProfit { get { return 0.1m; } }
         protected virtual decimal AtrScale { get { return 2m; } }
         protected string BTCUSD { get { return btcusd; } }
+        protected Decimal MinimumPosition { get { return 0.05m; } }
         RollingWindow<decimal> unrealizedProfit = new RollingWindow<decimal>(2);
 
         public enum StopLossStrategy
@@ -79,6 +80,13 @@ namespace QuantConnect.Algorithm.CSharp
 
         public void OnData(Ticks data)
         {
+            foreach (var item in Portfolio)
+            {
+                if (Portfolio[item.Key].AbsoluteHoldingsValue / Portfolio.TotalPortfolioValue < MinimumPosition)
+                {
+                    Liquidate();
+                }
+            }
             foreach (var item in data)
             {
                 foreach (var tick in item.Value)

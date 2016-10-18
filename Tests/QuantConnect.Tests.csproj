@@ -97,6 +97,7 @@
     <Compile Include="AlgorithmRunner.cs" />
     <Compile Include="Algorithm\AlgorithmSetHoldingsTests.cs" />
     <Compile Include="Algorithm\AlgorithmTradingTests.cs" />
+    <Compile Include="Algorithm\CSharp\BaseBitcoinTests.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexBrokerageModelTests.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexBrokerageMockTests.cs" />
     <Compile Include="Brokerages\Bitfinex\BitfinexBrokerageEthereumTests.cs" />

@@ -104,7 +104,8 @@ namespace QuantConnect.Brokerages.OKCoin
                         DataType = MarketDataType.Tick
                     });
 
-                }            }
+                }
+            }
         }
 
         private void PopulateTradeTicker(dynamic raw)
