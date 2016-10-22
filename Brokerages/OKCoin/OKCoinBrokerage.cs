@@ -304,6 +304,9 @@ namespace QuantConnect.Brokerages.OKCoin
                 this._checkConnectionTask.Wait(30000);
             }
             var subscribed = GetSubscribed();
+
+            WebSocket.OnError -= this.OnError;
+
             //try to clean up state
             try
             {
@@ -312,8 +315,20 @@ namespace QuantConnect.Brokerages.OKCoin
             catch (Exception)
             {
             }
-            WebSocket.Connect();
-            this.Subscribe(null, subscribed);
+
+            try
+            {
+                WebSocket.Connect();
+            }
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                WebSocket.OnError += this.OnError;
+                this.Subscribe(null, subscribed);
+            }
+
         }
 
 

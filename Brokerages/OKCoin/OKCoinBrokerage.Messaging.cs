@@ -57,12 +57,13 @@ namespace QuantConnect.Brokerages.OKCoin
                         //trade update
                         PopulateTrade(raw);
                     }
-                    else if (System.Text.RegularExpressions.Regex.IsMatch(((string)raw.channel), @"ok_sub_(spot|future)(usd|cny)_\w{3}_trades"))
+                    else if (System.Text.RegularExpressions.Regex.IsMatch(((string)raw.channel), @"ok_sub_(spot|future)(usd|cny)_\w{3}_trades") && raw.data != null)
                     {
                         if (_isTradeTickerEnabled)
                         {
                             //trade ticker update
                             PopulateTradeTicker(raw);
+                            return;
                         }
                     }
                 }
