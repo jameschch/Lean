@@ -78,6 +78,7 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                 ProcessEquityDirectories(dataDirectory, ignoreMaplessSymbols);
             }
             while (WaitUntilTimeInUpdateMode(updateMode, updateTime));
+            Console.ReadKey();
         }
 
         /// <summary>
@@ -185,6 +186,7 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                     ZipFile zip;
                     using (var reader = Compression.Unzip(file, out zip))
                     {
+                        Console.WriteLine("Started processing " + file);
                         // 30 period EMA constant
                         const decimal k = 2m / (30 + 1);
 
@@ -259,7 +261,7 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                         }
                     }
 
-                    if (symbols%1000 == 0)
+                    if (symbols % 1000 == 0)
                     {
                         Log.Trace("CoarseGenerator.ProcessDailyFolder(): Completed processing {0} symbols. Current elapsed: {1} seconds", symbols, (DateTime.UtcNow - start).TotalSeconds.ToString("0.00"));
                     }
