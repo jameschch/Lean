@@ -125,7 +125,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     break;
 
                 case SubscriptionTransportMedium.Rest:
-                    reader = new RestSubscriptionStreamReader(subscriptionDataSource.Source);
+                    reader = new RestSubscriptionStreamReader(subscriptionDataSource.Source, subscriptionDataSource.Format);
+                    break;
+
+                case SubscriptionTransportMedium.RestFile:
+                    reader = new RestFileSubscriptionStreamReader(subscriptionDataSource.Source, subscriptionDataSource.Format);
                     break;
 
                 default:
