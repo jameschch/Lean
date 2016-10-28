@@ -19,6 +19,10 @@ using QuantConnect.Logging;
 using RestSharp;
 using QuantConnect.Data;
 using System.Collections.Generic;
+using Newtonsoft.Json;
+using System.Dynamic;
+using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace QuantConnect.Lean.Engine.DataFeeds.Transport
 {
@@ -81,7 +85,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Transport
                         }
                         else if (_format == FileFormat.Json)
                         {
-                            split = new Queue<string>(_response.Content.Split(','));
+
+                            if (split == null)
+                            {
+                                var raw = JsonConvert.DeserializeObject<IEnumerable<JToken>>(_response.Content);
+                                split = new Queue<string>(raw.Select(t => JsonConvert.SerializeObject(t)));
+                            }
+                            return split.Dequeue();
+
                         }
                         else
                         {
