@@ -489,7 +489,12 @@ namespace QuantConnect
         /// <summary>
         /// The subscription's data comes from a rest call that is polled and returns a single line/data point of information
         /// </summary>
-        Rest
+        Rest,
+
+        /// <summary>
+        /// The subscription's data comes from a rest call that returns mutiple lines/data points of information
+        /// </summary>
+        RestFile
     }
 
     /// <summary>

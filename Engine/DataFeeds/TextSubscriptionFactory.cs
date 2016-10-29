@@ -128,6 +128,10 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     reader = new RestSubscriptionStreamReader(subscriptionDataSource.Source);
                     break;
 
+                case SubscriptionTransportMedium.RestFile:
+                    reader = new RestFileSubscriptionStreamReader(subscriptionDataSource.Source, subscriptionDataSource.Format);
+                    break;
+
                 default:
                     throw new InvalidEnumArgumentException("Unexpected SubscriptionTransportMedium specified: " + subscriptionDataSource.TransportMedium);
             }
