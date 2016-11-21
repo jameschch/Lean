@@ -21,7 +21,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using TradingApi.ModelObjects.Bitfinex.Json;
+using QuantConnect.Brokerages.Bitfinex.Rest.Json;
 
 namespace QuantConnect.Brokerages.Bitfinex
 {
@@ -127,7 +127,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <param name="payload"></param>
         /// <param name="apiSecret"></param>
         /// <returns></returns>
-        protected string GetHexHashSignature(string payload, string apiSecret)
+        public static string GetHexHashSignature(string payload, string apiSecret)
         {
             HMACSHA384 hmac = new HMACSHA384(Encoding.UTF8.GetBytes(apiSecret));
             byte[] hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));

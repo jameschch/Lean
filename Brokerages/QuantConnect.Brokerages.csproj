@@ -185,6 +185,20 @@
     <Compile Include="Bitfinex\BitfinexWebsocketsPaperBrokerage.cs" />
     <Compile Include="Bitfinex\Channel.cs" />
     <Compile Include="Bitfinex\IWebSocket.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexApi.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexBalanceResponse.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexCancelOrderPost.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexCancelReplaceOrderResponse.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexCancelReplacePost.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexMarginPositionResponse.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexNewOrderPost.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexNewOrderResponse.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexOrderStatusPost.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexOrderStatusResponse.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexPostBase.cs" />
+    <Compile Include="Bitfinex\RestClient\BitfinexPublicTickerGet.cs" />
+    <Compile Include="Bitfinex\RestClient\BtcInfo.cs" />
+    <Compile Include="Bitfinex\RestClient\ErrorResponse.cs" />
     <Compile Include="Bitfinex\TradeTickerMessage.cs" />
     <Compile Include="Bitfinex\TickerMessage.cs" />
     <Compile Include="Bitfinex\TradeMessage.cs" />
@@ -285,10 +299,6 @@
     <None Include="Fxcm\QuantConnect.Fxcm.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Bitfinex\TradingApi.Bitfinex.dll" />
-    <Content Include="Bitfinex\TradingApi.ModelObjects.dll" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

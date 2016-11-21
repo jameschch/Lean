@@ -7,11 +7,11 @@ using QuantConnect.Brokerages.Bitfinex;
 using NUnit.Framework;
 using Moq;
 using QuantConnect.Configuration;
-using TradingApi.ModelObjects.Bitfinex.Json;
-using TradingApi.ModelObjects;
 using QuantConnect.Securities;
 using System.Threading;
 using QuantConnect.Tests.Brokerages.Bitfinex;
+using QuantConnect.Brokerages.Bitfinex.Rest.Json;
+using QuantConnect.Brokerages.Bitfinex.Rest;
 
 namespace QuantConnect.Brokerages.Bitfinex.Tests
 {
@@ -20,7 +20,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
     {
 
         BitfinexBrokerage unit;
-        Mock<TradingApi.Bitfinex.BitfinexApi> mock = new Mock<TradingApi.Bitfinex.BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
+        Mock<BitfinexApi> mock = new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
         Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
         Mock<ISecurityProvider> securities = new Mock<ISecurityProvider>();
         decimal scaleFactor;
@@ -306,7 +306,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 Timestamp = "7",
                 Volume = "8"
             };
-            mock.Setup(m => m.GetPublicTicker("BTCUSD", BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker)).Returns(response);
+
+            mock.Setup(m => m.GetPublicTicker("btcusd", BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker)).Returns(response);
             unit.Subscribe(null, null);
             System.Threading.Thread.Sleep(9000);
             var actual = unit.GetNextTicks();

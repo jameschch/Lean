@@ -8,11 +8,10 @@ using NUnit.Framework;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using QuantConnect.Configuration;
-using TradingApi.ModelObjects.Bitfinex.Json;
 using QuantConnect.Orders;
 using System.Reflection;
 using Moq;
-using TradingApi.Bitfinex;
+using QuantConnect.Brokerages.Bitfinex.Rest;
 
 namespace QuantConnect.Tests.Brokerages.Bitfinex
 {

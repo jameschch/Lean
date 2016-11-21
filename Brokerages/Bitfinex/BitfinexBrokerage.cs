@@ -27,8 +27,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using TradingApi.Bitfinex;
-using TradingApi.ModelObjects.Bitfinex.Json;
+using QuantConnect.Brokerages.Bitfinex.Rest;
+using QuantConnect.Brokerages.Bitfinex.Rest.Json;
 
 namespace QuantConnect.Brokerages.Bitfinex
 {
@@ -77,7 +77,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Api Secret
         /// </summary>
         protected string ApiSecret;
-        TradingApi.Bitfinex.BitfinexApi _restClient;
+        BitfinexApi _restClient;
         /// <summary>
         /// Security Provider
         /// </summary>
@@ -392,14 +392,16 @@ namespace QuantConnect.Brokerages.Bitfinex
             var response = _restClient.GetActivePositions();
             foreach (var item in response)
             {
-                var ticker = _restClient.GetPublicTicker(item.Symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+
+                var ticker = _restClient.GetPublicTicker(item.Symbol.ToLower(), BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
 
                 decimal conversionRate = 1m;
 
                 if (!item.Symbol.EndsWith(usd))
                 {
-                    var baseSymbol = item.Symbol.Substring(0, 3) + usd;
-                    var baseTicker = _restClient.GetPublicTicker(baseSymbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+
+                    var baseSymbol = (item.Symbol.Substring(0, 3) + usd).ToLower();
+                    var baseTicker = _restClient.GetPublicTicker(baseSymbol, BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
                     conversionRate = decimal.Parse(baseTicker.Mid);
                 }
                 else
@@ -441,8 +443,9 @@ namespace QuantConnect.Brokerages.Bitfinex
                     else
                     {
                         //todo: refactor to string symbol. merge to main repo
-                        var symbol = item.Currency + usd;
-                        var ticker = _restClient.GetPublicTicker(symbol, TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+
+                        var baseSymbol = (item.Currency + usd).ToLower();
+                        var ticker = _restClient.GetPublicTicker(baseSymbol, BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
                         list.Add(new Securities.Cash(item.Currency.ToUpper(), item.Amount * ScaleFactor, decimal.Parse(ticker.Mid) / ScaleFactor));
                     }
                 }

@@ -27,8 +27,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using TradingApi.Bitfinex;
-using TradingApi.ModelObjects.Bitfinex.Json;
+using QuantConnect.Brokerages.Bitfinex.Rest;
+using QuantConnect.Brokerages.Bitfinex.Rest.Json;
 
 namespace QuantConnect.Brokerages.Bitfinex
 {
@@ -66,7 +66,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         //todo: support multiple currencies
         private async Task RequestTicker()
         {
-            var response = _restClient.GetPublicTicker("BTCUSD", TradingApi.ModelObjects.BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
+            var response = _restClient.GetPublicTicker("btcusd", BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
             lock (Ticks)
             {
                 Ticks.Add(new Tick

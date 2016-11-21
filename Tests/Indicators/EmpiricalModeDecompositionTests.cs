@@ -25,36 +25,36 @@ namespace QuantConnect.Tests.Indicators
     [TestFixture]
     public class EmpiricalModeDecompositionTests
     {
-        [Test]
-        public void ComputesCorrectly()
-        {
-            var nu = new EmpiricalModeDecomposition("", 26, 0.4, 0.1m, 26);
-            var old = new EmpiricalModeDecompositionOld();
-            bool first = true;
+        //[Test]
+        //public void ComputesCorrectly()
+        //{
+        //    var nu = new EmpiricalModeDecomposition("", 26, 0.4, 0.1m, 26);
+        //    var old = new EmpiricalModeDecompositionOld();
+        //    bool first = true;
 
-            foreach (var line in File.ReadLines(Path.Combine("TestData", "spy_kama.txt")))
-            {
+        //    foreach (var line in File.ReadLines(Path.Combine("TestData", "spy_kama.txt")))
+        //    {
 
-                if (first)
-                {
-                    first = false;
-                    continue;
-                }
+        //        if (first)
+        //        {
+        //            first = false;
+        //            continue;
+        //        }
 
-                string[] parts = line.Split(new[] { ',' }, StringSplitOptions.None);
+        //        string[] parts = line.Split(new[] { ',' }, StringSplitOptions.None);
 
-                decimal price = decimal.Parse(parts[1]);
+        //        decimal price = decimal.Parse(parts[1]);
 
-                var now = DateTime.UtcNow;
-                nu.Update(new TradeBar { Time = now, High = price * 2, Low = 0 });
-                var expected = old.IsCyclical(new TradeBar { Time = now, High = price * 2, Low = 0 });
+        //        var now = DateTime.UtcNow;
+        //        nu.Update(new TradeBar { Time = now, High = price * 2, Low = 0 });
+        //        var expected = old.IsCyclical(new TradeBar { Time = now, High = price * 2, Low = 0 });
 
-                if (nu.IsReady && old.IsReady)
-                {
-                    Assert.IsTrue((expected && nu > 0) || (!expected && nu < 0));
-                }
-            }
-        }
+        //        if (nu.IsReady && old.IsReady)
+        //        {
+        //            Assert.IsTrue((expected && nu > 0) || (!expected && nu < 0));
+        //        }
+        //    }
+        //}
 
         [Test]
         public void ResetsProperly()

@@ -20,7 +20,7 @@ using System.Threading.Tasks;
 using QuantConnect.Util;
 using QuantConnect.Interfaces;
 using QuantConnect.Configuration;
-using TradingApi.Bitfinex;
+using QuantConnect.Brokerages.Bitfinex.Rest;
 
 namespace QuantConnect.Brokerages.Bitfinex
 {

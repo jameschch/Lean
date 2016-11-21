@@ -28,7 +28,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using TradingApi.Bitfinex;
+using QuantConnect.Brokerages.Bitfinex.Rest;
 using WebSocketSharp;
 
 namespace QuantConnect.Brokerages.Bitfinex
