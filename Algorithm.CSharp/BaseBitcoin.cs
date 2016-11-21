@@ -100,10 +100,10 @@ namespace QuantConnect.Algorithm.CSharp
 
         public abstract void OnData(Tick data);
 
-        protected virtual void Output(string title)
+        protected virtual void Output(string title, string symbol = btcusd)
         {
-            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[BTCUSD].Price.ToString() + " Trade:" + Math.Round(Portfolio[BTCUSD].LastTradeProfit, 2)
-                + " Total:" + Math.Round(Portfolio.TotalPortfolioValue, 2));
+            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[symbol].Price.ToString() + " Trade:" + Math.Round(Portfolio[symbol].LastTradeProfit, 2)
+                + " Total:" + Portfolio.TotalPortfolioValue);
         }
 
         /// <summary>
@@ -131,7 +131,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (Portfolio[symbol].TotalCloseProfit() / Portfolio.TotalPortfolioValue < -StopLoss)
                     {
                         Liquidate();
-                        Output("stop");
+                        Output("stop", symbol);
                     }
                 }
                 else if (strategy == StopLossStrategy.UnrealizedProfit)
@@ -139,7 +139,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (Portfolio[symbol].UnrealizedProfitPercent < -StopLoss)
                     {
                         Liquidate();
-                        Output("stop");
+                        Output("stop", symbol);
                     }
                 }
                 else if (strategy == StopLossStrategy.AverageTrueRange)
@@ -148,7 +148,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (Portfolio.TotalUnrealisedProfit < -atrLimit)
                     {
                         Liquidate();
-                        Output("stop");
+                        Output("stop", symbol);
                     }
                 }
             }
@@ -163,7 +163,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (Portfolio[symbol].TotalCloseProfit() / Portfolio.TotalPortfolioValue > TakeProfit)
                     {
                         Liquidate();
-                        Output("take");
+                        Output("take", symbol);
                     }
                 }
                 else if (strategy == TakeProfitStrategy.UnrealizedProfit)
@@ -171,7 +171,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (Portfolio[symbol].UnrealizedProfitPercent > TakeProfit)
                     {
                         Liquidate();
-                        Output("take");
+                        Output("take", symbol);
                     }
                 }
                 else if (strategy == TakeProfitStrategy.AverageTrueRange)
@@ -180,7 +180,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (Portfolio.TotalUnrealisedProfit > atrLimit)
                     {
                         Liquidate();
-                        Output("take");
+                        Output("take", symbol);
                     }
                 }
                 else if (strategy == TakeProfitStrategy.UntilReversal)
@@ -194,7 +194,7 @@ namespace QuantConnect.Algorithm.CSharp
                     {
                         unrealizedProfit = 0;
                         Liquidate();
-                        Output("take");
+                        Output("take", symbol);
                     }
                 }
                 else if (unrealizedProfit > 0)
