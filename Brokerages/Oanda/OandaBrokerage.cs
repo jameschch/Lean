@@ -71,6 +71,9 @@ namespace QuantConnect.Brokerages.Oanda
             _environment = environment;
             _accessToken = accessToken;
             _accountId = accountId;
+
+            System.Net.ServicePointManager.ServerCertificateValidationCallback += (o, certificate, chain, errors) => true;
+            System.Security.Cryptography.AesCryptoServiceProvider b = new System.Security.Cryptography.AesCryptoServiceProvider();
         }
 
         #region IBrokerage implementation

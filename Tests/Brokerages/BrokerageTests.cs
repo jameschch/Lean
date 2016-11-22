@@ -438,7 +438,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <param name="order">The order to be modified</param>
         /// <param name="parameters">The order test parameters that define how to modify the order</param>
         /// <param name="secondsTimeout">Maximum amount of time to wait until the order fills</param>
-        protected void ModifyOrderUntilFilled(Order order, OrderTestParameters parameters, double secondsTimeout = 90)
+        protected void ModifyOrderUntilFilled(Order order, OrderTestParameters parameters, double secondsTimeout = 120)
         {
             if (order.Status == OrderStatus.Filled)
             {
@@ -497,7 +497,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <param name="expectedStatus">The status to wait for</param>
         /// <param name="secondsTimeout">Maximum amount of time to wait for <paramref name="expectedStatus"/></param>
         /// <returns>The same order that was submitted.</returns>
-        protected Order PlaceOrderWaitForStatus(Order order, OrderStatus expectedStatus = OrderStatus.Filled, double secondsTimeout = 30.0, bool allowFailedSubmission = false)
+        protected Order PlaceOrderWaitForStatus(Order order, OrderStatus expectedStatus = OrderStatus.Filled, double secondsTimeout = 60.0, bool allowFailedSubmission = false)
         {
             var requiredStatusEvent = new ManualResetEvent(false);
             var desiredStatusEvent = new ManualResetEvent(false);

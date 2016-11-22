@@ -205,7 +205,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         private void Reconnect()
         {
-            this._checkConnectionTask.Wait(60000);
+            this._checkConnectionTask.Wait(TimeSpan.FromSeconds(60));
 
             if (_webSocket.Instance == null)
             {
@@ -216,15 +216,26 @@ namespace QuantConnect.Brokerages.Bitfinex
             //try to clean up state
             try
             {
+                _webSocket.OnError -= OnError;
                 this.UnAuthenticate();
                 this.Unsubscribe();
                 _webSocket.Close();
             }
             catch (Exception)
             {
+                Log.Trace("Exception encountered cleaning up state.");
             }
             Log.Trace("Attempting Connect");
-            _webSocket.Connect();
+            try
+            {
+                _webSocket.Initialize(_url);
+                _webSocket.Connect();
+            }
+            catch (Exception)
+            {
+                Log.Trace("Exception encountered attempting reconnect.");
+            }
+            _webSocket.OnError += OnError;
             Log.Trace("Attempting Subscribe");
             this.Subscribe(null, subscribed);
             Log.Trace("Attempting Auth");

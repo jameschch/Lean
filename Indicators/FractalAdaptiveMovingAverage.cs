@@ -45,7 +45,7 @@ namespace QuantConnect.Indicators
         {
             if (n % 2 > 0)
             {
-                throw new ArgumentException("N must be even.");
+                n = n + 1;
             }
             _n = n;
             _w = CalculateW(longPeriod);

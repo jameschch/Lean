@@ -1051,7 +1051,7 @@ namespace QuantConnect.Algorithm
 
         public EmpiricalModeDecomposition EMD(Symbol symbol, int period, double delta, decimal fraction, int mesaLength, Resolution? resolution = null, Func<BaseData, TradeBar> selector = null)
         {
-            string name = CreateIndicatorName(symbol, "EMA" + period, resolution);
+            string name = CreateIndicatorName(symbol, "EMD" + period, resolution);
             var emd = new EmpiricalModeDecomposition(name, period, delta, fraction, mesaLength);
             RegisterIndicator(symbol, emd, resolution, selector);
             return emd;
@@ -1080,6 +1080,14 @@ namespace QuantConnect.Algorithm
             var mamafama = new MamaFama(name, fast, slow);
             RegisterIndicator(symbol, mamafama, resolution, selector);
             return mamafama;
+        }
+
+        public EhlersStochastic EHLSTO(Symbol symbol, int smoothingPeriod = 10, int highPassBars = 48, Resolution? resolution = null, Func<BaseData, TradeBar> selector = null)
+        {
+            var name = CreateIndicatorName(symbol, "EhlersSto" + smoothingPeriod, resolution);
+            var ehlers = new EhlersStochastic(name, smoothingPeriod, highPassBars);
+            RegisterIndicator(symbol, ehlers, resolution, selector);
+            return ehlers;
         }
 
         /// <summary>

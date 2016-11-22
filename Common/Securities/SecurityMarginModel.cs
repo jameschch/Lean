@@ -60,8 +60,8 @@ namespace QuantConnect.Securities
                 throw new ArgumentException("Leverage must be greater than or equal to 1.");
             }
 
-            _initialMarginRequirement = 1/leverage;
-            _maintenanceMarginRequirement = 1/leverage;
+            _initialMarginRequirement = 1 / leverage;
+            _maintenanceMarginRequirement = 1 / leverage;
         }
 
         /// <summary>
@@ -71,7 +71,7 @@ namespace QuantConnect.Securities
         /// <returns>The current leverage in the security</returns>
         public virtual decimal GetLeverage(Security security)
         {
-            return 1/GetMaintenanceMarginRequirement(security);
+            return 1 / GetMaintenanceMarginRequirement(security);
         }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace QuantConnect.Securities
                 throw new ArgumentException("Leverage must be greater than or equal to 1.");
             }
 
-            decimal margin = 1/leverage;
+            decimal margin = 1 / leverage;
             _initialMarginRequirement = margin;
             _maintenanceMarginRequirement = margin;
         }
@@ -117,7 +117,7 @@ namespace QuantConnect.Securities
         /// <returns>The maintenance margin required for the </returns>
         public virtual decimal GetMaintenanceMargin(Security security)
         {
-            return security.Holdings.AbsoluteHoldingsCost*GetMaintenanceMarginRequirement(security);
+            return security.Holdings.AbsoluteHoldingsCost * GetMaintenanceMarginRequirement(security);
         }
 
         /// <summary>
@@ -146,7 +146,7 @@ namespace QuantConnect.Securities
                         return portfolio.MarginRemaining;
 
                     case OrderDirection.Sell:
-                        return 
+                        return
                             // portion of margin to close the existing position
                             GetMaintenanceMargin(security) +
                             // portion of margin to open the new position
@@ -188,7 +188,7 @@ namespace QuantConnect.Securities
             // leave a buffer in default implementation
             const decimal marginBuffer = 0.10m;
 
-            if (totalMargin <= netLiquidationValue*(1 + marginBuffer))
+            if (totalMargin <= netLiquidationValue * (1 + marginBuffer))
             {
                 return null;
             }
@@ -205,18 +205,30 @@ namespace QuantConnect.Securities
             }
 
             // compute the amount of quote currency we need to liquidate in order to get within margin requirements
-            var deltaInQuoteCurrency = (totalMargin - netLiquidationValue)/security.QuoteCurrency.ConversionRate;
+            var deltaInQuoteCurrency = (totalMargin - netLiquidationValue) / security.QuoteCurrency.ConversionRate;
 
             // compute the number of shares required for the order, rounding up
             var unitPriceInQuoteCurrency = security.Price * security.SymbolProperties.ContractMultiplier;
-            var quantity = Math.Round(deltaInQuoteCurrency/unitPriceInQuoteCurrency, MidpointRounding.AwayFromZero)/GetMaintenanceMarginRequirement(security);
+            var quantity = (deltaInQuoteCurrency / unitPriceInQuoteCurrency) / GetMaintenanceMarginRequirement(security);
 
-            // don't try and liquidate more share than we currently hold, minimum value of 1, maximum value for absolute quantity
-            quantity = Math.Max(1, Math.Min((int)security.Holdings.AbsoluteQuantity, quantity));
+            // don't try and liquidate more share than we currently hold, minimum value of lotSize, maximum value for absolute quantity
+            quantity = Math.Max(security.SymbolProperties.LotSize, Math.Min(security.Holdings.AbsoluteQuantity, quantity));
             if (security.Holdings.IsLong)
             {
                 // adjust to a sell for long positions
                 quantity *= -1;
+            }
+            if (Math.Abs(security.SymbolProperties.LotSize % 1) == 0)
+            {
+                if (Math.Abs(quantity % 1) > 0)
+                {
+                    quantity = Math.Round(quantity, MidpointRounding.AwayFromZero);
+                }
+            }
+            else
+            {
+                int decimals = security.SymbolProperties.LotSize.ToString().Length - security.SymbolProperties.LotSize.ToString().IndexOf('.') -1;
+                quantity = Math.Round(quantity, decimals, MidpointRounding.AwayFromZero);
             }
 
             return new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol, quantity, 0, 0, security.LocalTime.ConvertToUtc(security.Exchange.TimeZone), "Margin Call");

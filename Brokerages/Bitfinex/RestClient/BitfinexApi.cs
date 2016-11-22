@@ -88,7 +88,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
             try
             {
                 newOrder.Request = NewOrderRequestUrl;
-                newOrder.Nonce = Time.DateTimeToUnixTimeStamp(DateTime.UtcNow).ToString();
+                newOrder.Nonce = UnixTimeStampUtc();
 
                 var client = GetRestClient(NewOrderRequestUrl);
                 response = GetRestResponse(client, newOrder);
@@ -113,7 +113,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
             var cancelPost = new BitfinexOrderStatusPost();
             cancelPost.Request = OrderCancelRequestUrl;
 
-            cancelPost.Nonce = Time.DateTimeToUnixTimeStamp(DateTime.UtcNow).ToString();
+            cancelPost.Nonce = UnixTimeStampUtc();
             cancelPost.OrderId = orderId;
 
             var client = GetRestClient(cancelPost.Request);
@@ -143,7 +143,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
         public virtual BitfinexCancelReplaceOrderResponse CancelReplaceOrder(BitfinexCancelReplacePost replaceOrder)
         {
             replaceOrder.Request = OrderCancelRequestUrl + CancelReplaceRequestUrl;
-            replaceOrder.Nonce = Time.DateTimeToUnixTimeStamp(DateTime.UtcNow).ToString();
+            replaceOrder.Nonce = UnixTimeStampUtc();
 
             var client = GetRestClient(replaceOrder.Request);
             var response = GetRestResponse(client, replaceOrder);
@@ -161,7 +161,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
         {
             var activeOrdersPost = new BitfinexPostBase();
             activeOrdersPost.Request = ActiveOrdersRequestUrl;
-            activeOrdersPost.Nonce = Time.DateTimeToUnixTimeStamp(DateTime.UtcNow).ToString();
+            activeOrdersPost.Nonce = UnixTimeStampUtc();
 
             var client = GetRestClient(activeOrdersPost.Request);
             var response = GetRestResponse(client, activeOrdersPost);
@@ -185,7 +185,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
             {
                 var balancePost = new BitfinexPostBase();
                 balancePost.Request = BalanceRequestUrl;
-                balancePost.Nonce = Time.DateTimeToUnixTimeStamp(DateTime.UtcNow).ToString();
+                balancePost.Nonce = UnixTimeStampUtc();
 
                 var client = GetRestClient(BalanceRequestUrl);
                 var response = GetRestResponse(client, balancePost);
@@ -211,7 +211,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
         {
             var activePositionsPost = new BitfinexPostBase();
             activePositionsPost.Request = ActivePositionsRequestUrl;
-            activePositionsPost.Nonce = Time.DateTimeToUnixTimeStamp(DateTime.UtcNow).ToString();
+            activePositionsPost.Nonce = UnixTimeStampUtc();
 
             var client = GetRestClient(activePositionsPost.Request);
             var response = GetRestResponse(client, activePositionsPost);
@@ -287,6 +287,16 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
                 Log.Error(ex);
                 return null;
             }
+        }
+
+        public static string UnixTimeStampUtc()
+        {
+            long unixTimeStamp;
+            DateTime currentTime = DateTime.Now;
+            DateTime dt = currentTime.ToUniversalTime();
+            DateTime unixEpoch = new DateTime(1970, 1, 1);
+            unixTimeStamp = (long)((dt.Subtract(unixEpoch)).TotalMilliseconds * 1000000D);
+            return unixTimeStamp.ToString();
         }
 
     }

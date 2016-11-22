@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using QuantConnect.Orders;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -34,11 +35,14 @@ namespace QuantConnect.Algorithm.CSharp
     {
 
         const string btcusd = "BTCUSD";
-        protected virtual decimal StopLoss { get { return 0.1m; } }
-        protected virtual decimal TakeProfit { get { return 0.1m; } }
+        protected virtual decimal StopLoss { get { return 0.04m; } }
+        protected virtual Dictionary<string, decimal> TrailingTakeProfit { get; set; }
+        protected virtual decimal TakeProfit { get { return 0.04m; } }
         protected virtual decimal AtrScale { get { return 2m; } }
         protected string BTCUSD { get { return btcusd; } }
         decimal unrealizedProfit;
+        protected virtual Decimal MinimumPosition { get { return 0.05m; } }
+        protected virtual Decimal[] TakeStep { get { return new[] { 0.01m, 0.005m }; } }
 
         public enum StopLossStrategy
         {
@@ -52,7 +56,8 @@ namespace QuantConnect.Algorithm.CSharp
             UnrealizedProfit,
             TotalPortfolioValue,
             AverageTrueRange,
-            UntilReversal
+            UntilReversal,
+            TrailingTake
         }
 
         /// <summary>
@@ -65,17 +70,22 @@ namespace QuantConnect.Algorithm.CSharp
             SetTimeZone(DateTimeZone.Utc);
             //Can be slow to fill. 60 second timeout should be adequate in most conditions
             Transactions.MarketOrderFillTimeout = new TimeSpan(0, 0, 60);
-            Portfolio.MarginCallModel = new BitfinexMarginCallModel(Portfolio);
+            //Portfolio.MarginCallModel = new BitfinexMarginCallModel(Portfolio);
+            TrailingTakeProfit = new Dictionary<string, decimal>();
+
         }
 
         //todo: this is temporary
         public BaseBitcoin(bool isBitcoin)
-        { }
+        {
+            TrailingTakeProfit = new Dictionary<string, decimal>();
+
+        }
 
         public override void Initialize()
         {
-            SetStartDate(2016, 1, 1);
-            SetEndDate(2016, 7, 16);
+            //SetStartDate(2016, 5, 1);
+            //SetEndDate(2016, 6, 30);
             SetCash("USD", 1000, 1m);
             var security = AddSecurity(SecurityType.Forex, BTCUSD, Resolution.Tick, Market.Bitfinex, false, 3.3m, false);
             if (LiveMode)
@@ -89,6 +99,16 @@ namespace QuantConnect.Algorithm.CSharp
 
         public void OnData(Ticks data)
         {
+            if (!IsWarmingUp)
+            {
+                foreach (var item in Portfolio)
+                {
+                    if (Portfolio[item.Key].AbsoluteHoldingsValue > 0 && Portfolio[item.Key].AbsoluteHoldingsValue / Portfolio.TotalPortfolioValue < MinimumPosition)
+                    {
+                        Liquidate();
+                    }
+                }
+            }
             foreach (var item in data)
             {
                 foreach (var tick in item.Value)
@@ -100,10 +120,15 @@ namespace QuantConnect.Algorithm.CSharp
 
         public abstract void OnData(Tick data);
 
+        protected virtual void Output(string title)
+        {
+            Output(title, btcusd);
+        }
+
         protected virtual void Output(string title, string symbol = btcusd)
         {
-            Log(title + ": " + this.UtcTime.ToString() + ": " + Portfolio.Securities[symbol].Price.ToString() + " Trade:" + Math.Round(Portfolio[symbol].LastTradeProfit, 2)
-                + " Total:" + Portfolio.TotalPortfolioValue);
+            Log(title + ": " + this.UtcTime.ToString() + symbol + ": " + Portfolio.Securities[symbol].Price.ToString() + " Trade:" + Math.Round(Portfolio[symbol].LastTradeProfit, 2)
+                + " Total:" + Math.Round(Portfolio.TotalPortfolioValue, 2));
         }
 
         /// <summary>
@@ -122,7 +147,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetHoldings(symbol, -3.0m);
         }
 
-        protected void TryStopLoss(string symbol = btcusd, StopLossStrategy strategy = StopLossStrategy.TotalPortfolioValue, AverageTrueRange atr = null)
+        protected void TryStopLoss(Symbol symbol, StopLossStrategy strategy = StopLossStrategy.TotalPortfolioValue, AverageTrueRange atr = null)
         {
             if (Portfolio[symbol].Invested)
             {
@@ -130,7 +155,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     if (Portfolio[symbol].TotalCloseProfit() / Portfolio.TotalPortfolioValue < -StopLoss)
                     {
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("stop", symbol);
                     }
                 }
@@ -138,7 +163,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     if (Portfolio[symbol].UnrealizedProfitPercent < -StopLoss)
                     {
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("stop", symbol);
                     }
                 }
@@ -147,7 +172,7 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal atrLimit = Portfolio[symbol].AbsoluteHoldingsCost * atr * AtrScale;
                     if (Portfolio.TotalUnrealisedProfit < -atrLimit)
                     {
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("stop", symbol);
                     }
                 }
@@ -162,7 +187,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     if (Portfolio[symbol].TotalCloseProfit() / Portfolio.TotalPortfolioValue > TakeProfit)
                     {
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("take", symbol);
                     }
                 }
@@ -170,7 +195,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     if (Portfolio[symbol].UnrealizedProfitPercent > TakeProfit)
                     {
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("take", symbol);
                     }
                 }
@@ -179,7 +204,7 @@ namespace QuantConnect.Algorithm.CSharp
                     decimal atrLimit = Portfolio[symbol].AbsoluteHoldingsCost * atr * AtrScale;
                     if (Portfolio.TotalUnrealisedProfit > atrLimit)
                     {
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("take", symbol);
                     }
                 }
@@ -193,14 +218,48 @@ namespace QuantConnect.Algorithm.CSharp
                         && unrealizedProfit - Portfolio[symbol].UnrealizedProfitPercent > 0.01m)
                     {
                         unrealizedProfit = 0;
-                        Liquidate();
+                        Liquidate(symbol);
                         Output("take", symbol);
                     }
                 }
-                else if (unrealizedProfit > 0)
+                else if (strategy == TakeProfitStrategy.TrailingTake)
                 {
-                    unrealizedProfit = 0;
+                    decimal profit = Portfolio[symbol].UnrealizedProfitPercent;
+                    if (profit > TakeProfit)
+                    {
+                        if (!TrailingTakeProfit.ContainsKey(symbol))
+                        {
+                            TrailingTakeProfit.Add(symbol, TakeProfit);
+                        }
+                        else if (profit > TrailingTakeProfit[symbol])
+                        {
+                            TrailingTakeProfit[symbol] = profit;
+                        }
+                        else if (profit < TrailingTakeProfit[symbol])
+                        {
+                            TrailingTakeProfit.Remove(symbol);
+                            Liquidate(symbol);
+                            Output("take", symbol);
+                        }
+                    }
+                    else
+                    {
+                        if (TrailingTakeProfit.ContainsKey(symbol))
+                        {
+                            Liquidate(symbol);
+                            Output("take", symbol);
+                            TrailingTakeProfit.Remove(symbol);
+                        }
+                    }
                 }
+            }
+        }
+
+        public override void OnOrderEvent(OrderEvent orderEvent)
+        {
+            if (orderEvent.Status == OrderStatus.Submitted)
+            {
+                unrealizedProfit = 0;
             }
         }
 

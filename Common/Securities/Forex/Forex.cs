@@ -19,7 +19,7 @@ using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Fills;
 using QuantConnect.Orders.Slippage;
 
-namespace QuantConnect.Securities.Forex 
+namespace QuantConnect.Securities.Forex
 {
     /// <summary>
     /// FOREX Security Object Implementation for FOREX Assets
@@ -46,7 +46,7 @@ namespace QuantConnect.Securities.Forex
                 new SpreadSlippageModel(),
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
-                new SecurityMarginModel(50m),
+                config.Market == Market.Bitfinex ? new BitfinexSecurityMarginModel() : new SecurityMarginModel(50m),
                 new ForexDataFilter()
                 )
         {
