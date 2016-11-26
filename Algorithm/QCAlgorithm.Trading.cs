@@ -584,7 +584,7 @@ namespace QuantConnect.Algorithm
         /// <param name="symbolToLiquidate">Symbols we wish to liquidate</param>
         /// <returns>Array of order ids for liquidated symbols</returns>
         /// <seealso cref="MarketOrder"/>
-        public List<int> Liquidate(Symbol symbolToLiquidate = null)
+        public virtual List<int> Liquidate(Symbol symbolToLiquidate = null)
         {
             var orderIdList = new List<int>();
             symbolToLiquidate = symbolToLiquidate ?? QuantConnect.Symbol.Empty;

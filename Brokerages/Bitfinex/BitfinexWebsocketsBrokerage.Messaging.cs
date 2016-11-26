@@ -35,7 +35,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        public void OnMessage(object sender, MessageEventArgs e)
+        public virtual void OnMessage(object sender, MessageEventArgs e)
         {
             try
             {
@@ -246,29 +246,24 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected override void Authenticate()
         {
-            //prevent attempting auth more than every 10 seconds
-            if (DateTime.Now > _previousAuthentication.AddSeconds(10))
+            string key = ApiKey;
+            string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
+            WebSocket.Send(JsonConvert.SerializeObject(new
             {
-                string key = ApiKey;
-                string payload = "AUTH" + DateTime.UtcNow.Ticks.ToString();
-                _webSocket.Send(JsonConvert.SerializeObject(new
-                {
-                    @event = "auth",
-                    apiKey = key,
-                    authSig = GetHexHashSignature(payload, ApiSecret),
-                    authPayload = payload
-                }));
-                _previousAuthentication = DateTime.Now;
-            }
+                @event = "auth",
+                apiKey = key,
+                authSig = GetHexHashSignature(payload, ApiSecret),
+                authPayload = payload
+            }));
         }
 
         private void UnAuthenticate()
         {
-            _webSocket.Send(JsonConvert.SerializeObject(new
+            WebSocket.Send(JsonConvert.SerializeObject(new
             {
                 @event = "unauth"
             }));
-            _webSocket.Close();
+            WebSocket.Close();
         }
 
         public void OnError(object sender, ErrorEventArgs e)

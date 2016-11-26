@@ -107,7 +107,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 raised.Set();
             };
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             Assert.IsTrue(raised.WaitOne(1000));
 
         }
@@ -130,7 +130,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 raised.Set();
             };
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             Assert.IsTrue(raised.WaitOne(1000));
         }
 
@@ -153,7 +153,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 raised.Set();
             };
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             Assert.IsTrue(raised.WaitOne(1000));
         }
 
@@ -163,11 +163,11 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"0\",\"pair\":\"btcusd\"}";
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             var actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
@@ -176,7 +176,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             //should not serialize into exponent
             json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.0000001\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
@@ -185,7 +185,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             //should not fail due to parse error on superfluous field
             json = "[\"0\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"abc\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
@@ -199,11 +199,11 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"btcusd\"}";
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             json = "[2,432.51,5.79789796,432.74,0.00009992,-6.41,-0.01,432.72,20067.46166511,442.79,427.26]";
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             var actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
@@ -217,16 +217,16 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
 
             string json = "{\"event\":\"subscribed\",\"channel\":\"trades\",\"chanId\":\"5\",\"pair\":\"btcusd\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"btcusd\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             json = "[ 5, 'te', '1234-BTCUSD', 1443659698, 236.42, 0.49064538 ]";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             json = "[ 5, 'tu', '1234-BTCUSD', 9869875, 1443659698, 987.42, 0.123 ]";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             var actual = unit.GetNextTicks().First();
             Assert.AreEqual("BTCUSD", actual.Symbol.Value);
@@ -248,7 +248,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             mock.Setup(m => m.Initialize(It.IsAny<string>())).Verifiable();
             unit.Connect();
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             mock.Verify();
         }
@@ -270,17 +270,17 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             //create subs
             string json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"btcusd\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"ethbtc\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             json = "{\"event\":\"subscribed\",\"channel\":\"trades\",\"chanId\":\"3\",\"pair\":\"ethbtc\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             //return ticks for subs.
             json = "[\"1\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
-            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            unit.OnMessage(brokerageMock.Object, BitfinexTestsHelpers.GetArgs(json));
             json = "[\"2\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"2\",\"0.02\",\"0.02\",\"0.02\"]";
-            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            unit.OnMessage(brokerageMock.Object, BitfinexTestsHelpers.GetArgs(json));
 
             //ensure ticks for subs
             var actual = unit.GetNextTicks();
@@ -294,21 +294,21 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             //trigger reset event
             json = "{\"event\":\"info\",\"code\":20061,\"msg\":\"Resync from the Trading Engine ended\"}";
-            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            unit.OnMessage(brokerageMock.Object, BitfinexTestsHelpers.GetArgs(json));
 
             //return new subs
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"2\",\"pair\":\"btcusd\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             json = "{\"event\":\"subscribed\",\"channel\":\"ticker\",\"chanId\":\"1\",\"pair\":\"ethbtc\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             json = "{\"event\":\"subscribed\",\"channel\":\"trades\",\"chanId\":\"4\",\"pair\":\"btcusd\"}";
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
 
             //return ticks for new subs. eth is now 1 and btc is 2
             json = "[\"1\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"0.01\",\"1\",\"0.01\",\"0.01\",\"0.01\"]";
-            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            unit.OnMessage(brokerageMock.Object, BitfinexTestsHelpers.GetArgs(json));
             json = "[\"2\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"0.02\",\"2\",\"0.02\",\"0.02\",\"0.02\"]";
-            unit.OnMessage(brokerageMock.Object, GetArgs(json));
+            unit.OnMessage(brokerageMock.Object, BitfinexTestsHelpers.GetArgs(json));
 
             //ensure ticks for new subs
             actual = unit.GetNextTicks();
@@ -351,7 +351,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             foreach (var line in File.ReadLines(Path.Combine("TestData", "btcusd_fill.txt")))
             {
-                unit.OnMessage(unit, GetArgs(line));
+                unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(line));
             }
             Assert.IsTrue(raised.WaitOne(1000));
 
@@ -371,21 +371,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
                 raised.Set();
             };
 
-            unit.OnMessage(unit, GetArgs(json));
+            unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             Assert.IsTrue(raised.WaitOne(2000));
-        }
-
-        [DebuggerStepThrough]
-        private MessageEventArgs GetArgs(string json)
-        {
-            BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-            System.Globalization.CultureInfo culture = null;
-            MessageEventArgs args = (MessageEventArgs)Activator.CreateInstance(typeof(MessageEventArgs), flags, null, new object[]
-            {
-                Opcode.Text, System.Text.Encoding.UTF8.GetBytes(json)
-            }, culture);
-
-            return args;
         }
 
     }

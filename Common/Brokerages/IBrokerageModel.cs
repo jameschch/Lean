@@ -168,6 +168,9 @@ namespace QuantConnect.Brokerages
                 case BrokerageName.BitfinexBrokerage:
                     return new BitfinexBrokerageModel(accountType);
 
+                case BrokerageName.OKCoin:
+                    return new OKCoinBrokerageModel(accountType);
+
                 default:
                     throw new ArgumentOutOfRangeException("brokerage", brokerage, null);
             }

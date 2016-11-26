@@ -143,9 +143,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>Fxcm\QuantConnect.Fxcm.dll</HintPath>
     </Reference>
-    <Reference Include="RestSharp, Version=105.1.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\RestSharp.105.1.0\lib\net45\RestSharp.dll</HintPath>
+    <Reference Include="RestSharp, Version=105.2.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\RestSharp.105.2.3\lib\net45\RestSharp.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
@@ -255,6 +255,19 @@
     <Compile Include="Oanda\Session\EventsSession.cs" />
     <Compile Include="Oanda\Session\RatesSession.cs" />
     <Compile Include="Oanda\Session\StreamSession.cs" />
+    <Compile Include="OKCoin\BaseMessage.cs" />
+    <Compile Include="OKCoin\IOKCoinHttpClient.cs" />
+    <Compile Include="OKCoin\IOKCoinRestFactory.cs" />
+    <Compile Include="OKCoin\IOKCoinWebsocketsFactory.cs" />
+    <Compile Include="OKCoin\OKCoinFill.cs" />
+    <Compile Include="OKCoin\OKCoinBrokerageFactory.cs" />
+    <Compile Include="OKCoin\OKCoinBrokerage.cs" />
+    <Compile Include="OKCoin\OKCoinBrokerage.Messaging.cs" />
+    <Compile Include="OKCoin\OKCoinRestFactory.cs" />
+    <Compile Include="OKCoin\OKCoinWebsocketsFactory.cs" />
+    <Compile Include="OKCoin\OKCoinHttpClient.cs" />
+    <Compile Include="OKCoin\TickerMessage.cs" />
+    <Compile Include="OKCoin\TradeMessage.cs" />
     <Compile Include="Paper\PaperBrokerage.cs" />
     <Compile Include="Paper\PaperBrokerageFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

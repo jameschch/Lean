@@ -1,55 +1,61 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); 
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
+using QuantConnect.Data.Market;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace QuantConnect.Brokerages
+namespace QuantConnect.Brokerages.OKCoin
 {
+
     /// <summary>
-    /// Specifices what transaction model and submit/execution rules to use
+    /// Ticker message object
     /// </summary>
-    public enum BrokerageName
+    public class TickerMessage : BaseMessage
     {
-        /// <summary>
-        /// Transaction and submit/execution rules will be the default as initialized
-        /// </summary>
-        Default,
 
         /// <summary>
-        /// Transaction and submit/execution rules will use interactive brokers models
+        /// Bid
         /// </summary>
-        InteractiveBrokersBrokerage,
-
+        public decimal Buy { get; set; }
         /// <summary>
-        /// Transaction and submit/execution rules will use tradier models
+        /// Ask
         /// </summary>
-        TradierBrokerage,
-
+        public decimal Sell { get; set; }
         /// <summary>
-        /// Transaction and submit/execution rules will use oanda models
+        /// Last Price
         /// </summary>
-        OandaBrokerage,
-
+        public decimal Last { get; set; }
         /// <summary>
-        /// Transaction and submit/execution rules will use fxcm models
+        /// Volume
         /// </summary>
-        FxcmBrokerage,
-
+        public decimal Volume { get; set; }
         /// <summary>
-        /// Transaction and submit/execution rules will use Bitfinex models
+        /// High
         /// </summary>
-        BitfinexBrokerage,
+        public decimal High { get; set; }
+        /// <summary>
+        /// Low
+        /// </summary>
+        public decimal Low { get; set; }
+        /// <summary>
+        /// Timestamp
+        /// </summary>
+        public int Timestamp { get; set; }
 
-        OKCoin
     }
 }

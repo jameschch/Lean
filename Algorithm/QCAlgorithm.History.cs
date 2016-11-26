@@ -38,7 +38,7 @@ namespace QuantConnect.Algorithm
         /// <summary>
         /// Gets whether or not this algorithm is still warming up
         /// </summary>
-        public bool IsWarmingUp
+        public virtual bool IsWarmingUp
         {
             get;
             private set;
