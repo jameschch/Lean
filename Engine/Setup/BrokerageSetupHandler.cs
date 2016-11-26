@@ -110,8 +110,9 @@ namespace QuantConnect.Lean.Engine.Setup
         /// </summary>
         /// <param name="algorithmNodePacket">Job packet</param>
         /// <param name="uninitializedAlgorithm">The algorithm instance before Initialize has been called</param>
+        /// <param name="factory">The brokerage factory</param>
         /// <returns>The brokerage instance, or throws if error creating instance</returns>
-        public IBrokerage CreateBrokerage(AlgorithmNodePacket algorithmNodePacket, IAlgorithm uninitializedAlgorithm)
+        public IBrokerage CreateBrokerage(AlgorithmNodePacket algorithmNodePacket, IAlgorithm uninitializedAlgorithm, out IBrokerageFactory factory)
         {
             var liveJob = algorithmNodePacket as LiveNodePacket;
             if (liveJob == null)
@@ -120,7 +121,8 @@ namespace QuantConnect.Lean.Engine.Setup
             }
 
             // find the correct brokerage factory based on the specified brokerage in the live job packet
-            _factory = Composer.Instance.Single<IBrokerageFactory>(factory => factory.BrokerageType.MatchesTypeName(liveJob.Brokerage));
+            _factory = Composer.Instance.Single<IBrokerageFactory>(brokerageFactory => brokerageFactory.BrokerageType.MatchesTypeName(liveJob.Brokerage));
+            factory = _factory;
 
             // initialize the correct brokerage using the resolved factory
             var brokerage = _factory.CreateBrokerage(liveJob, uninitializedAlgorithm);
@@ -219,7 +221,6 @@ namespace QuantConnect.Lean.Engine.Setup
                 brokerage.Message += brokerageOnMessage;
 
                 algorithm.Transactions.SetOrderProcessor(transactionHandler);
-                algorithm.PostInitialize();
 
                 Log.Trace("BrokerageSetupHandler.Setup(): Connecting to brokerage...");
                 try
@@ -308,7 +309,7 @@ namespace QuantConnect.Lean.Engine.Setup
                             // for items not directly requested set leverage to 1 and at the min resolution
                             algorithm.AddSecurity(holding.Type, holding.Symbol.Value, minResolution.Value, null, true, 1.0m, false);
                         }
-                        algorithm.Portfolio[holding.Symbol].SetHoldings(holding.AveragePrice, holding.Quantity);
+                        algorithm.Portfolio[holding.Symbol].SetHoldings(holding.AveragePrice, (int) holding.Quantity);
                         algorithm.Securities[holding.Symbol].SetMarketPrice(new TradeBar
                         {
                             Time = DateTime.Now,
@@ -328,6 +329,8 @@ namespace QuantConnect.Lean.Engine.Setup
                     AddInitializationError("Error getting account holdings from brokerage: " + err.Message);
                     return false;
                 }
+
+                algorithm.PostInitialize();
 
                 //Set the starting portfolio value for the strategy to calculate performance:
                 StartingPortfolioValue = algorithm.Portfolio.TotalPortfolioValue;

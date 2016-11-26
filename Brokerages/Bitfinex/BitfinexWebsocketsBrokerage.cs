@@ -88,13 +88,14 @@ namespace QuantConnect.Brokerages.Bitfinex
                     channel = "ticker",
                     pair = item.ToString()
                 }));
+                Log.Trace("Sent subcribe: " + item.ToString());
 
-                _webSocket.Send(JsonConvert.SerializeObject(new
-                {
-                    @event = "subscribe",
-                    channel = "trades",
-                    pair = item.ToString()
-                }));
+                //_webSocket.Send(JsonConvert.SerializeObject(new
+                //{
+                //    @event = "subscribe",
+                //    channel = "trades",
+                //    pair = item.ToString()
+                //}));
             }
         }
 
@@ -206,11 +207,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         private void Reconnect()
         {
             this._checkConnectionTask.Wait(TimeSpan.FromSeconds(60));
-
-            if (_webSocket.Instance == null)
-            {
-                _webSocket.Initialize(_url);
-            }
 
             var subscribed = GetSubscribed();
             //try to clean up state
