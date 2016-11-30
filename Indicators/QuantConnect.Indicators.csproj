@@ -117,9 +117,11 @@
     <Compile Include="CandlestickPatterns\Doji.cs" />
     <Compile Include="CandlestickPatterns\TwoCrows.cs" />
     <Compile Include="ChandeMomentumOscillator.cs" />
+    <Compile Include="CyberCycle.cs" />
     <Compile Include="DonchianChannel.cs" />
     <Compile Include="DoubleExponentialMovingAverage.cs" />
     <Compile Include="EmpiricalModeDecomposition.cs" />
+    <Compile Include="InverseFisherTransform.cs" />
     <Compile Include="MamaFama.cs" />
     <Compile Include="FractalAdaptiveMovingAverage.cs" />
     <Compile Include="SwissArmyKnife.cs" />

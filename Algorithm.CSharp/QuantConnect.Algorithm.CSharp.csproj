@@ -56,8 +56,10 @@
     <Compile Include="Benchmarks\EmptyMinute400EquityAlgorithm.cs" />
     <Compile Include="Benchmarks\Symbols.cs" />
     <Compile Include="CoarseUniverseTop5DollarVolumeAlgorithm.cs" />
+    <Compile Include="CrudeIncident.cs" />
     <Compile Include="CustomBenchmarkAlgorithm.cs" />
     <Compile Include="CustomBrokerageMessageHandlerAlgorithm.cs" />
+    <Compile Include="CyberCycleAlgorithm.cs" />
     <Compile Include="FractionalQuantityRegressionAlgorithm.cs" />
     <Compile Include="CustomDataRegressionAlgorithm.cs" />
     <Compile Include="CustomDataUniverseAlgorithm.cs" />
@@ -120,6 +122,10 @@
     <ProjectReference Include="..\Common\QuantConnect.csproj">
       <Project>{2545c0b4-fabb-49c9-8dd1-9ad7ee23f86b}</Project>
       <Name>QuantConnect</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Configuration\QuantConnect.Configuration.csproj">
+      <Project>{0AEB4EA3-28C8-476E-89FD-926F06590B4C}</Project>
+      <Name>QuantConnect.Configuration</Name>
     </ProjectReference>
     <ProjectReference Include="..\Indicators\QuantConnect.Indicators.csproj">
       <Project>{73fb2522-c3ed-4e47-8e3d-afad48a6b888}</Project>
