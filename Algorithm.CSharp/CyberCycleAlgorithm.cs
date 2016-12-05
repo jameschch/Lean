@@ -28,7 +28,7 @@ namespace QuantConnect.Algorithm.MyAlgorithms
         DateTime startTime = DateTime.Now;
         private DateTime _startDate = new DateTime(2015, 5, 19);
         private DateTime _endDate = new DateTime(2015, 6, 1);
-        private string symbol = "BCOUSD";
+        private string symbol = "EURUSD";
         private int barcount = 0;
         private RollingWindow<IndicatorDataPoint> Price;
         private CyberCycle cycle;
