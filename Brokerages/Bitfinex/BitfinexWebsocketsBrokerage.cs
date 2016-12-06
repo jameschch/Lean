@@ -45,7 +45,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         Task _checkConnectionTask = null;
         CancellationTokenSource _checkConnectionToken;
         DateTime _heartbeatCounter = DateTime.UtcNow;
-        const int _heartBeatTimeout = 90;
+        const int _heartBeatTimeout = 120;
         protected IWebSocket WebSocket;
         JsonSerializerSettings settings = new JsonSerializerSettings
         {
@@ -206,7 +206,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         protected virtual void Reconnect()
         {
-            this._checkConnectionTask.Wait(TimeSpan.FromSeconds(60));
+            this._checkConnectionTask.Wait(TimeSpan.FromSeconds(120));
 
             var subscribed = GetSubscribed();
             //try to clean up state
