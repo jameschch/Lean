@@ -16,9 +16,9 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
     public class BitfinexTestsHelpers
     {
 
-        public static Security GetSecurity()
+        public static Security GetSecurity(decimal price = 1m)
         {
-            return new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.Utc), CreateConfig(), new Cash(CashBook.AccountCurrency, 1000, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency));
+            return new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.Utc), CreateConfig(), new Cash(CashBook.AccountCurrency, 1000, price), new SymbolProperties("BTCUSD", CashBook.AccountCurrency, 1, 1, 0.01m));
         }
 
         private static SubscriptionDataConfig CreateConfig()
