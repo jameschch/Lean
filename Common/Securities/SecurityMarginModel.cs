@@ -227,7 +227,7 @@ namespace QuantConnect.Securities
             }
             else
             {
-                int decimals = security.SymbolProperties.LotSize.ToString().Length - security.SymbolProperties.LotSize.ToString().IndexOf('.') -1;
+                int decimals = BitConverter.GetBytes(decimal.GetBits(security.SymbolProperties.LotSize)[3])[2]; ;
                 quantity = Math.Round(quantity, decimals, MidpointRounding.AwayFromZero);
             }
 
