@@ -9,7 +9,7 @@
     "environment": "backtesting",
 
     // algorithm class selector
-    "algorithm-type-name": "Blackfish",
+    "algorithm-type-name": "",
 
     // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
     "algorithm-language": "CSharp",
@@ -77,8 +77,12 @@
 
     // parameters to set in the algorithm (the below are just samples)
     "parameters": {
-        "ema-fast": 10,
-        "ema-slow": 20
+        "p1": "",
+        "p2": "",
+        "p3": "",
+        "p4": "",
+        "stop": "",
+        "take": "",
     },
 
     "bitfinex-wallet": "trading",

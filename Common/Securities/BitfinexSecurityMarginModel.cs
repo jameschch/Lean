@@ -38,19 +38,11 @@ namespace QuantConnect.Securities
         /// used by the account. Returns null when no margin call is to be issued.
         /// </summary>
         /// <param name="security">The security to generate a margin call order for</param>
-        /// <param name="netLiquidationValue">The net liquidation value for the entire account</param>
-        /// <param name="totalMargin">The total margin used by the account in units of base currency</param>
+        /// <param name="totalPortfolioValue">ignored</param>
+        /// <param name="totalMargin">ignored</param>
         /// <returns>An order object representing a liquidation order to be executed to bring the account within margin requirements</returns>
-        public override SubmitOrderRequest GenerateMarginCallOrder(Security security, decimal netLiquidationValue, decimal totalMargin)
+        public override SubmitOrderRequest GenerateMarginCallOrder(Security security, decimal totalPortfolioValue, decimal totalMargin)
         {
-            // leave a buffer
-            const decimal marginBuffer = 0.10m;
-
-            if (totalMargin <= netLiquidationValue * (1 + marginBuffer))
-            {
-                return null;
-            }
-
             if (!security.Holdings.Invested)
             {
                 return null;
@@ -70,22 +62,20 @@ namespace QuantConnect.Securities
                 return null;
             }
 
-            // compute the amount of quote currency we need to liquidate in order to get within margin requirements
-            var deltaInQuoteCurrency = (totalMargin - netLiquidationValue) / security.QuoteCurrency.ConversionRate;
+            var delta = security.Holdings.IsShort ? ratio - 1.5m : 0.75m - ratio;
 
-            // compute the number of shares required for the order, rounding up
-            var unitPriceInQuoteCurrency = security.Price * security.SymbolProperties.ContractMultiplier;
-            int quantity = (int)(Math.Round(deltaInQuoteCurrency / unitPriceInQuoteCurrency, MidpointRounding.AwayFromZero) / GetMaintenanceMarginRequirement(security));
+            var quantity = security.Holdings.AbsoluteQuantity * Math.Abs(delta);
+            quantity = Math.Max(security.SymbolProperties.LotSize, Math.Min(security.Holdings.AbsoluteQuantity, quantity));
+            quantity = Math.Round(quantity, BitConverter.GetBytes(decimal.GetBits(security.SymbolProperties.LotSize)[3])[2], MidpointRounding.AwayFromZero);
 
-            // don't try and liquidate more share than we currently hold, minimum value of 1, maximum value for absolute quantity
-            quantity = Math.Max(1, Math.Min((int)security.Holdings.AbsoluteQuantity, quantity));
+            // don't try and liquidate more share than we currently hold, minimum value of lot size, maximum value for absolute quantity
             if (security.Holdings.IsLong)
             {
                 // adjust to a sell for long positions
                 quantity *= -1;
             }
 
-            return new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol, quantity, 0, 0, security.LocalTime.ConvertToUtc(security.Exchange.TimeZone), "Margin Call");
+            return new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol, quantity, 0, 0, DateTime.UtcNow, "Margin Call");
         }
 
 
