@@ -14,7 +14,7 @@ namespace QuantConnect.Indicators
         double _alpha = 0.07;
         private readonly RollingWindow<double> _smooth;
         private readonly RollingWindow<double> _cycle;
-        private readonly int _period;
+        private readonly int _period = 7;
         private int barcount;
         private readonly RollingWindow<double> _instPeriod;
         private readonly RollingWindow<double> _periodWindow;
@@ -27,23 +27,22 @@ namespace QuantConnect.Indicators
         /// Instanciates the indicator and the two Rolling Windows
         /// </summary>
         /// <param name="name">string - a custom name for your indicator</param>
-        /// <param name="period">int - the number of bar in the RollingWindow histories</param>
+        /// <param name="alpha"></param>
         /// <remarks>Ehlers only uses the last 4 bars of the history, but he maintains a list
         /// of bars for 7 bars on both indicators.  I recommend a period of 7 and use IsReady to warm up your algo</remarks>
-        public CyberCycle(string name, int period, double alpha)
-            : base(name, period)
+        public CyberCycle(string name, double alpha)
+            : base(name, 4)
         {
             // Creates the smoother data set to which the resulting cybercycle is applied
-            _smooth = new RollingWindow<double>(period);
+            _smooth = new RollingWindow<double>(3);
             // CyberCycle history
-            _cycle = new RollingWindow<double>(period);
+            _cycle = new RollingWindow<double>(7);
             _instPeriod = new RollingWindow<double>(2);
             _q1 = new RollingWindow<double>(2);
             _i1 = new RollingWindow<double>(2);
             _delta = new FixedSizeHashQueue<double>(5);
             _periodWindow = new RollingWindow<double>(2);
             _adaptCycle = new RollingWindow<double>(2);
-            _period = period;
             _alpha = alpha;
             barcount = 0;
 
@@ -51,9 +50,9 @@ namespace QuantConnect.Indicators
         /// <summary>
         /// Default constructor
         /// </summary>
-        /// <param name="period">int - the number of periods in the indicator warmup</param>
-        public CyberCycle(int period)
-            : this("CCY" + period, period, 0.07)
+        /// <param name="alpha"></param>
+        public CyberCycle(double alpha)
+            : this("CCY", alpha)
         {
         }
 

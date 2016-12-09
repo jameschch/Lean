@@ -21,14 +21,14 @@ namespace QuantConnect.Algorithm.MyAlgorithms
         public CyberCycleAlgorithm() : base(false)
         { }
 
-        decimal stop = Config.GetValue<decimal>("stop", 0.01m);
-        decimal take = Config.GetValue<decimal>("take", 0.06m);
+        decimal stop = Config.GetValue<decimal>("stop", 0.04m);
+        decimal take = Config.GetValue<decimal>("take", 0.04m);
         protected override decimal StopLoss { get { return stop; } }
         protected override decimal TakeProfit { get { return take; } }
         DateTime startTime = DateTime.Now;
         private DateTime _startDate = new DateTime(2015, 5, 19);
-        private DateTime _endDate = new DateTime(2015, 6, 1);
-        private string symbol = "EURUSD";
+        private DateTime _endDate = new DateTime(2015, 8, 19);
+        private string symbol = "BCOUSD";
         private int barcount = 0;
         private RollingWindow<IndicatorDataPoint> Price;
         private CyberCycle cycle;
@@ -39,6 +39,7 @@ namespace QuantConnect.Algorithm.MyAlgorithms
         private RollingWindow<IndicatorDataPoint> fishHistory;
         private RollingWindow<IndicatorDataPoint> fishDirectionHistory;
         bool fishDirectionChanged;
+        int quantity = Config.GetInt("quantity", 496);
 
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -61,11 +62,11 @@ namespace QuantConnect.Algorithm.MyAlgorithms
             SetBrokerageModel(Brokerages.BrokerageName.OandaBrokerage);
             Price = new RollingWindow<IndicatorDataPoint>(14);
             cycleSignal = new RollingWindow<IndicatorDataPoint>(14);
-            cycle = new CyberCycle(Config.GetInt("period", 7));
+            cycle = new CyberCycle(Config.GetDouble("alpha", 1.71));
             Price = new RollingWindow<IndicatorDataPoint>(14);
             diff = new RollingWindow<IndicatorDataPoint>(20);
             standardDeviation = new StandardDeviation(30);
-            fish = new InverseFisherTransform(Config.GetInt("fisherPeriod", 10));
+            fish = new InverseFisherTransform(Config.GetInt("fisherPeriod", 41));
             fishHistory = new RollingWindow<IndicatorDataPoint>(2);
             fishDirectionHistory = new RollingWindow<IndicatorDataPoint>(2);
 
@@ -81,7 +82,7 @@ namespace QuantConnect.Algorithm.MyAlgorithms
 
             if (Portfolio.TotalPortfolioValue < 900)
             {
-                Quit();
+                this.Quit();
             }
 
             barcount++;
@@ -90,10 +91,10 @@ namespace QuantConnect.Algorithm.MyAlgorithms
             cycleSignal.Add(idp(time, cycle.Current.Value));        //add last iteration value for the cycle
             cycle.Update(time, data[symbol].Close);
             diff.Add(idp(time, cycle.Current.Value - cycleSignal[0].Value));
-            fish.Update(idp(time, cycle.Current.Value));
 
             try
             {
+                fish.Update(idp(time, cycle.Current.Value));
                 standardDeviation.Update(idp(time, fish.Current.Value));
 
             }
@@ -139,12 +140,12 @@ namespace QuantConnect.Algorithm.MyAlgorithms
             {
                 if (fishDirectionHistory[0].Value > 0 && fishDirectionChanged)  // if it started up
                 {
-                    Buy(symbol, 1);
+                    Buy(symbol, quantity);
                     //Output("buy ", symbol);
                 }
                 if (fishDirectionHistory[0].Value < 0 && fishDirectionChanged) // if it started going down
                 {
-                    Sell(symbol, 1);
+                    Sell(symbol, quantity);
                     //Output("sell", symbol);
                 }
             }
@@ -156,12 +157,12 @@ namespace QuantConnect.Algorithm.MyAlgorithms
             {
                 if (fishDirectionHistory[0].Value > 0 && fishDirectionChanged)  // if it started up
                 {
-                    Buy(symbol, 1);
+                    Buy(symbol, quantity);
                     //Output("buy ", symbol);
                 }
                 if (fishDirectionHistory[0].Value < 0 && fishDirectionChanged) // if it started going down
                 {
-                    Sell(symbol, 1);
+                    Sell(symbol, quantity);
                    // Output("sell", symbol);
                 }
                 //if (Portfolio[symbol].IsShort)
