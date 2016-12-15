@@ -59,6 +59,14 @@ namespace QuantConnect.Securities
             }
         }
 
+        public bool IsReady
+        {
+            get
+            {
+                return _window.IsReady;
+            }
+        }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="QuantConnect.Securities.RelativeStandardDeviationVolatilityModel"/> class
         /// </summary>

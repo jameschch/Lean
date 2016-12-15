@@ -39,6 +39,17 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
+        /// Returns whether the indicator is ready
+        /// </summary>
+        public bool IsReady
+        {
+            get
+            {
+                return _indicator.IsReady;
+            }
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="IVolatilityModel"/> using
         /// the specified <paramref name="indicator"/>. The <paramref name="indicator"/>
         /// is assumed to but updated externally from this model, such as being registered
