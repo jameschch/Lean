@@ -152,14 +152,6 @@ namespace QuantConnect.Brokerages.OKCoin
         }
 
         /// <summary>
-        /// Returns if wss is connected
-        /// </summary>
-        public override bool IsConnected
-        {
-            get { return WebSocket.IsAlive; }
-        }
-
-        /// <summary>
         /// Creates wss connection
         /// </summary>
         public override void Connect()

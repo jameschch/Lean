@@ -52,11 +52,10 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                 var scaleFactor = Config.GetValue("bitfinex-scale-factor", 1m);
 
                 // Create an instance of the downloader
-                const string market = Market.Bitfinex;
                 var downloader = new CryptoiqDownloader(args[2], scaleFactor);
 
                 // Download the data
-                var symbolObject = Symbol.Create(args[3], SecurityType.Forex, market);
+                var symbolObject = Symbol.Create(args[3], SecurityType.Forex, args[2]);
                 var data = downloader.Get(symbolObject, Resolution.Tick, startDate, endDate);
 
                 // Save the data

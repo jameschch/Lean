@@ -139,7 +139,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         public override bool IsConnected
         {
-            get { return WebSocket.IsAlive; }
+            get { return WebSocket.ReadyState == WebSocketState.Connecting || WebSocket.ReadyState == WebSocketState.Open; }
         }
 
         /// <summary>
@@ -206,36 +206,42 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         protected virtual void Reconnect()
         {
-            this._checkConnectionTask.Wait(TimeSpan.FromSeconds(120));
-
-            var subscribed = GetSubscribed();
-            //try to clean up state
+            this._checkConnectionTask.Wait(TimeSpan.FromSeconds(190));
             try
             {
-                WebSocket.OnError -= OnError;
-                this.UnAuthenticate();
-                this.Unsubscribe();
-                WebSocket.Close();
+                var subscribed = GetSubscribed();
+                //try to clean up state
+                try
+                {
+                    if (IsConnected)
+                    {
+                        WebSocket.Close();
+                    }
+                    WebSocket.OnError -= OnError;
+                    this.UnAuthenticate();
+                    this.Unsubscribe();
+                }
+                catch (Exception ex)
+                {
+                    Log.Trace("Exception encountered cleaning up state.", ex);
+                }
+                if (!IsConnected)
+                {
+                    WebSocket.Connect();
+                }
+                Log.Trace("Attempting Subscribe");
+                this.Subscribe(null, subscribed);
+                Log.Trace("Attempting Auth");
+                this.Authenticate();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                Log.Trace("Exception encountered cleaning up state.");
+                Log.Trace("Exception encountered reconnecting.", ex);
             }
-            Log.Trace("Attempting Connect");
-            try
+            finally
             {
-                WebSocket.Initialize(Url);
-                WebSocket.Connect();
+                WebSocket.OnError += OnError;
             }
-            catch (Exception)
-            {
-                Log.Trace("Exception encountered attempting reconnect.");
-            }
-            WebSocket.OnError += OnError;
-            Log.Trace("Attempting Subscribe");
-            this.Subscribe(null, subscribed);
-            Log.Trace("Attempting Auth");
-            this.Authenticate();
         }
 
         private void Unsubscribe()
