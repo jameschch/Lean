@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using System;
 using QuantConnect.Data;
 
 namespace QuantConnect.Securities
@@ -34,6 +35,11 @@ namespace QuantConnect.Securities
         /// <param name="security">The security to calculate volatility for</param>
         /// <param name="data">The new data used to update the model</param>
         void Update(Security security, BaseData data);
+
+        /// <summary>
+        /// Returns whether the volatility model is ready
+        /// </summary>
+        bool IsReady { get; }
     }
 
     /// <summary>
@@ -49,6 +55,14 @@ namespace QuantConnect.Securities
 
         private sealed class NullVolatilityModel : IVolatilityModel
         {
+            public bool IsReady
+            {
+                get
+                {
+                    return true;
+                }
+            }
+
             public decimal Volatility { get; private set; }
             public void Update(Security security, BaseData data) { }
         }
