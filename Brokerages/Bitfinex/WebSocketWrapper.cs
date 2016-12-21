@@ -37,6 +37,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         public void Initialize(string url)
         {
             wrapped = new WebSocket(url);
+            wrapped.EmitOnPing = true;
         }
 
         /// <summary>

@@ -47,10 +47,14 @@ namespace QuantConnect.Brokerages.OKCoin
         #region Declarations
         List<Securities.Cash> _cash = new List<Securities.Cash>();
         Dictionary<string, Channel> _channelId = new Dictionary<string, Channel>();
-        Task _checkConnectionTask = null;
-        CancellationTokenSource _checkConnectionToken;
-        DateTime _heartbeatCounter = DateTime.UtcNow;
-        const int _heartBeatTimeout = 30;
+
+        Thread _connectionMonitorThread;
+        CancellationTokenSource _cancellationTokenSource;
+        private readonly object _lockerConnectionMonitor = new object();
+        DateTime _lastHeartbeatUtcTime = DateTime.UtcNow;
+        const int _heartbeatTimeout = 300;
+        private volatile bool _connectionLost;
+
         object _cashLock = new object();
         JsonSerializerSettings settings = new JsonSerializerSettings
         {
@@ -101,6 +105,8 @@ namespace QuantConnect.Brokerages.OKCoin
             _rest = rest;
             _restFactory = restFactory;
             _httpClient = httpClient;
+            WebSocket.OnMessage += OnMessage;
+            WebSocket.OnError += OnError;
         }
 
         /// <summary>
@@ -114,6 +120,20 @@ namespace QuantConnect.Brokerages.OKCoin
             {
                 this.Connect();
             }
+
+            var parameters = new Dictionary<string, string>
+            {
+                {"api_key" , ApiKey},
+            };
+            var sign = BuildSign(parameters);
+            parameters["sign"] = sign;
+
+            WebSocket.Send(JsonConvert.SerializeObject(new
+            {
+                @event = "addChannel",
+                channel = "ok_sub_" + _spotOrFuture + _baseCurrency + "_trades",
+                parameters = parameters
+            }));
 
             foreach (var item in symbols)
             {
@@ -157,28 +177,86 @@ namespace QuantConnect.Brokerages.OKCoin
         public override void Connect()
         {
             WebSocket.Connect();
-            if (this._checkConnectionTask == null || this._checkConnectionTask.IsFaulted || this._checkConnectionTask.IsCanceled || this._checkConnectionTask.IsCompleted)
+
+            var _cancellationTokenSource = new CancellationTokenSource();
+            _connectionMonitorThread = new Thread(() =>
             {
-                this._checkConnectionTask = Task.Run(() => CheckConnection());
-                this._checkConnectionToken = new CancellationTokenSource();
+                var nextReconnectionAttemptUtcTime = DateTime.UtcNow;
+                double nextReconnectionAttemptSeconds = 1;
+
+                lock (_lockerConnectionMonitor)
+                {
+                    _lastHeartbeatUtcTime = DateTime.UtcNow;
+                }
+
+                try
+                {
+                    while (!_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        WebSocket.Send("{'event':'ping'}");
+
+                        TimeSpan elapsed;
+                        lock (_lockerConnectionMonitor)
+                        {
+                            elapsed = DateTime.UtcNow - _lastHeartbeatUtcTime;
+                        }
+
+                        if (!_connectionLost && elapsed > TimeSpan.FromSeconds(_heartbeatTimeout))
+                        {
+                            _connectionLost = true;
+                            nextReconnectionAttemptUtcTime = DateTime.UtcNow.AddSeconds(nextReconnectionAttemptSeconds);
+
+                            OnMessage(BrokerageMessageEvent.Disconnected("Connection with server lost. " +
+                                                                         "This could be because of internet connectivity issues. "));
+                        }
+                        else if (_connectionLost)
+                        {
+                            try
+                            {
+                                if (elapsed <= TimeSpan.FromSeconds(_heartbeatTimeout))
+                                {
+                                    _connectionLost = false;
+                                    nextReconnectionAttemptSeconds = 1;
+
+                                    OnMessage(BrokerageMessageEvent.Reconnected("Connection with server restored."));
+                                }
+                                else
+                                {
+                                    if (DateTime.UtcNow > nextReconnectionAttemptUtcTime)
+                                    {
+                                        try
+                                        {
+                                            Reconnect();
+                                        }
+                                        catch (Exception)
+                                        {
+                                            // double the interval between attempts (capped to 1 minute)
+                                            nextReconnectionAttemptSeconds = Math.Min(nextReconnectionAttemptSeconds * 2, 60);
+                                            nextReconnectionAttemptUtcTime = DateTime.UtcNow.AddSeconds(nextReconnectionAttemptSeconds);
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception exception)
+                            {
+                                Log.Error(exception);
+                            }
+                        }
+
+                        Thread.Sleep(10000);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log.Error(exception);
+                }
+            });
+            _connectionMonitorThread.Start();
+            while (!_connectionMonitorThread.IsAlive)
+            {
+                Thread.Sleep(1);
             }
 
-            var parameters = new Dictionary<string, string>
-            {
-                {"api_key" , ApiKey},
-            };
-            var sign = BuildSign(parameters);
-            parameters["sign"] = sign;
-
-            WebSocket.Send(JsonConvert.SerializeObject(new
-            {
-                @event = "addChannel",
-                channel = "ok_sub_" + _spotOrFuture + _baseCurrency + "_trades",
-                parameters = parameters
-            }));
-
-            WebSocket.OnMessage += OnMessage;
-            WebSocket.OnError += OnError;
         }
 
         /// <summary>
@@ -186,7 +264,8 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         public override void Disconnect()
         {
-            _checkConnectionToken.Cancel();
+            _connectionMonitorThread.Join();
+            _cancellationTokenSource.Cancel();
             this.WebSocket.Close();
         }
 
@@ -275,45 +354,22 @@ namespace QuantConnect.Brokerages.OKCoin
             throw new NotSupportedException("OKCoin supports limit and market orders only.");
         }
 
-        private async Task CheckConnection()
-        {
-            while (!_checkConnectionToken.Token.IsCancellationRequested)
-            {
-                if (!this.IsConnected || (DateTime.UtcNow - _heartbeatCounter).TotalSeconds > _heartBeatTimeout)
-                {
-                    Log.Trace("OKCoinWebsocketsBrokerage.CheckConnection(): Heartbeat timeout. Reconnecting");
-                    Reconnect();
-                }
-                WebSocket.Send("{'event':'ping'}");
-                await Task.Delay(TimeSpan.FromSeconds(10), _checkConnectionToken.Token);
-            }
-        }
-
         protected override void Reconnect()
         {
-            this._checkConnectionTask.Wait(30000);
             var subscribed = GetSubscribed();
 
             WebSocket.OnError -= this.OnError;
-
-            //try to clean up state
             try
             {
-                WebSocket.Close();
-            }
-            catch (Exception)
-            {
-                Log.Trace("Exception encountered cleaning up state.");
-            }
-
-            try
-            {
-                WebSocket.Initialize(Url);
-                WebSocket.Connect();
-            }
-            catch (Exception ex)
-            {
-                Log.Trace("Exception encountered attempting reconnect.", ex);
+                //try to clean up state
+                if (IsConnected)
+                {
+                    WebSocket.Close();
+                }
+                if (!IsConnected)
+                {
+                    WebSocket.Connect();
+                }
             }
             finally
             {

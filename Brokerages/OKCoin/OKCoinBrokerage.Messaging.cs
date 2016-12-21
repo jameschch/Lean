@@ -40,6 +40,8 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             try
             {
+                _lastHeartbeatUtcTime = DateTime.UtcNow;
+
                 var raw = JsonConvert.DeserializeObject<dynamic>(e.Data, settings);
 
                 if (raw.Type == Newtonsoft.Json.Linq.JTokenType.Array)
@@ -69,10 +71,10 @@ namespace QuantConnect.Brokerages.OKCoin
                 }
                 else if (raw.@event == "pong")
                 {
-                    _heartbeatCounter = DateTime.UtcNow;
                     CheckUnknownForFills();
                     return;
                 }
+
 
                 Log.Trace("OKCoinWebsocketsBrokerage.OnMessage(): " + e.Data);
             }

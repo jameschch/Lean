@@ -434,7 +434,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             var response = _restClient.GetBalances();
             foreach (var item in response)
             {
-                if (item.Type == Wallet)
+                if (item.Type == Wallet && item.Amount > 0)
                 {
                     if (item.Currency == usd)
                     {
