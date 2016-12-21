@@ -85,6 +85,11 @@ namespace QuantConnect.Brokerages.Bitfinex
             get { return wrapped.Url; }
         }
 
+        public WebSocketState ReadyState
+        {
+            get { return wrapped.ReadyState; }
+        }
+
         event EventHandler<MessageEventArgs> IWebSocket.OnMessage
         {
             add { wrapped.OnMessage += value; }

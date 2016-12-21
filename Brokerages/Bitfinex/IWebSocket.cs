@@ -59,11 +59,13 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Returns wrapped instance
         /// </summary>
         WebSocket Instance { get; }
-		
+
         /// <summary>
         /// Wraps Url
         /// </summary>
         Uri Url { get; }
+
+        WebSocketState ReadyState { get; }
 
         event EventHandler<MessageEventArgs> OnMessage;
 
