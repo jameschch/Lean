@@ -76,7 +76,7 @@ namespace QuantConnect.Brokerages
         /// <returns></returns>
         public override ISlippageModel GetSlippageModel(Security security)
         {
-            return new BitfinexSlippageModel();
+            return new ZeroSlippageModel();
         }
 
         //todo: check minimum trade limits
