@@ -228,6 +228,7 @@
     <Compile Include="Orders\OrderResponseErrorCode.cs" />
     <Compile Include="Orders\OrderExtensions.cs" />
     <Compile Include="Orders\OrderTicket.cs" />
+    <Compile Include="Orders\Slippage\ZeroSlippageModel.cs" />
     <Compile Include="Orders\Slippage\ConstantSlippageModel.cs" />
     <Compile Include="Orders\Slippage\BitfinexSlippageModel.cs" />
     <Compile Include="Orders\Slippage\SpreadSlippageModel.cs" />
