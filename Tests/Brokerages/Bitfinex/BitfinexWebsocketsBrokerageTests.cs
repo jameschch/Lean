@@ -54,9 +54,9 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         [Test()]
         public void IsConnectedTest()
         {
-            mock.Setup(w => w.IsAlive).Returns(true);
+            mock.Setup(w => w.ReadyState).Returns(WebSocketState.Open);
             Assert.IsTrue(unit.IsConnected);
-            mock.Setup(w => w.IsAlive).Returns(false);
+            mock.Setup(w => w.ReadyState).Returns(WebSocketState.Closed);
             Assert.IsFalse(unit.IsConnected);
         }
 
@@ -245,7 +245,6 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             mock.Setup(m => m.Connect()).Verifiable();
             mock.Setup(m => m.Send(It.IsAny<string>())).Verifiable();
-            mock.Setup(m => m.Initialize(It.IsAny<string>())).Verifiable();
             unit.Connect();
 
             unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));

@@ -42,10 +42,12 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         #region Declarations
         Dictionary<int, Channel> _channelId = new Dictionary<int, Channel>();
-        Task _checkConnectionTask = null;
-        CancellationTokenSource _checkConnectionToken;
-        DateTime _heartbeatCounter = DateTime.UtcNow;
-        const int _heartBeatTimeout = 120;
+        Thread _connectionMonitorThread;
+        CancellationTokenSource _cancellationTokenSource;
+        private readonly object _lockerConnectionMonitor = new object();
+        DateTime _lastHeartbeatUtcTime = DateTime.UtcNow;
+        const int _heartbeatTimeout = 300;
+        private volatile bool _connectionLost;
         protected IWebSocket WebSocket;
         JsonSerializerSettings settings = new JsonSerializerSettings
         {
@@ -147,15 +149,88 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         public override void Connect()
         {
-            WebSocket.Connect();
-            if (this._checkConnectionTask == null || this._checkConnectionTask.IsFaulted || this._checkConnectionTask.IsCanceled || this._checkConnectionTask.IsCompleted)
-            {
-                this._checkConnectionTask = Task.Run(() => CheckConnection());
-                this._checkConnectionToken = new CancellationTokenSource();
-            }
             WebSocket.OnMessage += OnMessage;
             WebSocket.OnError += OnError;
-            this.Authenticate();
+            WebSocket.OnOpen += (o, e) => { this.Authenticate(); };
+
+            WebSocket.Connect();
+            _cancellationTokenSource = new CancellationTokenSource();
+            _connectionMonitorThread = new Thread(() =>
+            {
+                var nextReconnectionAttemptUtcTime = DateTime.UtcNow;
+                double nextReconnectionAttemptSeconds = 1;
+
+                lock (_lockerConnectionMonitor)
+                {
+                    _lastHeartbeatUtcTime = DateTime.UtcNow;
+                }
+
+                try
+                {
+                    while (!_cancellationTokenSource.IsCancellationRequested)
+                    {
+
+                        TimeSpan elapsed;
+                        lock (_lockerConnectionMonitor)
+                        {
+                            elapsed = DateTime.UtcNow - _lastHeartbeatUtcTime;
+                        }
+
+                        if (!_connectionLost && elapsed > TimeSpan.FromSeconds(_heartbeatTimeout))
+                        {
+                            _connectionLost = true;
+                            nextReconnectionAttemptUtcTime = DateTime.UtcNow.AddSeconds(nextReconnectionAttemptSeconds);
+
+                            OnMessage(BrokerageMessageEvent.Disconnected("Connection with server lost. " +
+                                                                         "This could be because of internet connectivity issues. "));
+                        }
+                        else if (_connectionLost)
+                        {
+                            try
+                            {
+                                if (elapsed <= TimeSpan.FromSeconds(_heartbeatTimeout))
+                                {
+                                    _connectionLost = false;
+                                    nextReconnectionAttemptSeconds = 1;
+
+                                    OnMessage(BrokerageMessageEvent.Reconnected("Connection with server restored."));
+                                }
+                                else
+                                {
+                                    if (DateTime.UtcNow > nextReconnectionAttemptUtcTime)
+                                    {
+                                        try
+                                        {
+                                            Reconnect();
+                                        }
+                                        catch (Exception)
+                                        {
+                                            // double the interval between attempts (capped to 1 minute)
+                                            nextReconnectionAttemptSeconds = Math.Min(nextReconnectionAttemptSeconds * 2, 60);
+                                            nextReconnectionAttemptUtcTime = DateTime.UtcNow.AddSeconds(nextReconnectionAttemptSeconds);
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception exception)
+                            {
+                                Log.Error(exception);
+                            }
+                        }
+
+                        Thread.Sleep(10000);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log.Error(exception);
+                }
+            });
+            _connectionMonitorThread.Start();
+            while (!_connectionMonitorThread.IsAlive)
+            {
+                Thread.Sleep(1);
+            }
         }
 
         /// <summary>
@@ -164,7 +239,8 @@ namespace QuantConnect.Brokerages.Bitfinex
         public override void Disconnect()
         {
             this.UnAuthenticate();
-            _checkConnectionToken.Cancel();
+            _cancellationTokenSource.Cancel();
+            _connectionMonitorThread.Join();
             this.WebSocket.Close();
         }
 
@@ -190,23 +266,8 @@ namespace QuantConnect.Brokerages.Bitfinex
             return result;
         }
 
-
-        private async Task CheckConnection()
-        {
-            while (!_checkConnectionToken.Token.IsCancellationRequested)
-            {
-                if (!this.IsConnected || (DateTime.UtcNow - _heartbeatCounter).TotalSeconds > _heartBeatTimeout)
-                {
-                    Log.Trace("BitfinexWebsocketsBrokerage.CheckConnection(): Heartbeat timeout. Reconnecting");
-                    Reconnect();
-                }
-                await Task.Delay(TimeSpan.FromSeconds(30), _checkConnectionToken.Token);
-            }
-        }
-
         protected virtual void Reconnect()
         {
-            this._checkConnectionTask.Wait(TimeSpan.FromSeconds(190));
             try
             {
                 var subscribed = GetSubscribed();

@@ -37,8 +37,7 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                 Console.WriteLine("TODATE = yyyymmdd");
                 Environment.Exit(1);
                 //useful detault params
-                //args = new string[] { "20160702", DateTime.UtcNow.ToString("yyyyMMdd"), "bitfinex", "ETHBTC" };
-
+                //args = new string[] { "20150101", DateTime.UtcNow.ToString("yyyyMMdd"), "huobi", "BTCCNY" };
             }
 
             try
@@ -53,6 +52,11 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
 
                 // Create an instance of the downloader
                 var downloader = new CryptoiqDownloader(args[2], scaleFactor);
+
+                if (Market.Encode(args[2]) == null)
+                {
+                    Market.Add(args[2], 999);
+                }
 
                 // Download the data
                 var symbolObject = Symbol.Create(args[3], SecurityType.Forex, args[2]);

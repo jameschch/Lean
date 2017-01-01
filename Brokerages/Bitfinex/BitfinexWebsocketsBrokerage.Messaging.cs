@@ -49,7 +49,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     if (term == "hb")
                     {
                         //heartbeat
-                        _heartbeatCounter = DateTime.UtcNow;
+                        _lastHeartbeatUtcTime = DateTime.UtcNow;
                         return;
                     }
                     else if (_channelId.ContainsKey(id) && _channelId[id].Name == "ticker")

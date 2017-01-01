@@ -178,7 +178,7 @@ namespace QuantConnect.Brokerages.OKCoin
         {
             WebSocket.Connect();
 
-            var _cancellationTokenSource = new CancellationTokenSource();
+            _cancellationTokenSource = new CancellationTokenSource();
             _connectionMonitorThread = new Thread(() =>
             {
                 var nextReconnectionAttemptUtcTime = DateTime.UtcNow;
@@ -264,8 +264,8 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         public override void Disconnect()
         {
-            _connectionMonitorThread.Join();
             _cancellationTokenSource.Cancel();
+            _connectionMonitorThread.Join();
             this.WebSocket.Close();
         }
 

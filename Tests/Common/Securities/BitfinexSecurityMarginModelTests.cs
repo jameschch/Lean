@@ -65,7 +65,7 @@ namespace QuantConnect.Tests.Common.Securities
 
             var actual = unit.GenerateMarginCallOrder(security, 0, 0);
 
-            Assert.AreEqual(-0.01, actual.Quantity);
+            Assert.AreEqual(-0.06, actual.Quantity);
         }
 
 

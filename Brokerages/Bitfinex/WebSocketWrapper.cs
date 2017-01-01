@@ -91,16 +91,22 @@ namespace QuantConnect.Brokerages.Bitfinex
             get { return wrapped.ReadyState; }
         }
 
-        event EventHandler<MessageEventArgs> IWebSocket.OnMessage
+        public event EventHandler<MessageEventArgs> OnMessage
         {
             add { wrapped.OnMessage += value; }
             remove { wrapped.OnMessage -= value; }
         }
 
-        event EventHandler<ErrorEventArgs> IWebSocket.OnError
+        public event EventHandler<ErrorEventArgs> OnError
         {
             add { wrapped.OnError += value; }
             remove { wrapped.OnError -= value; }
+        }
+
+        public event EventHandler OnOpen
+        {
+            add { wrapped.OnOpen += value; }
+            remove { wrapped.OnOpen -= value; }
         }
 
     }
