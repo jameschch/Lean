@@ -42,13 +42,12 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
         BitfinexWebsocketsBrokerage unit;
         Mock<IWebSocket> mock = new Mock<IWebSocket>();
-        decimal scaleFactor = 1m;
 
         [SetUp()]
         public void Setup()
         {
             unit = new BitfinexWebsocketsBrokerage("wss://localhost", mock.Object, "abc", "123", "trading",
-                new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, scaleFactor, new Mock<ISecurityProvider>().Object);
+                new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, new Mock<ISecurityProvider>().Object);
         }
 
         [Test()]
@@ -94,7 +93,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             string brokerId = "2";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"6\",\"BTC\"]]";
 
-            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, scaleFactor, 3);
+            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, 3);
             ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
@@ -117,7 +116,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             string brokerId = "2";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"0.000006\",\"USD\"]]";
-            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, scaleFactor, 3);
+            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, 3);
             ManualResetEvent raised = new ManualResetEvent(false);
 
             unit.OrderStatusChanged += (s, e) =>
@@ -139,7 +138,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             string brokerId = "2";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"-0.000004\",\"<ORD_TYPE>\",\"5\",\"6\",\"USD\"]]";
-            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, scaleFactor, 3);
+            BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, 3);
 
             ManualResetEvent raised = new ManualResetEvent(false);
 
@@ -258,7 +257,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             mock.Setup(m => m.Connect()).Verifiable();
             var brokerageMock = new Mock<BitfinexWebsocketsBrokerage>("wss://localhost", mock.Object, "abc", "123", "trading",
-                new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, 100m, new Mock<ISecurityProvider>().Object);
+                new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>()).Object, new Mock<ISecurityProvider>().Object);
 
             brokerageMock.Setup(m => m.Unsubscribe(null, It.IsAny<List<Symbol>>())).Verifiable();
             brokerageMock.Setup(m => m.Subscribe(null, It.IsAny<List<Symbol>>())).Verifiable();
@@ -326,7 +325,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         {
             int expectedQuantity = 2;
 
-            BitfinexTestsHelpers.AddOrder(unit, 1, "700658426", scaleFactor, expectedQuantity);
+            BitfinexTestsHelpers.AddOrder(unit, 1, "700658426", expectedQuantity);
 
             ManualResetEvent raised = new ManualResetEvent(false);
 

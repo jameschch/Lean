@@ -32,10 +32,9 @@ namespace QuantConnect.ToolBox.BitcoinChartsDownloader
 
                 // Load settings from config.json
                 var dataDirectory = Config.Get("data-directory", "../../../Data");
-                decimal scaleFactor = Config.GetValue<decimal>("bitfinex-scale-factor", 1m);
 
                 // Create an instance of the downloader
-                var downloader = new BitcoinChartsDownloader(scaleFactor);
+                var downloader = new BitcoinChartsDownloader();
 
                 // Download the data
                 var symbolObject = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);

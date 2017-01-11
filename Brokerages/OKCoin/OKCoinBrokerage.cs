@@ -95,7 +95,7 @@ namespace QuantConnect.Brokerages.OKCoin
         /// </summary>
         public OKCoinBrokerage(string url, IWebSocket webSocket, IOKCoinWebsocketsFactory websocketsFactory, IRestClient rest, IOKCoinRestFactory restFactory,
         IOKCoinHttpClient httpClient, string baseCurrency, string apiKey, string apiSecret, string spotOrFuture, bool isTradeTickerEnabled, ISecurityProvider securityProvider)
-            : base(url, webSocket, apiKey, apiSecret, null, null, 1, securityProvider)
+            : base(url, webSocket, apiKey, apiSecret, null, null, securityProvider)
         {
             _spotOrFuture = spotOrFuture;
             _baseCurrency = baseCurrency.ToLower();

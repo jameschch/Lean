@@ -26,11 +26,11 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             return new SubscriptionDataConfig(typeof(TradeBar), Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex), Resolution.Minute, TimeZones.Utc, TimeZones.Utc, false, true, false);
         }
 
-        public static void AddOrder(BitfinexBrokerage unit, int id, string brokerId, decimal scaleFactor, int quantity)
+        public static void AddOrder(BitfinexBrokerage unit, int id, string brokerId, int quantity)
         {
             var order = new Orders.MarketOrder { BrokerId = new List<string> { brokerId }, Quantity = quantity, Id = id };
             unit.CachedOrderIDs.TryAdd(1, order);
-            unit.FillSplit.TryAdd(id, new BitfinexFill(order, scaleFactor));
+            unit.FillSplit.TryAdd(id, new BitfinexFill(order));
         }
 
         [DebuggerStepThrough]

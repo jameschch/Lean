@@ -141,12 +141,12 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 Ticks.Add(new Tick
                 {
-                    AskPrice = msg.Ask / ScaleFactor,
-                    BidPrice = msg.Bid / ScaleFactor,
-                    AskSize = (long)Math.Round(msg.AskSize * ScaleFactor, 0),
-                    BidSize = (long)Math.Round(msg.BidSize * ScaleFactor, 0),
+                    AskPrice = msg.Ask,
+                    BidPrice = msg.Bid,
+                    AskSize = (long)Math.Round(msg.AskSize, 0),
+                    BidSize = (long)Math.Round(msg.BidSize, 0),
                     Time = DateTime.UtcNow,
-                    Value = ((msg.Ask + msg.Bid) / 2m) / ScaleFactor,
+                    Value = ((msg.Ask + msg.Bid) / 2m),
                     TickType = TickType.Quote,
                     Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick
@@ -165,11 +165,11 @@ namespace QuantConnect.Brokerages.Bitfinex
                 Ticks.Add(new Tick
                 {
                     Time = DateTime.UtcNow,
-                    Value = msg.Price / ScaleFactor,
+                    Value = msg.Price,
                     TickType = TickType.Trade,
                     Symbol = Symbol.Create(symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(msg.Amount * ScaleFactor))
+                    Quantity = (int)(Math.Round(msg.Amount))
                 });
             }
 
@@ -183,7 +183,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 var msg = new WalletMessage(item);
                 if (msg.WLT_NAME == this.Wallet)
                 {
-                    this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE * ScaleFactor));
+                    this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE));
                 }
             }
         }
@@ -215,16 +215,16 @@ namespace QuantConnect.Brokerages.Bitfinex
                 (
                     cached.First().Key, Symbol.Create(msg.TrdPair, SecurityType.Forex, Market.Bitfinex), msg.TrdTimestamp, OrderStatus.PartiallyFilled,
                     msg.TrdAmountExecuted > 0 ? OrderDirection.Buy : OrderDirection.Sell,
-                    msg.TrdPriceExecuted / ScaleFactor, 0,
+                    msg.TrdPriceExecuted, 0,
                     0, "Bitfinex Fill Event"
                 );
-                fill.FillPrice = msg.TrdPriceExecuted / ScaleFactor;
+                fill.FillPrice = msg.TrdPriceExecuted;
 
                 if (split.IsCompleted())
                 {
                     fill.Status = OrderStatus.Filled;
                     fill.OrderFee = Math.Abs(split.TotalFee());
-                    fill.FillQuantity = split.TotalQuantity * ScaleFactor;
+                    fill.FillQuantity = split.TotalQuantity;
                     FilledOrderIDs.Add(cached.First().Key);
 
                     Order outOrder = cached.First().Value;
