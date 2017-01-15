@@ -9,6 +9,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Securities;
 using QuantConnect.Tests.Brokerages.Bitfinex;
 using Moq;
+using Jtc.Algorithm;
 
 namespace QuantConnect.Tests.Algorithm.CSharp
 {

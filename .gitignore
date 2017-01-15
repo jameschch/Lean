@@ -253,3 +253,6 @@ Charts/
 *.ncrunchsolution
 *.ncrunchproject
 /.vs/config/applicationhost.config
+
+#ignore config
+config.json

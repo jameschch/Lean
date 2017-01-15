@@ -138,11 +138,12 @@ namespace QuantConnect.Brokerages.Oanda
 
                     if (DateTime.UtcNow > requestTime)
                     {
-                        // restart streaming session
-                        SubscribeSymbols(symbolsToSubscribe);
 
                         lock (_lockerSubscriptions)
                         {
+                            // restart streaming session
+                            SubscribeSymbols(symbolsToSubscribe);
+
                             _lastSubscribeRequestUtcTime = DateTime.UtcNow;
                             if (_subscribedSymbols.Count == symbolsToSubscribe.Count)
                             {
