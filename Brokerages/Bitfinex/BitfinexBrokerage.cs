@@ -45,10 +45,6 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         protected List<Tick> Ticks = new List<Tick>();
         CancellationTokenSource _tickerToken;
-        /// <summary>
-        /// Divisor for prices. Scales prices/volumes to allow trades on 0.01 of unit
-        /// </summary>
-        protected decimal ScaleFactor = 1;
         readonly object _fillLock = new object();
         const string buy = "buy";
         const string sell = "sell";
@@ -97,14 +93,13 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Create bitfinex brokerage
         /// </summary>
-        public BitfinexBrokerage(string apiKey, string apiSecret, string wallet, BitfinexApi restClient, decimal scaleFactor, ISecurityProvider securityProvider)
+        public BitfinexBrokerage(string apiKey, string apiSecret, string wallet, BitfinexApi restClient, ISecurityProvider securityProvider)
             : base("bitfinex")
         {
             ApiKey = apiKey;
             ApiSecret = apiSecret;
             Wallet = wallet;
             _restClient = restClient;
-            ScaleFactor = scaleFactor;
             SecurityProvider = securityProvider;
             FillSplit = new ConcurrentDictionary<int, BitfinexFill>();
         }
@@ -121,14 +116,14 @@ namespace QuantConnect.Brokerages.Bitfinex
         {
             if (order is StopMarketOrder)
             {
-                return ((StopMarketOrder)order).StopPrice * ScaleFactor;
+                return ((StopMarketOrder)order).StopPrice;
             }
             else if (order is LimitOrder)
             {
-                return ((LimitOrder)order).LimitPrice * ScaleFactor;
+                return ((LimitOrder)order).LimitPrice;
             }
 
-            return order.Price <= 0 ? order.Id : (order.Price * ScaleFactor);
+            return order.Price <= 0 ? order.Id : (order.Price);
         }
 
         /// <summary>
@@ -163,7 +158,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
             var newOrder = new BitfinexNewOrderPost
             {
-                Amount = (Math.Abs(order.Quantity) / ScaleFactor).ToString(),
+                Amount = (Math.Abs(order.Quantity)).ToString(),
                 Price = GetPrice(order).ToString(),
                 Symbol = order.Symbol.Value,
                 Type = MapOrderType(order.Type),
@@ -201,8 +196,8 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                     caching.Id = order.Id;
                     caching.BrokerId = new List<string> { response.OrderId.ToString() };
-                    caching.Price = order.Price / ScaleFactor;
-                    caching.Quantity = totalQuantity * (int)ScaleFactor;
+                    caching.Price = order.Price;
+                    caching.Quantity = totalQuantity;
                     caching.Status = OrderStatus.Submitted;
                     caching.Symbol = order.Symbol;
                     caching.Time = order.Time;
@@ -324,14 +319,14 @@ namespace QuantConnect.Brokerages.Bitfinex
                         {
                             order = new LimitOrder
                             {
-                                LimitPrice = decimal.Parse(item.Price) / ScaleFactor
+                                LimitPrice = decimal.Parse(item.Price)
                             };
                         }
                         else if (item.Type == _exchangeStop || item.Type == _stop)
                         {
                             order = new StopMarketOrder
                             {
-                                StopPrice = decimal.Parse(item.Price) / ScaleFactor
+                                StopPrice = decimal.Parse(item.Price)
                             };
                         }
                         else
@@ -340,11 +335,11 @@ namespace QuantConnect.Brokerages.Bitfinex
                             continue;
                         }
 
-                        order.Quantity = decimal.Parse(item.OriginalAmount) * ScaleFactor;
+                        order.Quantity = decimal.Parse(item.OriginalAmount);
                         order.BrokerId = new List<string> { item.Id.ToString() };
                         order.Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex);
                         order.Time = Time.UnixTimeStampToDateTime(double.Parse(item.Timestamp));
-                        order.Price = decimal.Parse(item.Price) / ScaleFactor;
+                        order.Price = decimal.Parse(item.Price);
                         order.Status = MapOrderStatus(item);
                         list.Add(order);
                     }
@@ -412,12 +407,12 @@ namespace QuantConnect.Brokerages.Bitfinex
                 list.Add(new Holding
                 {
                     Symbol = Symbol.Create(item.Symbol.ToUpper(), SecurityType.Forex, Market.Bitfinex.ToString()),
-                    Quantity = decimal.Parse(item.Amount) * ScaleFactor,
+                    Quantity = decimal.Parse(item.Amount),
                     Type = SecurityType.Forex,
                     CurrencySymbol = item.Symbol.Substring(0, 3).ToUpper(),                     
-                    ConversionRate = (conversionRate / ScaleFactor),
-                    MarketPrice = (decimal.Parse(ticker.Mid) / ScaleFactor),
-                    AveragePrice = (decimal.Parse(item.Base) / ScaleFactor),                    
+                    ConversionRate = (conversionRate),
+                    MarketPrice = (decimal.Parse(ticker.Mid)),
+                    AveragePrice = (decimal.Parse(item.Base)),                    
                 });
             }
             return list;
@@ -446,7 +441,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                         var baseSymbol = (item.Currency + usd).ToLower();
                         var ticker = _restClient.GetPublicTicker(baseSymbol, BtcInfo.BitfinexUnauthenicatedCallsEnum.pubticker);
-                        list.Add(new Securities.Cash(item.Currency.ToUpper(), item.Amount * ScaleFactor, decimal.Parse(ticker.Mid) / ScaleFactor));
+                        list.Add(new Securities.Cash(item.Currency.ToUpper(), item.Amount, decimal.Parse(ticker.Mid)));
                     }
                 }
             }

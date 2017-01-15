@@ -28,17 +28,14 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
     public class CryptoiqDownloader : IDataDownloader
     {
         private readonly string _exchange;
-        private readonly decimal _scaleFactor;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CryptoiqDownloader"/> class
         /// </summary>
         /// <param name="exchange">The bitcoin exchange</param>
-        /// <param name="scaleFactor">Scale factor used to scale the data, useful for changing the BTC units</param>
-        public CryptoiqDownloader(string exchange = "bitfinex", decimal scaleFactor = 1m)
+        public CryptoiqDownloader(string exchange = "bitfinex")
         {
             _exchange = exchange;
-            _scaleFactor = scaleFactor;
         }
 
         /// <summary>
@@ -77,11 +74,11 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                             {
                                 Time = item.Time,
                                 Symbol = symbol,
-                                Value = item.Last / _scaleFactor,
-                                AskPrice = item.Ask / _scaleFactor,
-                                BidPrice = item.Bid / _scaleFactor,
+                                Value = item.Last,
+                                AskPrice = item.Ask,
+                                BidPrice = item.Bid,
                                 TickType = TickType.Quote,
-                                Quantity = item.Volume * _scaleFactor
+                                Quantity = item.Volume
                             };
                         }
                         hour++;

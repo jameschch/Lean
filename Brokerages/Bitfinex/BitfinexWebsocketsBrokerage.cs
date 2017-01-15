@@ -62,8 +62,8 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Create Brokerage instance
         /// </summary>
         public BitfinexWebsocketsBrokerage(string url, IWebSocket websocket, string apiKey, string apiSecret, string wallet, BitfinexApi restClient,
-            decimal scaleFactor, ISecurityProvider securityProvider)
-            : base(apiKey, apiSecret, wallet, restClient, scaleFactor, securityProvider)
+            ISecurityProvider securityProvider)
+            : base(apiKey, apiSecret, wallet, restClient, securityProvider)
         {
             WebSocket = websocket;
             WebSocket.Initialize(url);
@@ -260,7 +260,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         public override bool PlaceOrder(Order order)
         {
             decimal quantity = order.Quantity;
-            this.FillSplit.TryAdd(order.Id, new BitfinexFill(order, ScaleFactor));
+            this.FillSplit.TryAdd(order.Id, new BitfinexFill(order));
             var result = base.PlaceOrder(order);
             order.Quantity = quantity;
             return result;

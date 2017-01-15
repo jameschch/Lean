@@ -30,11 +30,9 @@ namespace QuantConnect.ToolBox.BitcoinChartsDownloader
     public class BitcoinChartsDownloader : IDataDownloader
     {
 
-        decimal _scaleFactor;
-
-        public BitcoinChartsDownloader(decimal scaleFactor)
+        public BitcoinChartsDownloader()
         {
-            this._scaleFactor = scaleFactor;
+
         }
 
         /// <summary>
@@ -77,9 +75,9 @@ namespace QuantConnect.ToolBox.BitcoinChartsDownloader
                     {
                         Time = Time.UnixTimeStampToDateTime(long.Parse(line[0])),
                         Symbol = symbol,
-                        Value = decimal.Parse(line[1]) / _scaleFactor,
+                        Value = decimal.Parse(line[1]),
                         DataType = MarketDataType.Tick,
-                        Quantity = (int)(Math.Round(decimal.Parse(line[2])) * _scaleFactor),
+                        Quantity = (int)(Math.Round(decimal.Parse(line[2]))),
                         TickType = TickType.Trade
                     };
                 }

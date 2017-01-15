@@ -28,7 +28,6 @@ namespace QuantConnect.Brokerages.Bitfinex
     {
 
         Orders.Order _order;
-        decimal _scaleFactor;
 
         /// <summary>
         /// Lean orderId
@@ -47,11 +46,9 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Creates instance of BitfinexFill
         /// </summary>
         /// <param name="order"></param>
-        /// <param name="scaleFactor"></param>
-        public BitfinexFill(Orders.Order order, decimal scaleFactor)
+        public BitfinexFill(Orders.Order order)
         {
             _order = order;
-            _scaleFactor = scaleFactor;
         }
 
         /// <summary>
@@ -81,7 +78,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <returns></returns>
         public bool IsCompleted()
         {
-            decimal quantity = messages.Sum(m => m.Value.TrdAmountExecuted) * _scaleFactor;
+            decimal quantity = messages.Sum(m => m.Value.TrdAmountExecuted);
             return quantity >= _order.Quantity;
         }
 

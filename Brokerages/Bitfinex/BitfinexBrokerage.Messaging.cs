@@ -71,14 +71,14 @@ namespace QuantConnect.Brokerages.Bitfinex
             {
                 Ticks.Add(new Tick
                 {
-                    AskPrice = decimal.Parse(response.Ask) / ScaleFactor,
-                    BidPrice = decimal.Parse(response.Bid) / ScaleFactor,
+                    AskPrice = decimal.Parse(response.Ask),
+                    BidPrice = decimal.Parse(response.Bid),
                     Time = Time.UnixTimeStampToDateTime(double.Parse(response.Timestamp)),
-                    Value = decimal.Parse(response.LastPrice) / ScaleFactor,
+                    Value = decimal.Parse(response.LastPrice),
                     TickType = TickType.Quote,
                     Symbol = Symbol.Create("BTCUD", SecurityType.Forex, Market.Bitfinex),
                     DataType = MarketDataType.Tick,
-                    Quantity = (int)(Math.Round(decimal.Parse(response.Volume), 2) * ScaleFactor)
+                    Quantity = (int)(Math.Round(decimal.Parse(response.Volume), 2))
                 });
             }
             if (!_tickerToken.IsCancellationRequested)

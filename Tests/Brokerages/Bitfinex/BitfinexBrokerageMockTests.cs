@@ -23,13 +23,11 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         Mock<BitfinexApi> mock = new Mock<BitfinexApi>(It.IsAny<string>(), It.IsAny<string>());
         Symbol symbol = Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
         Mock<ISecurityProvider> securities = new Mock<ISecurityProvider>();
-        decimal scaleFactor;
 
         [SetUp()]
         public void Setup()
         {
-            scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor"));
-            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, scaleFactor, securities.Object);
+            unit = new BitfinexBrokerage("abc", "123", "trading", mock.Object, securities.Object);
         }
 
         [Test()]
@@ -188,7 +186,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             var actual = unit.GetOpenOrders();
 
             Assert.AreEqual(1, actual.Count());
-            Assert.AreEqual(expected / scaleFactor, unit.CachedOrderIDs.First().Value.Price);
+            Assert.AreEqual(expected, unit.CachedOrderIDs.First().Value.Price);
 
             list.First().Id = 123;
             actual = unit.GetOpenOrders();
@@ -242,13 +240,13 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             var actual = unit.GetAccountHoldings();
 
-            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "btcusd").Single().Amount)*scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().Quantity);
-            Assert.AreEqual(decimal.Parse(btcusdTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().MarketPrice);
-            Assert.AreEqual(decimal.Parse(btcusdTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "BTCUSD").Single().ConversionRate);
+            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "btcusd").Single().Amount), actual.Where(e => e.Symbol.Value == "BTCUSD").Single().Quantity);
+            Assert.AreEqual(decimal.Parse(btcusdTicker.Mid), actual.Where(e => e.Symbol.Value == "BTCUSD").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(btcusdTicker.Mid), actual.Where(e => e.Symbol.Value == "BTCUSD").Single().ConversionRate);
 
-            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "ethbtc").Single().Amount)*scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().Quantity);
-            Assert.AreEqual(decimal.Parse(ethbtcTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().MarketPrice);
-            Assert.AreEqual(decimal.Parse(ethusdTicker.Mid) / scaleFactor, actual.Where(e => e.Symbol.Value == "ETHBTC").Single().ConversionRate);
+            Assert.AreEqual(decimal.Parse(expected.Where(e => e.Symbol == "ethbtc").Single().Amount), actual.Where(e => e.Symbol.Value == "ETHBTC").Single().Quantity);
+            Assert.AreEqual(decimal.Parse(ethbtcTicker.Mid), actual.Where(e => e.Symbol.Value == "ETHBTC").Single().MarketPrice);
+            Assert.AreEqual(decimal.Parse(ethusdTicker.Mid), actual.Where(e => e.Symbol.Value == "ETHBTC").Single().ConversionRate);
 
         }
 
@@ -286,8 +284,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
             Assert.AreEqual(expected.Where(e => e.Currency == "usd").Single().Amount, actual.Where(e => e.Symbol == "USD").Single().Amount);
             Assert.AreEqual(1, actual.Where(e => e.Symbol == "USD").Single().ConversionRate);
 
-            Assert.AreEqual(expected.Where(e => e.Currency == "btc").Single().Amount * scaleFactor, actual.Where(e => e.Symbol == "BTC").Single().Amount);
-            Assert.AreEqual(decimal.Parse(ticker.Mid) / scaleFactor, actual.Where(e => e.Symbol == "BTC").Single().ConversionRate);
+            Assert.AreEqual(expected.Where(e => e.Currency == "btc").Single().Amount, actual.Where(e => e.Symbol == "BTC").Single().Amount);
+            Assert.AreEqual(decimal.Parse(ticker.Mid), actual.Where(e => e.Symbol == "BTC").Single().ConversionRate);
 
         }
 

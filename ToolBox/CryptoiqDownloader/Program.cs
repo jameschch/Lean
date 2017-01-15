@@ -48,10 +48,9 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
 
                 // Load settings from config.json
                 var dataDirectory = Config.Get("data-directory", "../../../Data");
-                var scaleFactor = Config.GetValue("bitfinex-scale-factor", 1m);
 
                 // Create an instance of the downloader
-                var downloader = new CryptoiqDownloader(args[2], scaleFactor);
+                var downloader = new CryptoiqDownloader(args[2]);
 
                 if (Market.Encode(args[2]) == null)
                 {

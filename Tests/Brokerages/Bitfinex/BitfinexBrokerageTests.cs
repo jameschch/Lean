@@ -60,11 +60,10 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             string apiSecret = Config.Get("bitfinex-api-secret");
             string apiKey = Config.Get("bitfinex-api-key");
             string wallet = Config.Get("bitfinex-wallet");
-            decimal scaleFactor = decimal.Parse(Config.Get("bitfinex-scale-factor", "1"));
             string url = Config.Get("bitfinex-wss", "wss://api2.bitfinex.com:3000/ws");
             var restClient = new BitfinexApi(apiSecret, apiKey);
             var webSocketClient = new WebSocketWrapper();
-            return new BitfinexWebsocketsBrokerage(url, webSocketClient, apiKey, apiSecret, wallet, restClient, scaleFactor, securityProvider);
+            return new BitfinexWebsocketsBrokerage(url, webSocketClient, apiKey, apiSecret, wallet, restClient, securityProvider);
         }
 
         protected override decimal GetAskPrice(Symbol symbol)
