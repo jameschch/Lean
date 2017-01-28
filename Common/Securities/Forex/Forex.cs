@@ -43,7 +43,7 @@ namespace QuantConnect.Securities.Forex
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new InteractiveBrokersFeeModel(),
-                new SpreadSlippageModel(),
+                new ConstantSlippageModel(0),
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 config.Market == Market.Bitfinex ? new BitfinexSecurityMarginModel() : new SecurityMarginModel(50m),

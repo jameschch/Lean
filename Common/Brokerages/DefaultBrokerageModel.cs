@@ -192,11 +192,11 @@ namespace QuantConnect.Brokerages
 
                 case SecurityType.Forex:
                 case SecurityType.Equity:
+                case SecurityType.Option:
+                case SecurityType.Future:
                     return new InteractiveBrokersFeeModel();
 
                 case SecurityType.Commodity:
-                case SecurityType.Option:
-                case SecurityType.Future:
                 case SecurityType.Cfd:
                 default:
                     return new ConstantFeeModel(0m);
@@ -218,7 +218,7 @@ namespace QuantConnect.Brokerages
 
                 case SecurityType.Forex:
                 case SecurityType.Cfd:
-                    return new SpreadSlippageModel();
+                    return new ConstantSlippageModel(0);
 
                 case SecurityType.Commodity:
                 case SecurityType.Option:

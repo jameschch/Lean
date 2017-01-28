@@ -231,7 +231,6 @@
     <Compile Include="Orders\Slippage\ZeroSlippageModel.cs" />
     <Compile Include="Orders\Slippage\ConstantSlippageModel.cs" />
     <Compile Include="Orders\Slippage\BitfinexSlippageModel.cs" />
-    <Compile Include="Orders\Slippage\SpreadSlippageModel.cs" />
     <Compile Include="Orders\Slippage\ISlippageModel.cs" />
     <Compile Include="Orders\StopLimitOrder.cs" />
     <Compile Include="Orders\StopMarketOrder.cs" />
@@ -271,7 +270,6 @@
     <Compile Include="Securities\CompositeSecurityInitializer.cs" />
     <Compile Include="Securities\ConstantFeeTransactionModel.cs" />
     <Compile Include="Securities\DelayedSettlementModel.cs" />
-    <Compile Include="Securities\Forex\BitfinexTransactionModel.cs" />
     <Compile Include="Securities\FuncSecurityInitializer.cs" />
     <Compile Include="Securities\IndicatorVolatilityModel.cs" />
     <Compile Include="Securities\ISecurityInitializer.cs" />

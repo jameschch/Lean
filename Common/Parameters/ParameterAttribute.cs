@@ -35,8 +35,8 @@ namespace QuantConnect.Parameters
         public const BindingFlags BindingFlags = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance;
 
         private static readonly string ParameterAttributeNameProperty = "Name";
-        private static readonly string ParameterAttributeFullName = typeof(ParameterAttribute).FullName;
-
+        private static readonly string ParameterAttributeFullName = typeof (ParameterAttribute).FullName;
+        
         /// <summary>
         /// Gets the name of this parameter
         /// </summary>
@@ -97,11 +97,6 @@ namespace QuantConnect.Parameters
 
                 // resolve the member type
                 var memberType = fieldInfo != null ? fieldInfo.FieldType : propertyInfo.PropertyType;
-
-                if (parameterValue == "" && memberType != typeof(string))
-                {
-                    return;
-                }
 
                 // convert the parameter string value to the member type
                 var value = parameterValue.ConvertTo(memberType);
