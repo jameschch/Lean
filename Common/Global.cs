@@ -45,6 +45,8 @@ namespace QuantConnect
         public const string US = "M/d/yyyy h:mm:ss tt";
         /// Date format of QC forex data
         public const string Forex = "yyyyMMdd HH:mm:ss.ffff";
+        /// YYYYMM Year and Month Character Date Representation (used for futures)
+        public const string YearMonth = "yyyyMM";
     }
 
     /// <summary>
@@ -74,6 +76,12 @@ namespace QuantConnect
         /// Current market conversion rate into the account currency
         public decimal ConversionRate;
 
+        /// Current market value of the holding 
+        public decimal MarketValue;
+
+        /// Current unrealized P/L of the holding 
+        public decimal UnrealizedPnL;
+
         /// Create a new default holding:
         public Holding()
         {
@@ -93,6 +101,7 @@ namespace QuantConnect
             Symbol = holding.Symbol;
             Type = holding.Type;
             Quantity = holding.Quantity;
+            MarketValue = holding.HoldingsValue;
             CurrencySymbol = Currencies.CurrencySymbols[security.QuoteCurrency.Symbol];
             ConversionRate = security.QuoteCurrency.ConversionRate;
 
@@ -104,6 +113,7 @@ namespace QuantConnect
 
             AveragePrice = Math.Round(holding.AveragePrice, rounding);
             MarketPrice = Math.Round(holding.Price, rounding);
+            UnrealizedPnL = Math.Round(holding.UnrealizedProfit, 2);
         }
 
         /// <summary>
@@ -119,6 +129,8 @@ namespace QuantConnect
                 Type = Type,
                 Quantity = Quantity,
                 MarketPrice = MarketPrice,
+                MarketValue = MarketValue,
+                UnrealizedPnL = UnrealizedPnL,
                 ConversionRate  = ConversionRate,
                 CurrencySymbol = CurrencySymbol
             };
@@ -151,6 +163,24 @@ namespace QuantConnect
         Parallel
     }
 
+    /// <summary>
+    /// Represents the types of environments supported by brokerages for trading
+    /// </summary>
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum BrokerageEnvironment
+    {
+        /// <summary>
+        /// Live trading
+        /// </summary>
+        [EnumMember(Value = "live")]
+        Live,
+
+        /// <summary>
+        /// Paper trading
+        /// </summary>
+        [EnumMember(Value = "paper")]
+        Paper
+    }
 
     /// <summary>
     /// Multilanguage support enum: which language is this project for the interop bridge converter.
