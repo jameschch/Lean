@@ -33,6 +33,11 @@ namespace QuantConnect.Interfaces
         event EventHandler<OrderEvent> OrderStatusChanged;
 
         /// <summary>
+        /// Event that fires each time a short option position is assigned
+        /// </summary>
+        event EventHandler<OrderEvent> OptionPositionAssigned;
+
+        /// <summary>
         /// Event that fires each time a user's brokerage account is changed
         /// </summary>
         event EventHandler<AccountEvent> AccountChanged;
@@ -100,5 +105,10 @@ namespace QuantConnect.Interfaces
         /// Disconnects the client from the broker's remote servers
         /// </summary>
         void Disconnect();
+
+        /// <summary>
+        /// Specifies whether the brokerage will instantly update account balances
+        /// </summary>
+        bool AccountInstantlyUpdated { get; }
     }
 }

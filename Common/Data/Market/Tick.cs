@@ -35,7 +35,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Quantity exchanged in a trade.
         /// </summary>
-        public decimal Quantity = 0;
+        public int Quantity = 0;
 
         /// <summary>
         /// Exchange we are executing on. String short code expanded in the MarketCodes.US global dictionary
@@ -78,12 +78,12 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Size of bid quote.
         /// </summary>
-        public decimal BidSize = 0;
+        public long BidSize = 0;
 
         /// <summary>
         /// Size of ask quote.
         /// </summary>
-        public decimal AskSize = 0;
+        public long AskSize = 0;
 
         //In Base Class: Alias of Closing:
         //public decimal Price;
@@ -203,7 +203,7 @@ namespace QuantConnect.Data.Market
             Time = baseDate.Date.AddMilliseconds(csv[0].ToInt32());
             Value = csv[1].ToDecimal()/10000m;
             TickType = TickType.Trade;
-            Quantity = csv[2].ToDecimal();
+            Quantity = csv[2].ToInt32();
             Exchange = csv[3].Trim();
             SaleCondition = csv[4];
             Suspicious = csv[5].ToInt32() == 1;
@@ -233,7 +233,7 @@ namespace QuantConnect.Data.Market
                         Time = date.Date.AddMilliseconds(csv[0].ToInt64()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
                         Value = config.GetNormalizedPrice(csv[1].ToDecimal() / scaleFactor);
                         TickType = TickType.Trade;
-                        Quantity = csv[2].ToDecimal();
+                        Quantity = csv[2].ToInt32();
                         if (csv.Count > 3)
                         {
                             Exchange = csv[3];
@@ -253,15 +253,10 @@ namespace QuantConnect.Data.Market
                         BidPrice = csv[1].ToDecimal();
                         AskPrice = csv[2].ToDecimal();
                         Value = (BidPrice + AskPrice) / 2;
-
-                        if (config.Market == QuantConnect.Market.Bitfinex && csv.Count == 5)
-                        {
-                            Quantity = csv[4].ToDecimal();
-                        }
-                       
                         break;
                     }
 
+                    case SecurityType.Future:
                     case SecurityType.Option:
                     {
                         var csv = line.ToCsv(7);
@@ -272,22 +267,26 @@ namespace QuantConnect.Data.Market
                         if (TickType == TickType.Trade)
                         {
                             Value = config.GetNormalizedPrice(csv[1].ToDecimal()/scaleFactor);
-                            Quantity = csv[2].ToDecimal();
+                            Quantity = csv[2].ToInt32();
                             Exchange = csv[3];
                             SaleCondition = csv[4];
                             Suspicious = csv[5] == "1";
+                        }
+                        else if (TickType == TickType.OpenInterest)
+                        {
+                            Value = csv[1].ToDecimal();
                         }
                         else
                         {
                             if (csv[1].Length != 0)
                             {
                                 BidPrice = config.GetNormalizedPrice(csv[1].ToDecimal()/scaleFactor);
-                                BidSize = csv[2].ToDecimal();
+                                BidSize = csv[2].ToInt32();
                             }
                             if (csv[3].Length != 0)
                             {
                                 AskPrice = config.GetNormalizedPrice(csv[3].ToDecimal()/scaleFactor);
-                                AskSize = csv[4].ToDecimal();
+                                AskSize = csv[4].ToInt32();
                             }
                             Exchange = csv[5];
                             Suspicious = csv[6] == "1";
@@ -354,7 +353,8 @@ namespace QuantConnect.Data.Market
             }
 
             var source = LeanData.GenerateZipFilePath(Globals.DataFolder, config.Symbol, date, config.Resolution, config.TickType);
-            if (config.SecurityType == SecurityType.Option)
+            if (config.SecurityType == SecurityType.Option ||
+                config.SecurityType == SecurityType.Future)
             {
                 source += "#" + LeanData.GenerateZipEntryName(config.Symbol, date, config.Resolution, config.TickType);
             }
@@ -376,9 +376,9 @@ namespace QuantConnect.Data.Market
             Value = lastTrade;
             BidPrice = bidPrice;
             AskPrice = askPrice;
-            BidSize = bidSize;
-            AskSize = askSize;
-            Quantity = volume;
+            BidSize = (long) bidSize;
+            AskSize = (long) askSize;
+            Quantity = Convert.ToInt32(volume);
         }
 
         /// <summary>
@@ -388,7 +388,8 @@ namespace QuantConnect.Data.Market
         {
             return (TickType == TickType.Trade && LastPrice > 0.0m && Quantity > 0) ||
                    (TickType == TickType.Quote && AskPrice > 0.0m && AskSize > 0) ||
-                   (TickType == TickType.Quote && BidPrice > 0.0m && BidSize > 0);
+                   (TickType == TickType.Quote && BidPrice > 0.0m && BidSize > 0) ||
+                   (TickType == TickType.OpenInterest && Value > 0);
         }
 
         /// <summary>

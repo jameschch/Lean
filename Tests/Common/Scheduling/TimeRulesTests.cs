@@ -125,6 +125,13 @@ namespace QuantConnect.Tests.Common.Scheduling
         }
 
         [Test]
+        public void RegularMarketOpenWithNegativeDelta()
+        {
+            var rules = GetTimeRules(TimeZones.Utc);
+            Assert.Throws<ArgumentException>(() => rules.AfterMarketOpen(Symbols.SPY, -30));
+        }
+
+        [Test]
         public void RegularMarketCloseNoDelta()
         {
             var rules = GetTimeRules(TimeZones.Utc);
@@ -154,6 +161,13 @@ namespace QuantConnect.Tests.Common.Scheduling
                 Assert.AreEqual(TimeSpan.FromHours(16 + 5 - .5), time.TimeOfDay);
             }
             Assert.AreEqual(1, count);
+        }
+
+        [Test]
+        public void RegularMarketCloseWithNegativeDelta()
+        {
+            var rules = GetTimeRules(TimeZones.Utc);
+            Assert.Throws<ArgumentException>(() => rules.BeforeMarketClose(Symbols.SPY, -30));
         }
 
         [Test]
@@ -192,7 +206,7 @@ namespace QuantConnect.Tests.Common.Scheduling
         {
             var timeKeeper = new TimeKeeper(DateTime.Today, new List<DateTimeZone>());
             var manager = new SecurityManager(timeKeeper);
-            var marketHourDbEntry = MarketHoursDatabase.FromDataFolder().GetEntry(Market.USA, null, SecurityType.Equity);
+            var marketHourDbEntry = MarketHoursDatabase.FromDataFolder().GetEntry(Market.USA, (string)null, SecurityType.Equity);
             var securityExchangeHours = marketHourDbEntry.ExchangeHours;
             var config = new SubscriptionDataConfig(typeof(TradeBar), Symbols.SPY, Resolution.Daily, marketHourDbEntry.DataTimeZone, securityExchangeHours.TimeZone, true, false, false);
             manager.Add(Symbols.SPY, new Security(securityExchangeHours, config, new Cash(CashBook.AccountCurrency, 0, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency)));

@@ -56,7 +56,7 @@ namespace QuantConnect.Tests.Brokerages
         #region Test initialization and cleanup
 
         [SetUp]
-        public virtual void Setup()
+        public void Setup()
         {
             Log.Trace("");
             Log.Trace("");
@@ -138,9 +138,7 @@ namespace QuantConnect.Tests.Brokerages
             {
                 // these securities don't need to be real, just used for the ISecurityProvider impl, required
                 // by brokerages to track holdings
-                SecurityProvider[accountHolding.Symbol] = new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
-                    new SubscriptionDataConfig(typeof (TradeBar), accountHolding.Symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, false, false, false),
-                    new Cash(CashBook.AccountCurrency, 0, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency));
+                SecurityProvider[accountHolding.Symbol] = CreateSecurity(accountHolding.Symbol);
             }
             brokerage.OrderStatusChanged += (sender, args) =>
             {
@@ -161,18 +159,8 @@ namespace QuantConnect.Tests.Brokerages
                     }
                     else
                     {
-                        var accountHoldings = brokerage.GetAccountHoldings().ToDictionary(x => x.Symbol);
-                        if (accountHoldings.ContainsKey(args.Symbol) && _securityProvider.TryGetValue(args.Symbol, out security))
-                        {
-                            _securityProvider[args.Symbol].Holdings.SetHoldings(args.FillPrice, args.FillQuantity);
-                        }
-                        else
-                        {
-                            _securityProvider[args.Symbol] = new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
-                                new SubscriptionDataConfig(typeof (TradeBar), args.Symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, false, false, false),
-                                new Cash(CashBook.AccountCurrency, 0, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency));
-                            _securityProvider[args.Symbol].Holdings.SetHoldings(args.FillPrice, args.FillQuantity);
-                        }
+                        _securityProvider[args.Symbol] = CreateSecurity(args.Symbol);
+                        _securityProvider[args.Symbol].Holdings.SetHoldings(args.FillPrice, args.FillQuantity);
                     }
 
                     Log.Trace("--HOLDINGS: " + _securityProvider[args.Symbol]);
@@ -183,6 +171,13 @@ namespace QuantConnect.Tests.Brokerages
                 }
             };
             return brokerage;
+        }
+
+        internal static Security CreateSecurity(Symbol symbol)
+        {
+            return new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
+                new SubscriptionDataConfig(typeof (TradeBar), symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, false, false, false),
+                new Cash(CashBook.AccountCurrency, 0, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency));
         }
 
         public OrderProvider OrderProvider 
@@ -224,7 +219,7 @@ namespace QuantConnect.Tests.Brokerages
             {
                 if (holding.Quantity == 0) continue;
                 Log.Trace("Liquidating: " + holding);
-                var order = new MarketOrder(holding.Symbol, -holding.Quantity, DateTime.Now);
+                var order = new MarketOrder(holding.Symbol, (int)-holding.Quantity, DateTime.Now);
                 _orderProvider.Add(order);
                 PlaceOrderWaitForStatus(order, OrderStatus.Filled);
             }
@@ -273,7 +268,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <summary>
         /// Gets the default order quantity
         /// </summary>
-        protected virtual decimal GetDefaultQuantity()
+        protected virtual int GetDefaultQuantity()
         {
             return 1; 
         }
@@ -398,10 +393,9 @@ namespace QuantConnect.Tests.Brokerages
         [Test, Ignore("This test requires reading the output and selection of a low volume security for the Brokerageage")]
         public void PartialFills()
         {
-            bool orderFilled = false;
             var manualResetEvent = new ManualResetEvent(false);
 
-            var qty = 1000000m;
+            var qty = 1000000;
             var remaining = qty;
             var sync = new object();
             Brokerage.OrderStatusChanged += (sender, orderEvent) =>
@@ -412,7 +406,6 @@ namespace QuantConnect.Tests.Brokerages
                     Console.WriteLine("Remaining: " + remaining + " FillQuantity: " + orderEvent.FillQuantity);
                     if (orderEvent.Status == OrderStatus.Filled)
                     {
-                        orderFilled = true;
                         manualResetEvent.Set();
                     }
                 }
@@ -438,7 +431,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <param name="order">The order to be modified</param>
         /// <param name="parameters">The order test parameters that define how to modify the order</param>
         /// <param name="secondsTimeout">Maximum amount of time to wait until the order fills</param>
-        protected void ModifyOrderUntilFilled(Order order, OrderTestParameters parameters, double secondsTimeout = 120)
+        protected void ModifyOrderUntilFilled(Order order, OrderTestParameters parameters, double secondsTimeout = 90)
         {
             if (order.Status == OrderStatus.Filled)
             {
@@ -497,7 +490,7 @@ namespace QuantConnect.Tests.Brokerages
         /// <param name="expectedStatus">The status to wait for</param>
         /// <param name="secondsTimeout">Maximum amount of time to wait for <paramref name="expectedStatus"/></param>
         /// <returns>The same order that was submitted.</returns>
-        protected Order PlaceOrderWaitForStatus(Order order, OrderStatus expectedStatus = OrderStatus.Filled, double secondsTimeout = 60.0, bool allowFailedSubmission = false)
+        protected Order PlaceOrderWaitForStatus(Order order, OrderStatus expectedStatus = OrderStatus.Filled, double secondsTimeout = 10.0, bool allowFailedSubmission = false)
         {
             var requiredStatusEvent = new ManualResetEvent(false);
             var desiredStatusEvent = new ManualResetEvent(false);
@@ -529,7 +522,7 @@ namespace QuantConnect.Tests.Brokerages
                 Assert.Fail("Brokerage failed to place the order: " + order);
             }
             requiredStatusEvent.WaitOneAssertFail((int) (1000*secondsTimeout), "Expected every order to fire a submitted or invalid status event");
-            desiredStatusEvent.WaitOneAssertFail((int) (1000*secondsTimeout), "OrderStatus " + expectedStatus + " was not encountered within the timeout. Order Id:" + order.Id);
+            desiredStatusEvent.WaitOneAssertFail((int) (1000*secondsTimeout), "OrderStatus " + expectedStatus + " was not encountered within the timeout.");
 
             Brokerage.OrderStatusChanged -= brokerageOnOrderStatusChanged;
 

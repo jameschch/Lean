@@ -43,13 +43,6 @@ namespace QuantConnect.Brokerages
         /// <summary>
         /// Transaction and submit/execution rules will use fxcm models
         /// </summary>
-        FxcmBrokerage,
-
-        /// <summary>
-        /// Transaction and submit/execution rules will use Bitfinex models
-        /// </summary>
-        BitfinexBrokerage,
-
-        OKCoin
+        FxcmBrokerage
     }
 }

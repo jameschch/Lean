@@ -33,6 +33,7 @@ using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.Statistics;
 using QuantConnect.Util;
+using QuantConnect.Securities.Forex;
 
 namespace QuantConnect.Lean.Engine.Results
 {
@@ -294,9 +295,10 @@ namespace QuantConnect.Lean.Engine.Results
                     var serverStatistics = OS.GetServerStatistics();
                     var upTime = DateTime.UtcNow - _launchTimeUtc;
                     serverStatistics["Up Time"] = string.Format("{0}d {1:hh\\:mm\\:ss}", upTime.Days, upTime);
+                    serverStatistics["Total RAM (MB)"] = _job.Controls.RamAllocation.ToString();
 
-                    // only send holdings updates when we have changes in orders, except for first time, then we want to send all
-                    foreach (var asset in _algorithm.Securities.Values.Where(x => !x.SubscriptionDataConfig.IsInternalFeed).OrderBy(x => x.Symbol.Value))
+                    // Only send holdings updates when we have changes in orders, except for first time, then we want to send all
+                    foreach (var asset in _algorithm.Securities.Values.Where(x => !x.IsInternalFeed() && !x.Symbol.IsCanonical()).OrderBy(x => x.Symbol.Value))
                     {
                         holdings.Add(asset.Symbol.Value, new Holding(asset));
                     }
@@ -554,7 +556,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="stacktrace">Associated error stack trace.</param>
         public void RuntimeError(string message, string stacktrace = "")
         {
-            Messages.Enqueue(new RuntimeErrorPacket(_deployId, message, stacktrace));
+            Messages.Enqueue(new RuntimeErrorPacket(_job.UserId, _deployId, message, stacktrace));
             AddToLogStore(message + (!string.IsNullOrEmpty(stacktrace) ? ": StackTrace: " + stacktrace : string.Empty));
         }
 
@@ -618,7 +620,7 @@ namespace QuantConnect.Lean.Engine.Results
         {
             // don't send stockplots for internal feeds
             Security security;
-            if (_algorithm.Securities.TryGetValue(symbol, out security) && !security.SubscriptionDataConfig.IsInternalFeed && value > 0)
+            if (_algorithm.Securities.TryGetValue(symbol, out security) && !security.IsInternalFeed() && value > 0)
             {
                 var now = DateTime.UtcNow.ConvertFromUtc(security.Exchange.TimeZone);
                 if (security.Exchange.Hours.IsOpen(now, security.IsExtendedMarketHours))
@@ -840,17 +842,6 @@ namespace QuantConnect.Lean.Engine.Results
 
                         var highResolutionCharts = new Dictionary<string, Chart>(live.Results.Charts);
 
-                        // 10 minute resolution data, save today
-                        var tenminuteSampler = new SeriesSampler(TimeSpan.FromMinutes(10));
-                        var tenminuteCharts = tenminuteSampler.SampleCharts(live.Results.Charts, start, stop);
-
-                        live.Results.Charts = tenminuteCharts;
-                        data_keys.Add(new
-                        {
-                            Key = CreateKey("10minute"),
-                            Serialized = JsonConvert.SerializeObject(live.Results)
-                        });
-
                         // minute resoluton data, save today
                         var minuteSampler = new SeriesSampler(TimeSpan.FromMinutes(1));
                         var minuteCharts = minuteSampler.SampleCharts(live.Results.Charts, start, stop);
@@ -860,6 +851,17 @@ namespace QuantConnect.Lean.Engine.Results
                         data_keys.Add(new
                         {
                             Key = CreateKey("minute"),
+                            Serialized = JsonConvert.SerializeObject(live.Results)
+                        });
+
+                        // 10 minute resolution data, save today
+                        var tenminuteSampler = new SeriesSampler(TimeSpan.FromMinutes(10));
+                        var tenminuteCharts = tenminuteSampler.SampleCharts(live.Results.Charts, start, stop);
+
+                        live.Results.Charts = tenminuteCharts;
+                        data_keys.Add(new
+                        {
+                            Key = CreateKey("10minute"),
                             Serialized = JsonConvert.SerializeObject(live.Results)
                         });
 
@@ -920,7 +922,7 @@ namespace QuantConnect.Lean.Engine.Results
             DebugMessage(string.Format("New Order Event: OrderId:{0} Symbol:{1} Quantity:{2} Status:{3}", newEvent.OrderId, newEvent.Symbol, newEvent.FillQuantity, newEvent.Status));
 
             //Add the order event message to the log:
-            LogMessage("New Order Event: Id:" + newEvent.OrderId + " Symbol:" + newEvent.Symbol.ToString() + " Quantity:" + newEvent.FillQuantity.ToString() + " Status:" + newEvent.Status);
+            LogMessage("New Order Event: Id:" + newEvent.OrderId + " Symbol:" + newEvent.Symbol.ToString() + " Quantity:" + newEvent.FillQuantity + " Status:" + newEvent.Status);
         }
 
         /// <summary>
@@ -1011,6 +1013,9 @@ namespace QuantConnect.Lean.Engine.Results
                 {
                     foreach (var subscription in _dataFeed.Subscriptions)
                     {
+                        // OI subscription doesn't contain asset market prices
+                        if (subscription.Configuration.TickType == TickType.OpenInterest)
+                            continue;
 
                         Security security;
                         if (_algorithm.Securities.TryGetValue(subscription.Configuration.Symbol, out security))
@@ -1064,27 +1069,36 @@ namespace QuantConnect.Lean.Engine.Results
             }
 
             //Send out the debug messages:
-            var debugMessage = _algorithm.DebugMessages.ToList();
-            _algorithm.DebugMessages.Clear();
-            foreach (var source in debugMessage)
+            var debugStopWatch = Stopwatch.StartNew();
+            while (_algorithm.DebugMessages.Count > 0 && debugStopWatch.ElapsedMilliseconds < 250)
             {
-                DebugMessage(source);
+                string message;
+                if (_algorithm.DebugMessages.TryDequeue(out message))
+                {
+                    DebugMessage(message);
+                }
             }
 
             //Send out the error messages:
-            var errorMessage = _algorithm.ErrorMessages.ToList();
-            _algorithm.ErrorMessages.Clear();
-            foreach (var source in errorMessage)
+            var errorStopWatch = Stopwatch.StartNew();
+            while (_algorithm.ErrorMessages.Count > 0 && errorStopWatch.ElapsedMilliseconds < 250)
             {
-                ErrorMessage(source);
+                string message;
+                if (_algorithm.ErrorMessages.TryDequeue(out message))
+                {
+                    ErrorMessage(message);
+                }
             }
 
             //Send out the log messages:
-            var logMessage = _algorithm.LogMessages.ToList();
-            _algorithm.LogMessages.Clear();
-            foreach (var source in logMessage)
+            var logStopWatch = Stopwatch.StartNew();
+            while (_algorithm.LogMessages.Count > 0 && logStopWatch.ElapsedMilliseconds < 250)
             {
-                LogMessage(source);
+                string message;
+                if (_algorithm.LogMessages.TryDequeue(out message))
+                {
+                    LogMessage(message);
+                }
             }
 
             //Set the running statistics:

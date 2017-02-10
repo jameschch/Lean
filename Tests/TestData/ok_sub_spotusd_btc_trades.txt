@@ -1,4 +1,0 @@
-﻿[{
-    "channel":"ok_sub_spotusd_btc_trades",
-    "data":[["1001","2463.86","0.052","16:34:07","ask"]]
-}]

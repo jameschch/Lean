@@ -102,7 +102,7 @@ namespace QuantConnect
             Type = holding.Type;
             Quantity = holding.Quantity;
             MarketValue = holding.HoldingsValue;
-            CurrencySymbol = Currencies.CurrencySymbols[security.QuoteCurrency.Symbol];
+            CurrencySymbol = Currencies.GetCurrencySymbol(security.QuoteCurrency.Symbol);
             ConversionRate = security.QuoteCurrency.ConversionRate;
 
             var rounding = 2;
@@ -330,7 +330,11 @@ namespace QuantConnect
         /// Data associated with an instrument
         Auxiliary,
         /// QuoteBar market data type [Bid(OHLC), Ask(OHLC) and Mid(OHLC) summary bar]
-        QuoteBar
+        QuoteBar,
+        /// Option chain data
+        OptionChain,
+        /// Futures chain data
+        FuturesChain
     }
 
     /// <summary>
@@ -361,15 +365,17 @@ namespace QuantConnect
     }
 
     /// <summary>
-    /// Types of tick data - trades or quote ticks.
+    /// Types of tick data 
     /// </summary>
-    /// <remarks>QuantConnect currently only has trade tick data but can handle quote tick data with the same data structures.</remarks>
+    /// <remarks>QuantConnect currently only has trade, quote, open interest tick data.</remarks>
     public enum TickType
     {
         /// Trade type tick object.
         Trade,
         /// Quote type tick object.
-        Quote
+        Quote, 
+        /// Open Interest type tick object (for options, futures)
+        OpenInterest
     }
 
     /// <summary>
@@ -436,6 +442,22 @@ namespace QuantConnect
         /// European style options are able to be exercised on the expiration date only.
         /// </summary>
         European
+    }
+
+    /// <summary>
+    /// Specifies the type of settlement in derivative deals 
+    /// </summary>
+    public enum SettlementType
+    {
+        /// <summary>
+        /// Physical delivery of the underlying security 
+        /// </summary>
+        PhysicalDelivery, 
+        
+        /// <summary>
+        /// Cash is paid/received on settlement
+        /// </summary>
+        Cash
     }
 
     /// <summary>
@@ -519,12 +541,7 @@ namespace QuantConnect
         /// <summary>
         /// The subscription's data comes from a rest call that is polled and returns a single line/data point of information
         /// </summary>
-        Rest,
-
-        /// <summary>
-        /// The subscription's data comes from a rest call that returns mutiple lines/data points of information
-        /// </summary>
-        RestFile
+        Rest
     }
 
     /// <summary>

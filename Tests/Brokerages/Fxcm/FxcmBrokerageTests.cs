@@ -113,10 +113,10 @@ namespace QuantConnect.Tests.Brokerages.Fxcm
         /// <summary>
         /// Gets the default order quantity
         /// </summary>
-        protected override decimal GetDefaultQuantity()
+        protected override int GetDefaultQuantity()
         {
             // FXCM requires a multiple of 1000 for Forex instruments
-            return 1000m;
+            return 1000;
         }
 
         [Test, Ignore("This test requires disconnecting the internet to test for connection resiliency")]

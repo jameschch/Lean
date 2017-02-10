@@ -26,7 +26,7 @@ namespace QuantConnect.Data.Market
     /// TradeBar class for second and minute resolution data: 
     /// An OHLC implementation of the QuantConnect BaseData class with parameters for candles.
     /// </summary>
-    public class TradeBar : BaseData, IBar
+    public class TradeBar : BaseData, IBaseDataBar
     {
         // scale factor used in QC equity/forex data files
         private const decimal _scaleFactor = 1/10000m;
@@ -39,7 +39,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Volume:
         /// </summary>
-        public decimal Volume { get; set; }
+        public long Volume { get; set; }
 
         /// <summary>
         /// Opening price of the bar: Defined as the price at the start of the time period.
@@ -157,7 +157,7 @@ namespace QuantConnect.Data.Market
         /// <param name="close">Decimal Close price of this bar</param>
         /// <param name="volume">Volume sum over day</param>
         /// <param name="period">The period of this bar, specify null for default of 1 minute</param>
-        public TradeBar(DateTime time, Symbol symbol, decimal open, decimal high, decimal low, decimal close, decimal volume, TimeSpan? period = null)
+        public TradeBar(DateTime time, Symbol symbol, decimal open, decimal high, decimal low, decimal close, long volume, TimeSpan? period = null)
         {
             Time = time;
             Symbol = symbol;
@@ -209,7 +209,10 @@ namespace QuantConnect.Data.Market
                         return ParseCfd<TradeBar>(config, line, date);
 
                     case SecurityType.Option:
-                        return ParseOption<TradeBar>(config, line, date);
+                        return ParseOption(config, line, date);
+
+                    case SecurityType.Future:
+                        return ParseFuture(config, line, date);
                 }
             }
             catch (Exception err)
@@ -368,14 +371,14 @@ namespace QuantConnect.Data.Market
         }
 
         /// <summary>
-        /// Parses CFD trade bar data into the specified tradebar type, useful for custom types with OHLCV data deriving from TradeBar
+        /// Parses Option trade bar data into the specified tradebar type, useful for custom types with OHLCV data deriving from TradeBar
         /// </summary>
         /// <typeparam name="T">The requested output type, must derive from TradeBar</typeparam>
         /// <param name="config">Symbols, Resolution, DataType, </param>
         /// <param name="line">Line from the data file requested</param>
         /// <param name="date">The base data used to compute the time of the bar since the line specifies a milliseconds since midnight</param>
         /// <returns></returns>
-        public static T ParseOption<T>(SubscriptionDataConfig config, string line, DateTime date)
+        public static T ParseDerivative<T>(SubscriptionDataConfig config, string line, DateTime date)
             where T : TradeBar, new()
         {
             var tradeBar = new T
@@ -405,8 +408,9 @@ namespace QuantConnect.Data.Market
             return tradeBar;
         }
 
+
         /// <summary>
-        /// Parses CFD trade bar data into the specified tradebar type, useful for custom types with OHLCV data deriving from TradeBar
+        /// Parses Option trade bar data into the specified tradebar type, useful for custom types with OHLCV data deriving from TradeBar
         /// </summary>
         /// <param name="config">Symbols, Resolution, DataType, </param>
         /// <param name="line">Line from the data file requested</param>
@@ -414,7 +418,20 @@ namespace QuantConnect.Data.Market
         /// <returns></returns>
         public static TradeBar ParseOption(SubscriptionDataConfig config, string line, DateTime date)
         {
-            return ParseOption<TradeBar>(config, line, date);
+            return ParseDerivative<TradeBar>(config, line, date);
+        }
+
+
+        /// <summary>
+        /// Parses Future trade bar data into the specified tradebar type, useful for custom types with OHLCV data deriving from TradeBar
+        /// </summary>
+        /// <param name="config">Symbols, Resolution, DataType, </param>
+        /// <param name="line">Line from the data file requested</param>
+        /// <param name="date">The base data used to compute the time of the bar since the line specifies a milliseconds since midnight</param>
+        /// <returns></returns>
+        public static TradeBar ParseFuture(SubscriptionDataConfig config, string line, DateTime date)
+        {
+            return ParseDerivative<TradeBar>(config, line, date);
         }
 
         /// <summary>
@@ -432,7 +449,7 @@ namespace QuantConnect.Data.Market
             if (lastTrade > High) High = lastTrade;
             if (lastTrade < Low) Low = lastTrade;
             //Volume is the total summed volume of trades in this bar:
-            Volume += Convert.ToDecimal(volume);
+            Volume += Convert.ToInt32(volume);
             //Always set the closing price;
             Close = lastTrade;
         }
@@ -453,7 +470,8 @@ namespace QuantConnect.Data.Market
             }
 
             var source = LeanData.GenerateZipFilePath(Globals.DataFolder, config.Symbol, date, config.Resolution, config.TickType);
-            if (config.SecurityType == SecurityType.Option)
+            if (config.SecurityType == SecurityType.Option ||
+                config.SecurityType == SecurityType.Future)
             {
                 source += "#" + LeanData.GenerateZipEntryName(config.Symbol, date, config.Resolution, config.TickType);
             }

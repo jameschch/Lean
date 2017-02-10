@@ -72,23 +72,35 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Gets the most recent bid size submitted to this cache
         /// </summary>
-        public decimal BidSize { get; private set; }
+        public long BidSize { get; private set; }
 
         /// <summary>
         /// Gets the most recent ask size submitted to this cache
         /// </summary>
-        public decimal AskSize { get; private set; }
+        public long AskSize { get; private set; }
 
         /// <summary>
         /// Gets the most recent volume submitted to this cache
         /// </summary>
-        public decimal Volume { get; private set; }
+        public long Volume { get; private set; }
+
+        /// <summary>
+        /// Gets the most recent open interest submitted to this cache
+        /// </summary>
+        public long OpenInterest { get; private set; }
 
         /// <summary>
         /// Add a new market data point to the local security cache for the current market price.
         /// </summary>
         public void AddData(BaseData data)
         {
+            var openInterest = data as OpenInterest;
+            if (openInterest != null)
+            {
+                OpenInterest = (long)openInterest.Value;
+                return;
+            }
+
             _lastData = data;
             _dataByType[data.GetType()] = data;
 

@@ -36,8 +36,8 @@ namespace QuantConnect.Data
         ZipEntryName,
 
         /// <summary>
-        /// Json objects separated by commas
+        /// Reader returns a BaseDataCollection object.
         /// </summary>
-        Json
+        Collection
     }
 }

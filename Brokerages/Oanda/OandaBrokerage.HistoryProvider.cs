@@ -50,7 +50,7 @@ namespace QuantConnect.Brokerages.Oanda
         /// <param name="factorFileProvider">Provider used to get factor files to handle equity price scaling</param>
         /// <param name="dataFileProvider">Provider used to get data when it is not present on disk</param>
         /// <param name="statusUpdate">Function used to send status updates</param>
-        public void Initialize(AlgorithmNodePacket job, IMapFileProvider mapFileProvider, IFactorFileProvider factorFileProvider, Action<int> statusUpdate)
+        public void Initialize(AlgorithmNodePacket job, IMapFileProvider mapFileProvider, IFactorFileProvider factorFileProvider, IDataFileProvider dataFileProvider, Action<int> statusUpdate)
         {
             Connect();
         }

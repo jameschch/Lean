@@ -198,7 +198,7 @@ namespace QuantConnect.Securities
                     }
                     else
                     {
-                        security = new Forex.Forex(exchangeHours, this, config, symbolProperties);
+                        security = new Forex.Forex(exchangeHours, quoteCash, config, symbolProperties);
                     }
                     securities.Add(config.Symbol, security);
                     Log.Trace("Cash.EnsureCurrencyDataFeed(): Adding " + symbol.Value + " for cash " + Symbol + " currency feed");
@@ -223,7 +223,7 @@ namespace QuantConnect.Securities
                 Symbol, 
                 Amount.ToString("0.00"), 
                 rate.ToString("0.00####"), 
-                Currencies.CurrencySymbols[Symbol], 
+                Currencies.GetCurrencySymbol(Symbol), 
                 Math.Round(ValueInAccountCurrency, 2)
                 );
         }

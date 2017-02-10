@@ -40,7 +40,7 @@ namespace QuantConnect.Logging
         {
             _useTimestampPrefix = useTimestampPrefix;
             _writer = new Lazy<TextWriter>(
-                () => new StreamWriter(File.Open(filepath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                () => new StreamWriter(File.Open(filepath, FileMode.Append, FileAccess.Write, FileShare.Read))
                 );
         }
 

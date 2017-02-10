@@ -1,4 +1,4 @@
-/*
+﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -28,7 +28,7 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
         {
             if (args.Length == 3)
             {
-                args = new[] { args[0], DateTime.UtcNow.ToString("yyyyMMdd"), args[1], args[2] };
+                args = new [] { args[0], DateTime.UtcNow.ToString("yyyyMMdd"), args[1], args[2] };
             }
             else if (args.Length < 4)
             {
@@ -36,8 +36,6 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
                 Console.WriteLine("FROMDATE = yyyymmdd");
                 Console.WriteLine("TODATE = yyyymmdd");
                 Environment.Exit(1);
-                //useful detault params
-                //args = new string[] { "20150101", DateTime.UtcNow.ToString("yyyyMMdd"), "huobi", "BTCCNY" };
             }
 
             try
@@ -48,17 +46,14 @@ namespace QuantConnect.ToolBox.CryptoiqDownloader
 
                 // Load settings from config.json
                 var dataDirectory = Config.Get("data-directory", "../../../Data");
+                var scaleFactor = Config.GetValue("bitfinex-scale-factor", 1m);
 
                 // Create an instance of the downloader
-                var downloader = new CryptoiqDownloader(args[2]);
-
-                if (Market.Encode(args[2]) == null)
-                {
-                    Market.Add(args[2], 999);
-                }
+                const string market = Market.Bitfinex;
+                var downloader = new CryptoiqDownloader(args[2], scaleFactor);
 
                 // Download the data
-                var symbolObject = Symbol.Create(args[3], SecurityType.Forex, args[2]);
+                var symbolObject = Symbol.Create(args[3], SecurityType.Forex, market);
                 var data = downloader.Get(symbolObject, Resolution.Tick, startDate, endDate);
 
                 // Save the data

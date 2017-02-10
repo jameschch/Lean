@@ -3,7 +3,7 @@
     // Configuration for the Coarse Universe Generator
     //-------------------------------------------
 
-    "data-directory": "../../../../Data_Decimal/",
+    "data-directory": "C:\\Lean\\Data",
 
     // set to true to keep the process running and each day
     // at the specified update-time-of-day it will wake up

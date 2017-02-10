@@ -2,7 +2,7 @@
 Lean C# Algorithmic Trading Engine
 =========
 
-[![Join the chat at https://gitter.im/QuantConnect/Lean](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/QuantConnect/Lean?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) &nbsp;&nbsp;&nbsp;&nbsp; <img src="https://travis-ci.org/QuantConnect/Lean.svg?branch=master">  &nbsp;&nbsp;&nbsp;&nbsp;  [![Coverage Status](https://coveralls.io/repos/QuantConnect/Lean/badge.svg?branch=master&service=github)](https://coveralls.io/github/QuantConnect/Lean?branch=master)
+[![Join the chat at https://quantconnect-slack.herokuapp.com](https://cdn.quantconnect.com/lean/i/slack-sm.png)](https://quantconnect-slack.herokuapp.com/) &nbsp;&nbsp;&nbsp;&nbsp; <img src="https://travis-ci.org/QuantConnect/Lean.svg?branch=master">  &nbsp;&nbsp;&nbsp;&nbsp;  [![Coverage Status](https://coveralls.io/repos/QuantConnect/Lean/badge.svg?branch=master&service=github)](https://coveralls.io/github/QuantConnect/Lean?branch=master)
 
 [Lean Home - lean.quantconnect.com][1] | [Documentation][2] | [Download Zip][3]
 
@@ -43,15 +43,18 @@ Install [Mono for Mac](http://www.mono-project.com/docs/getting-started/install/
 
 Install [MonoDevelop](http://www.monodevelop.com/download/) or [Xamarin Studio](http://xamarin.com/studio) for your IDE. If you use MonoDevelop also install its [FSharp Plugin](http://addins.monodevelop.com/Project/Index/48).
 
-OSX does not fully support Visual Basic or F#. You will need to remove these projects from the solution for them to build properly. Alternatively for Visual Basic modify the target framework as shown [here](https://groups.google.com/forum/#!topic/lean-engine/uR94evlM01g).
-
 Clone the repo:
 ```
 git clone git@github.com:QuantConnect/Lean.git
 cd Lean
 ```
 
-Open the project in Xamarin Studio, then in the menu bar, click `Project > Update NuGet Packages`.
+OSX does not fully support Visual Basic or F#. You will need to remove these projects from the solution for them to build properly. Alternatively for Visual Basic modify the target framework as shown [here](https://groups.google.com/forum/#!topic/lean-engine/uR94evlM01g). Alternatively modify the target framework:
+```
+sed -i -e 's/4.5/4.0/' Algorithm.VisualBasic/QuantConnect.Algorithm.VisualBasic.vbproj
+```
+
+Open the project in Xamarin Studio, then in the menu bar, click `Project > Update NuGet Packages`. You should also run `nuget install MathNet.Filtering -pre` to install the MathNet library. 
 
 In OS X `mdtool` is not added to the PATH environment. Either set up the PATH manually or reference the binary directly.
 
@@ -68,7 +71,7 @@ If you are running MonoDevelop:
 Run the compiled `exe` file. For the time being you need to run the `exe` in the same path as your current working directory:
 ```
 cd Lean/Launcher/bin/Debug
-mono ./QuantConnect.Launcher.Lean.exe
+mono ./QuantConnect.Lean.Launcher.exe
 ```
 ### Linux (Debian, Ubuntu)
 
@@ -76,8 +79,9 @@ Setup Mono GPG signing key ([instructions here](http://www.mono-project.com/docs
 
 Install dependencies, MonoDevelop, Git and NuGet:
 ```
-sudo apt-get install mono-complete mono-vbnc fsharp monodevelop monodevelop-nunit  git nuget ca-certificates-mono
+sudo apt-get install mono-complete mono-vbnc fsharp monodevelop monodevelop-nunit  git ca-certificates-mono
 mozroots --import --sync
+apt-get upgrade mono-complete
 ```
 Clone the repo:
 ```
@@ -90,9 +94,13 @@ sed -i 's/4.5/4.0/' Algorithm.VisualBasic/QuantConnect.Algorithm.VisualBasic.vbp
 ```
 Restore NuGet packages then compile:
 ```
-nuget restore QuantConnect.Lean.sln
-xbuild build
+wget https://nuget.org/nuget.exe
+mono nuget.exe restore QuantConnect.Lean.sln
+xbuild
 ```
+If you get: "Error initializing task Fsc: Not registered task Fsc." -> apt-get upgrade mono-complete
+If you get: "XX not found" -> Make sure Nuget ran successfully, and re-run if neccessary.
+
 Run the compiled `exe` file. For the time being you need to run the `exe` in the same path as your current working directory:
 ```
 cd Lean/Launcher/bin/Debug

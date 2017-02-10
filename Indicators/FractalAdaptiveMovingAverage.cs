@@ -23,21 +23,19 @@ namespace QuantConnect.Indicators
     /// <summary>
     /// The Fractal Adaptive Moving Average (FRAMA) by John Ehlers
     /// </summary>
-    public class FractalAdaptiveMovingAverage : Indicator
+    public class FractalAdaptiveMovingAverage : BarIndicator
     {
 
+        double _filt;
         int _n = 16;
         double _w = -4.6;
         RollingWindow<double> _high;
         RollingWindow<double> _low;
-        RollingWindow<double> _filt;
-
-        public decimal TL { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the average class
         /// </summary>
-        /// <param name="name">The name of the indicator</param>
+        /// <param name="name">The name of the indicator instance</param>
         /// <param name="n">The window period (must be even). Example value: 16</param>
         /// <param name="longPeriod">The average period. Example value: 198</param>
         public FractalAdaptiveMovingAverage(string name, int n, int longPeriod)
@@ -45,19 +43,18 @@ namespace QuantConnect.Indicators
         {
             if (n % 2 > 0)
             {
-                n = n + 1;
+                throw new ArgumentException("N must be even.");
             }
             _n = n;
             _w = CalculateW(longPeriod);
             _high = new RollingWindow<double>(n);
             _low = new RollingWindow<double>(n);
-            _filt = new RollingWindow<double>(n);
         }
 
         /// <summary>
         /// Initializes a new instance of the average class
         /// </summary>
-        /// <param name="name">The name of the indicator</param>
+        /// <param name="name">The name of the indicator instance</param>
         /// <param name="n">The window period (must be even). Example value: 16</param>
         public FractalAdaptiveMovingAverage(int n)
             : this("FRAMA" + n, n, 198)
@@ -65,19 +62,21 @@ namespace QuantConnect.Indicators
 
         }
 
-        protected override decimal ComputeNextValue(IndicatorDataPoint input)
+        /// <summary>
+        /// Computes the average value
+        /// </summary>
+        /// <param name="input">The data for the calculation</param>
+        /// <returns>The average value</returns>
+        protected override decimal ComputeNextValue(IBaseDataBar input)
         {
-            var price = (double)input.Price;
-            _high.Add(price);
-            _low.Add(price);
-            //var price = (double)(input.High + input.Low) / 2;
-            //_high.Add((double)input.High);
-            //_low.Add((double)input.Low);
+            var price = (double)(input.High + input.Low) / 2;
+            _high.Add((double)input.High);
+            _low.Add((double)input.Low);
 
             // our first data point just return identity
-            if (_filt.Samples == 0)
+            if (_high.Samples <= _high.Size)
             {
-                _filt.Add(price);
+                _filt = price;
             }
             double n1;
             double n2;
@@ -111,15 +110,9 @@ namespace QuantConnect.Indicators
             if (alpha < .01) { alpha = .01; }
             if (alpha > 1) { alpha = 1; }
 
-            _filt.Add(alpha * price + (1 - alpha) * _filt[0]);
+            _filt = alpha * price + (1 - alpha) * _filt;
 
-            if (_filt.IsReady)
-            {
-                var slope = _filt[0] - _filt[_n / 2];
-                TL = (decimal)(_filt[0] + slope);
-            }
-
-            return (decimal)_filt[0];
+            return (decimal)_filt;
 
         }
 
@@ -142,14 +135,13 @@ namespace QuantConnect.Indicators
         /// </summary>
         public override void Reset()
         {
-            _filt.Reset();
+            _filt = 0;
             _high.Reset();
-            _low.Reset();
+			_low.Reset();
             _n = 16;
             _w = -4.6;
             base.Reset();
         }
-
 
     }
 }

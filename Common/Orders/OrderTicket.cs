@@ -35,7 +35,7 @@ namespace QuantConnect.Orders
         private OrderStatus? _orderStatusOverride;
         private CancelOrderRequest _cancelRequest;
 
-        private decimal _quantityFilled;
+        private int _quantityFilled;
         private decimal _averageFillPrice;
 
         private readonly int _orderId;
@@ -86,7 +86,7 @@ namespace QuantConnect.Orders
         /// <summary>
         /// Gets the number of units ordered
         /// </summary>
-        public decimal Quantity
+        public int Quantity
         {
             get { return _order == null ? _submitRequest.Quantity : _order.Quantity; }
         }

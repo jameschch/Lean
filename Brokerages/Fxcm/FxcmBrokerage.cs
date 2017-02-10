@@ -34,7 +34,7 @@ namespace QuantConnect.Brokerages.Fxcm
     /// <summary>
     /// FXCM brokerage - implementation of IBrokerage interface
     /// </summary>
-    public partial class FxcmBrokerage : Brokerage, IDataQueueHandler, IGenericMessageListener, IStatusMessageListener
+    public partial class FxcmBrokerage : Brokerage, IDataQueueHandler, IHistoryProvider, IGenericMessageListener, IStatusMessageListener
     {
         private readonly IOrderProvider _orderProvider;
         private readonly ISecurityProvider _securityProvider;
@@ -50,7 +50,6 @@ namespace QuantConnect.Brokerages.Fxcm
         private readonly object _lockerConnectionMonitor = new object();
         private DateTime _lastReadyMessageTime;
         private volatile bool _connectionLost;
-        private volatile bool _connectionError;
 
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private readonly ConcurrentQueue<OrderEvent> _orderEventQueue = new ConcurrentQueue<OrderEvent>();
@@ -76,6 +75,9 @@ namespace QuantConnect.Brokerages.Fxcm
             _userName = userName;
             _password = password;
             _accountId = accountId;
+
+            HistoryResponseTimeout = 5000;
+            MaximumHistoryRetryAttempts = 1;
         }
 
         #region IBrokerage implementation
@@ -103,24 +105,34 @@ namespace QuantConnect.Brokerages.Fxcm
             _cancellationTokenSource = new CancellationTokenSource();
 
             // create new thread to fire order events in queue
-            _orderEventThread = new Thread(() =>
+            if (!EnableOnlyHistoryRequests)
             {
-                while (!_cancellationTokenSource.IsCancellationRequested)
+                _orderEventThread = new Thread(() =>
                 {
-                    OrderEvent orderEvent;
-                    if (!_orderEventQueue.TryDequeue(out orderEvent))
+                    while (!_cancellationTokenSource.IsCancellationRequested)
                     {
-                        Thread.Sleep(1);
-                        continue;
-                    }
+                        try
+                        {
+                            OrderEvent orderEvent;
+                            if (!_orderEventQueue.TryDequeue(out orderEvent))
+                            {
+                                Thread.Sleep(1);
+                                continue;
+                            }
 
-                    OnOrderEvent(orderEvent);
+                            OnOrderEvent(orderEvent);
+                        }
+                        catch (Exception exception)
+                        {
+                            Log.Error(exception);
+                        }
+                    }
+                });
+                _orderEventThread.Start();
+                while (!_orderEventThread.IsAlive)
+                {
+                    Thread.Sleep(1);
                 }
-            });
-            _orderEventThread.Start();
-            while (!_orderEventThread.IsAlive)
-            {
-                Thread.Sleep(1);
             }
 
             // create the gateway
@@ -134,99 +146,133 @@ namespace QuantConnect.Brokerages.Fxcm
             var loginProperties = new FXCMLoginProperties(_userName, _password, _terminal, _server);
 
             // log in
-            _gateway.login(loginProperties);
+            try
+            {
+                _gateway.login(loginProperties);
+            }
+            catch (Exception err)
+            {
+                var message =
+                    err.Message.Contains("ORA-20101") ? "Incorrect login credentials" :
+                    err.Message.Contains("ORA-20003") ? "API connections are not available on Mini accounts. If you have a standard account contact api@fxcm.com to enable API access" :
+                    err.Message;
+
+                _cancellationTokenSource.Cancel();
+
+                throw new BrokerageException(message, err.InnerException);
+            }
 
             // create new thread to manage disconnections and reconnections
-            _connectionMonitorThread = new Thread(() =>
+            if (!EnableOnlyHistoryRequests)
             {
-                _lastReadyMessageTime = DateTime.UtcNow;
-
-                try
+                _connectionMonitorThread = new Thread(() =>
                 {
-                    while (!_cancellationTokenSource.IsCancellationRequested)
+                    _lastReadyMessageTime = DateTime.UtcNow;
+
+                    try
                     {
-                        TimeSpan elapsed;
-                        lock (_lockerConnectionMonitor)
+                        while (!_cancellationTokenSource.IsCancellationRequested)
                         {
-                            elapsed = DateTime.UtcNow - _lastReadyMessageTime;
-                        }
-
-                        if (!_connectionLost && elapsed > TimeSpan.FromSeconds(5))
-                        {
-                            _connectionLost = true;
-
-                            OnMessage(BrokerageMessageEvent.Disconnected("Connection with FXCM server lost. " +
-                                                                         "This could be because of internet connectivity issues. "));
-                        }
-                        else if (_connectionLost && elapsed <= TimeSpan.FromSeconds(5))
-                        {
-                            try
+                            TimeSpan elapsed;
+                            lock (_lockerConnectionMonitor)
                             {
-                                _gateway.relogin();
-
-                                _connectionLost = false;
-
-                                OnMessage(BrokerageMessageEvent.Reconnected("Connection with FXCM server restored."));
+                                elapsed = DateTime.UtcNow - _lastReadyMessageTime;
                             }
-                            catch (Exception exception)
+
+                            if (!_connectionLost && elapsed > TimeSpan.FromSeconds(10))
                             {
-                                Log.Error(exception);
+                                _connectionLost = true;
+
+                                OnMessage(BrokerageMessageEvent.Disconnected("Connection with FXCM server lost. " +
+                                                                             "This could be because of internet connectivity issues. "));
                             }
+                            else if (_connectionLost && IsWithinTradingHours())
+                            {
+                                Log.Trace("FxcmBrokerage.ConnectionMonitorThread(): Attempting reconnection...");
+
+                                try
+                                {
+                                    // log out
+                                    try
+                                    {
+                                        _gateway.logout();
+                                    }
+                                    catch (Exception)
+                                    {
+                                        // ignored
+                                    }
+
+                                    // remove the message listeners
+                                    _gateway.removeGenericMessageListener(this);
+                                    _gateway.removeStatusMessageListener(this);
+
+                                    // register the message listeners with the gateway
+                                    _gateway.registerGenericMessageListener(this);
+                                    _gateway.registerStatusMessageListener(this);
+
+                                    // log in
+                                    _gateway.login(loginProperties);
+
+                                    // load instruments, accounts, orders, positions
+                                    LoadInstruments();
+                                    if (!EnableOnlyHistoryRequests)
+                                    {
+                                        LoadAccounts();
+                                        LoadOpenOrders();
+                                        LoadOpenPositions();
+                                    }
+
+                                    _connectionLost = false;
+
+                                    OnMessage(BrokerageMessageEvent.Reconnected("Connection with FXCM server restored."));
+                                }
+                                catch (Exception exception)
+                                {
+                                    Log.Trace("FxcmBrokerage.ConnectionMonitorThread(): reconnect failed.");
+                                    Log.Error(exception);
+                                }
+                            }
+
+                            Thread.Sleep(5000);
                         }
-                        else if (_connectionError)
-                        {
-                            try
-                            {
-                                // log out
-                                _gateway.logout();
-
-                                // remove the message listeners
-                                _gateway.removeGenericMessageListener(this);
-                                _gateway.removeStatusMessageListener(this);
-
-                                // register the message listeners with the gateway
-                                _gateway.registerGenericMessageListener(this);
-                                _gateway.registerStatusMessageListener(this);
-
-                                // log in
-                                _gateway.login(loginProperties);
-
-                                // load instruments, accounts, orders, positions
-                                LoadInstruments();
-                                LoadAccounts();
-                                LoadOpenOrders();
-                                LoadOpenPositions();
-
-                                _connectionError = false;
-                                _connectionLost = false;
-
-                                OnMessage(BrokerageMessageEvent.Reconnected("Connection with FXCM server restored."));
-                            }
-                            catch (Exception exception)
-                            {
-                                Log.Error(exception);
-                            }
-                        }
-
-                        Thread.Sleep(5000);
                     }
-                }
-                catch (Exception exception)
+                    catch (Exception exception)
+                    {
+                        Log.Error(exception);
+                    }
+                });
+                _connectionMonitorThread.Start();
+                while (!_connectionMonitorThread.IsAlive)
                 {
-                    Log.Error(exception);
+                    Thread.Sleep(1);
                 }
-            });
-            _connectionMonitorThread.Start();
-            while (!_connectionMonitorThread.IsAlive)
-            {
-                Thread.Sleep(1);
             }
 
             // load instruments, accounts, orders, positions
             LoadInstruments();
-            LoadAccounts();
-            LoadOpenOrders();
-            LoadOpenPositions();
+            if (!EnableOnlyHistoryRequests)
+            {
+                LoadAccounts();
+                LoadOpenOrders();
+                LoadOpenPositions();
+            }
+        }
+
+        /// <summary>
+        /// Returns true if we are within FXCM trading hours
+        /// </summary>
+        /// <returns></returns>
+        private static bool IsWithinTradingHours()
+        {
+            var time = DateTime.UtcNow.ConvertFromUtc(TimeZones.EasternStandard);
+
+            // FXCM Trading Hours: http://help.fxcm.com/us/Trading-Basics/New-to-Forex/38757093/What-are-the-Trading-Hours.htm
+
+            return !(time.DayOfWeek == DayOfWeek.Friday && time.TimeOfDay > new TimeSpan(16, 55, 0) ||
+                     time.DayOfWeek == DayOfWeek.Saturday ||
+                     time.DayOfWeek == DayOfWeek.Sunday && time.TimeOfDay < new TimeSpan(17, 0, 0) ||
+                     time.Month == 12 && time.Day == 25 ||
+                     time.Month == 1 && time.Day == 1);
         }
 
         /// <summary>
@@ -234,21 +280,34 @@ namespace QuantConnect.Brokerages.Fxcm
         /// </summary>
         public override void Disconnect()
         {
-            if (!IsConnected) return;
-
             Log.Trace("FxcmBrokerage.Disconnect()");
 
-            // log out
-            _gateway.logout();
+            if (_gateway != null)
+            {
+                // log out
+                try
+                {
+                    if (_gateway.isConnected())
+                        _gateway.logout();
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
 
-            // remove the message listeners
-            _gateway.removeGenericMessageListener(this);
-            _gateway.removeStatusMessageListener(this);
+                // remove the message listeners
+                _gateway.removeGenericMessageListener(this);
+                _gateway.removeStatusMessageListener(this);
+            }
 
             // request and wait for thread to stop
-            _cancellationTokenSource.Cancel();
-            _orderEventThread.Join();
-            _connectionMonitorThread.Join();
+            if (_cancellationTokenSource != null) _cancellationTokenSource.Cancel();
+
+            if (!EnableOnlyHistoryRequests)
+            {
+                if (_orderEventThread != null) _orderEventThread.Join();
+                if (_connectionMonitorThread != null) _connectionMonitorThread.Join();
+            }
         }
 
         /// <summary>
@@ -258,12 +317,12 @@ namespace QuantConnect.Brokerages.Fxcm
         /// <returns>The open orders returned from FXCM</returns>
         public override List<Order> GetOpenOrders()
         {
-            Log.Trace("FxcmBrokerage.GetOpenOrders()");
-
-            return _openOrders.Values.ToList()
+            Log.Trace(string.Format("FxcmBrokerage.GetOpenOrders(): Located {0} orders", _openOrders.Count));
+            var orders = _openOrders.Values.ToList()
                 .Where(x => OrderIsOpen(x.getFXCMOrdStatus().getCode()))
                 .Select(ConvertOrder)
                 .ToList();
+            return orders;
         }
 
         /// <summary>
@@ -274,7 +333,22 @@ namespace QuantConnect.Brokerages.Fxcm
         {
             Log.Trace("FxcmBrokerage.GetAccountHoldings()");
 
-            var holdings = _openPositions.Values.Select(ConvertHolding).Where(x => x.Quantity != 0).ToList();
+            // FXCM maintains multiple positions per symbol, so we aggregate them by symbol.
+            // The average price for the aggregated position is the quantity weighted average price.
+            var holdings = _openPositions.Values
+                .Select(ConvertHolding)
+                .Where(x => x.Quantity != 0)
+                .GroupBy(x => x.Symbol)
+                .Select(group => new Holding
+                {
+                    Symbol = group.Key,
+                    Type = group.First().Type,
+                    AveragePrice = group.Sum(x => x.AveragePrice * x.Quantity) / group.Sum(x => x.Quantity),
+                    ConversionRate = group.First().ConversionRate,
+                    CurrencySymbol = group.First().CurrencySymbol,
+                    Quantity = group.Sum(x => x.Quantity)
+                })
+                .ToList();
 
             // Set MarketPrice in each Holding
             var fxcmSymbols = holdings
@@ -304,11 +378,56 @@ namespace QuantConnect.Brokerages.Fxcm
         public override List<Cash> GetCashBalance()
         {
             Log.Trace("FxcmBrokerage.GetCashBalance()");
+            var cashBook = new List<Cash>();
 
-            return new List<Cash>
+            //Adds the account currency USD to the cashbook.
+            cashBook.Add(new Cash(_fxcmAccountCurrency,
+                        Convert.ToDecimal(_accounts[_accountId].getCashOutstanding()),
+                        GetUsdConversion(_fxcmAccountCurrency)));
+
+            foreach (var trade in _openPositions.Values)
             {
-                new Cash(_fxcmAccountCurrency, Convert.ToDecimal(_accounts[_accountId].getCashOutstanding()), GetUsdConversion(_fxcmAccountCurrency))
-            };
+                //settlement price for the trade
+                var settlementPrice = Convert.ToDecimal(trade.getSettlPrice());
+                //direction of trade
+                var direction = trade.getPositionQty().getLongQty() > 0 ? 1 : -1;
+                //quantity of the asset
+                var quantity = Convert.ToDecimal(trade.getPositionQty().getQty());
+                //quantity of base currency
+                var baseQuantity = direction * quantity;
+                //quantity of quote currency
+                var quoteQuantity = -direction * quantity * settlementPrice;
+                //base currency
+                var baseCurrency = trade.getCurrency();
+                //quote currency
+                var quoteCurrency = FxcmSymbolMapper.ConvertFxcmSymbolToLeanSymbol(trade.getInstrument().getSymbol());
+                quoteCurrency = quoteCurrency.Substring(quoteCurrency.Length - 3);
+
+                var baseCurrencyObject = (from cash in cashBook where cash.Symbol == baseCurrency select cash).FirstOrDefault();
+                //update the value of the base currency
+                if (baseCurrencyObject != null)
+                {
+                    baseCurrencyObject.AddAmount(baseQuantity);
+                }
+                else
+                {
+                    //add the base currency if not present
+                    cashBook.Add(new Cash(baseCurrency, baseQuantity, GetUsdConversion(baseCurrency)));
+                }
+
+                var quoteCurrencyObject = (from cash in cashBook where cash.Symbol == quoteCurrency select cash).FirstOrDefault();
+                //update the value of the quote currency
+                if (quoteCurrencyObject != null)
+                {
+                    quoteCurrencyObject.AddAmount(quoteQuantity);
+                }
+                else
+                {
+                    //add the quote currency if not present
+                    cashBook.Add(new Cash(quoteCurrency, quoteQuantity, GetUsdConversion(quoteCurrency)));
+                }
+            }
+            return cashBook;
         }
 
         /// <summary>

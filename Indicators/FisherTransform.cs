@@ -36,7 +36,7 @@ namespace QuantConnect.Indicators
     /// http://www.mesasoftware.com/papers/UsingTheFisherTransform.pdf
     /// 
     /// </summary>
-    public class FisherTransform : Indicator
+    public class FisherTransform : BarIndicator
     {
         private double _alpha;
         private double _previous;
@@ -86,11 +86,11 @@ namespace QuantConnect.Indicators
         /// </summary>
         /// <param name="input">IndicatorDataPoint - the time and value of the next price</param>
         /// <returns></returns>
-        protected override decimal ComputeNextValue(IndicatorDataPoint input)
+        protected override decimal ComputeNextValue(IBaseDataBar input)
         {
             var x = 0.0;
             var y = 0.0;
-            var price = (input.Value);
+            var price = (input.Low + input.High) / 2m;
             _medianMin.Update(input.Time, price);
             _medianMax.Update(input.Time, price);
 

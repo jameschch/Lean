@@ -204,6 +204,7 @@ namespace QuantConnect
             "TRYJPY",
             "TWDJPY",
             "USDAUD",
+            "USDCNH",
             "USDCNY",
             "USDCZK",
             "USDDKK",
@@ -242,6 +243,7 @@ namespace QuantConnect
             {"HKD", "$"},
             {"SGD", "$"},
             {"XAG", "Ag"},
+            {"CNH", "¥"},
             {"CNY", "¥"},
             {"CZK", "Kč"},
             {"DKK", "kr"},
@@ -255,13 +257,18 @@ namespace QuantConnect
             {"THB", "฿"},
             {"TRY", "₺"},
             {"TWD", "NT$"},
-            {"DDK", "kr"},			
-            {"ZAR", "R"},
-            {"BTC", "Ƀ"},
-            {"ETH", "ETH"},
-            {"LTC", "LTC"},
-            {"ETC", "ETC"},
-            {"BFX", "BFX"}				
+            {"ZAR", "R"}
         };
+
+        /// <summary>
+        /// Gets the currency symbol for the specified currency code
+        /// </summary>
+        /// <param name="currency">The currency code</param>
+        /// <returns>The currency symbol</returns>
+        public static string GetCurrencySymbol(string currency)
+        {
+            string currencySymbol;
+            return CurrencySymbols.TryGetValue(currency, out currencySymbol) ? currencySymbol : "$";
+        }
     }
 }

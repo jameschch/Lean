@@ -19,7 +19,7 @@ using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Fills;
 using QuantConnect.Orders.Slippage;
 
-namespace QuantConnect.Securities.Forex
+namespace QuantConnect.Securities.Forex 
 {
     /// <summary>
     /// FOREX Security Object Implementation for FOREX Assets
@@ -46,8 +46,9 @@ namespace QuantConnect.Securities.Forex
                 new ConstantSlippageModel(0),
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
-                config.Market == Market.Bitfinex ? new BitfinexSecurityMarginModel() : new SecurityMarginModel(50m),
-                new ForexDataFilter()
+                new SecurityMarginModel(50m),
+                new ForexDataFilter(),
+                new SecurityPriceVariationModel()
                 )
         {
             Holdings = new ForexHolding(this);
@@ -55,6 +56,38 @@ namespace QuantConnect.Securities.Forex
             // decompose the symbol into each currency pair
             string baseCurrencySymbol, quoteCurrencySymbol;
             DecomposeCurrencyPair(config.Symbol.Value, out baseCurrencySymbol, out quoteCurrencySymbol);
+            BaseCurrencySymbol = baseCurrencySymbol;
+        }
+
+        /// <summary>
+        /// Constructor for the forex security
+        /// </summary>
+        /// <param name="symbol">The security's symbol</param>
+        /// <param name="exchangeHours">Defines the hours this exchange is open</param>
+        /// <param name="quoteCurrency">The cash object that represent the quote currency</param>
+        /// <param name="symbolProperties">The symbol properties for this security</param>
+        public Forex(Symbol symbol, SecurityExchangeHours exchangeHours, Cash quoteCurrency, SymbolProperties symbolProperties)
+            : base(symbol,
+                quoteCurrency,
+                symbolProperties,
+                new ForexExchange(exchangeHours),
+                new ForexCache(),
+                new SecurityPortfolioModel(),
+                new ImmediateFillModel(),
+                new InteractiveBrokersFeeModel(),
+                new ConstantSlippageModel(0),
+                new ImmediateSettlementModel(),
+                Securities.VolatilityModel.Null,
+                new SecurityMarginModel(50m),
+                new ForexDataFilter(),
+                new SecurityPriceVariationModel()
+                )
+        {
+            Holdings = new ForexHolding(this);
+
+            // decompose the symbol into each currency pair
+            string baseCurrencySymbol, quoteCurrencySymbol;
+            DecomposeCurrencyPair(symbol.Value, out baseCurrencySymbol, out quoteCurrencySymbol);
             BaseCurrencySymbol = baseCurrencySymbol;
         }
 

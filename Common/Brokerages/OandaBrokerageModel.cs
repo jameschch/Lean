@@ -94,11 +94,6 @@ namespace QuantConnect.Brokerages
                 return false;
             }
 
-            if (!ValidateQuantity(order.Quantity, security, out message))
-            {
-                return false;
-            }
-
             return true;
         }
 

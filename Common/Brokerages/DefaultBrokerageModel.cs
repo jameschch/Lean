@@ -22,6 +22,7 @@ using QuantConnect.Orders.Fills;
 using QuantConnect.Orders.Slippage;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Equity;
+using QuantConnect.Securities.Option;
 using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages
@@ -40,6 +41,7 @@ namespace QuantConnect.Brokerages
             {SecurityType.Base, Market.USA},
             {SecurityType.Equity, Market.USA},
             {SecurityType.Option, Market.USA},
+            {SecurityType.Future, Market.USA},
             {SecurityType.Forex, Market.FXCM},
             {SecurityType.Cfd, Market.FXCM}
         }.ToReadOnlyDictionary();
@@ -85,12 +87,6 @@ namespace QuantConnect.Brokerages
         public virtual bool CanSubmitOrder(Security security, Order order, out BrokerageMessageEvent message)
         {
             message = null;
-
-            if (!ValidateQuantity(order.Quantity, security, out message))
-            {
-                return false;
-            }
-
             return true;
         }
 
@@ -148,7 +144,7 @@ namespace QuantConnect.Brokerages
         /// </summary>
         /// <param name="security">The security's whose leverage we seek</param>
         /// <returns>The leverage for the specified security</returns>
-        public virtual decimal GetLeverage(Security security)
+        public decimal GetLeverage(Security security)
         {
             switch (security.Type)
             {
@@ -236,90 +232,19 @@ namespace QuantConnect.Brokerages
         /// <returns>The settlement model for this brokerage</returns>
         public virtual ISettlementModel GetSettlementModel(Security security, AccountType accountType)
         {
-            if (security.Type == SecurityType.Equity && accountType == AccountType.Cash)
-                return new DelayedSettlementModel(Equity.DefaultSettlementDays, Equity.DefaultSettlementTime);
-            
+            if (accountType == AccountType.Cash)
+            {
+                switch (security.Type)
+                {
+                    case SecurityType.Equity:
+                        return new DelayedSettlementModel(Equity.DefaultSettlementDays, Equity.DefaultSettlementTime);
+
+                    case SecurityType.Option:
+                        return new DelayedSettlementModel(Option.DefaultSettlementDays, Option.DefaultSettlementTime);
+                }
+            }
+
             return new ImmediateSettlementModel();
-        }
-
-        /// <summary>
-        /// Ensure the order quantity is not fractional
-        /// </summary>
-        /// <param name="quantity">The order quantity</param>
-        /// <param name="message">The error message returned</param>
-        /// <returns>Returns true is order quantity is valid</returns>
-        protected bool ValidateQuantity(decimal quantity, Security security, out BrokerageMessageEvent message)
-        {
-            message = null;
-
-            //reject fractional if not supported.
-            if (Math.Abs(security.SymbolProperties.LotSize % 1) == 0)
-            {
-                if (Math.Abs(quantity % 1) > 0)
-                {
-                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                        "The order quantity must not be fractional."
-                        );
-
-                    return false;
-                }
-            }
-            else
-            {
-                if (Math.Abs(quantity) < security.SymbolProperties.LotSize)
-                {
-                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                       string.Format("The minimum order quantity must be greater than {0}.", security.SymbolProperties.LotSize.ToString())
-                       );
-
-                    return false;
-                }
-                else if (GetDecimalPlaces(quantity) > GetDecimalPlaces(security.SymbolProperties.LotSize))
-                {
-                    message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                       string.Format("The maximum decimal places of order quantity cannot be be greater than {0}.", GetDecimalPlaces(security.SymbolProperties.LotSize).ToString())
-                       );
-
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Modify the order quantity to conform to minimum lot size
-        /// </summary>
-        /// <param name="security">The security to truncate</param>
-        /// <param name="quantity">The order quantity</param>
-        /// <returns>The modified quantity</returns>
-        public virtual decimal TruncateQuantity(Security security, decimal quantity)
-        {
-            if (Math.Abs(security.SymbolProperties.LotSize % 1) != 0)
-            {
-                decimal places = (decimal)Math.Pow(10, (double)GetDecimalPlaces(security.SymbolProperties.LotSize));
-                decimal truncated = Math.Truncate(quantity);
-                var decimals = (quantity - truncated) * places;
-                decimals = Math.Truncate(decimals) / places;
-                truncated += decimals;
-                return truncated;
-            }
-    
-            return Math.Truncate(quantity);
-
-        }
-
-        private int GetDecimalPlaces(decimal quantity)
-        {
-            return BitConverter.GetBytes(decimal.GetBits(quantity)[3])[2];
-        }
-
-        /// <summary>
-        /// Allows the brokerage to push cashbook updates. This is disabled by default.
-        /// </summary>
-        public virtual bool AllowAccountUpdates
-        {
-            get { return false; }
         }
 
     }

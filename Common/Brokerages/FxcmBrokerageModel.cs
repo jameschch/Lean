@@ -103,11 +103,6 @@ namespace QuantConnect.Brokerages
                 return false;
             }
 
-            if (!ValidateQuantity(order.Quantity, security, out message))
-            {
-                return false;
-            }
-
             // validate stop/limit orders= prices
             var limit = order as LimitOrder;
             if (limit != null)

@@ -23,7 +23,7 @@ namespace QuantConnect.Orders
         /// <summary>
         /// Specify to update the quantity of the order
         /// </summary>
-        public decimal? Quantity { get; set; }
+        public int? Quantity { get; set; }
 
         /// <summary>
         /// Specify to update the limit price of the order

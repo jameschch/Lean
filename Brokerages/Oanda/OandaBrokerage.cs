@@ -37,7 +37,7 @@ namespace QuantConnect.Brokerages.Oanda
         private readonly ISecurityProvider _securityProvider;
         private readonly Environment _environment;
         private readonly string _accessToken;
-        private readonly int _accountId;
+        private readonly string _accountId;
 
         private EventsSession _eventsSession;
         private Dictionary<string, Instrument> _oandaInstruments; 
@@ -59,7 +59,7 @@ namespace QuantConnect.Brokerages.Oanda
         /// <param name="environment">The Oanda environment (Trade or Practice)</param>
         /// <param name="accessToken">The Oanda access token (can be the user's personal access token or the access token obtained with OAuth by QC on behalf of the user)</param>
         /// <param name="accountId">The account identifier.</param>
-        public OandaBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider, Environment environment, string accessToken, int accountId)
+        public OandaBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider, Environment environment, string accessToken, string accountId)
             : base("Oanda Brokerage")
         {
             _orderProvider = orderProvider;
@@ -71,9 +71,6 @@ namespace QuantConnect.Brokerages.Oanda
             _environment = environment;
             _accessToken = accessToken;
             _accountId = accountId;
-
-            System.Net.ServicePointManager.ServerCertificateValidationCallback += (o, certificate, chain, errors) => true;
-            System.Security.Cryptography.AesCryptoServiceProvider b = new System.Security.Cryptography.AesCryptoServiceProvider();
         }
 
         #region IBrokerage implementation

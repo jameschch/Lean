@@ -166,16 +166,16 @@ namespace QuantConnect.Tests.Common.Orders.Fills
 
                 // make sure some time has passed
                 var lastOrderEvent = ticket.OrderEvents.LastOrDefault();
-                var increment = TimeSpan.FromTicks(Math.Max(asset.SubscriptionDataConfig.Increment.Ticks, 1));
+                var increment = TimeSpan.FromTicks(Math.Max(asset.Resolution.ToTimeSpan().Ticks, 1));
                 if (lastOrderEvent != null && currentUtcTime - lastOrderEvent.UtcTime < increment)
                 {
                     // wait a minute between fills
                     return new OrderEvent(order, currentUtcTime, 0);
                 }
 
-                var remaining = (ticket.Quantity - ticket.QuantityFilled);
+                var remaining = (int)(ticket.Quantity - ticket.QuantityFilled);
                 var fill = base.MarketFill(asset, order);
-                var filledThisTime = Math.Min(remaining, (_percent * order.Quantity));
+                var filledThisTime = Math.Min(remaining, (int)(_percent * order.Quantity));
                 fill.FillQuantity = filledThisTime;
 
                 // only mark it as filled if there is zero quantity remaining

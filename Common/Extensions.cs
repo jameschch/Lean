@@ -800,16 +800,5 @@ namespace QuantConnect
         {
             return @enum.ToString().ToLower();
         }
-
-        /// <summary>
-        /// Number of decimal places for a decimal value
-        /// </summary>
-        /// <param name="quantity"></param>
-        /// <returns></returns>
-        public static int NumberOfDecimals(this decimal quantity)
-        {
-            return BitConverter.GetBytes(decimal.GetBits(quantity)[3])[2];
-        }
-
     }
 }

@@ -14,6 +14,9 @@
 */
 
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Fills;
@@ -21,6 +24,7 @@ using QuantConnect.Orders.Slippage;
 using QuantConnect.Securities.Equity;
 using QuantConnect.Securities.Forex;
 using QuantConnect.Securities.Interfaces;
+using QuantConnect.Data.Market;
 
 namespace QuantConnect.Securities 
 {
@@ -33,18 +37,25 @@ namespace QuantConnect.Securities
     /// </remarks>
     public class Security 
     {
+        private readonly Symbol _symbol;
         private LocalTimeKeeper _localTimeKeeper;
-        private readonly SubscriptionDataConfig _config;
+        // using concurrent bag to avoid list enumeration threading issues
+        protected readonly ConcurrentBag<SubscriptionDataConfig> SubscriptionsBag;
+
+        /// <summary>
+        /// Gets all the subscriptions for this security
+        /// </summary>
+        public IEnumerable<SubscriptionDataConfig> Subscriptions
+        {
+            get { return SubscriptionsBag; }
+        }
 
         /// <summary>
         /// <see cref="Symbol"/> for the asset.
         /// </summary>
-        public Symbol Symbol 
+        public Symbol Symbol
         {
-            get 
-            {
-                return _config.Symbol;
-            }
+            get { return _symbol; }
         }
 
         /// <summary>
@@ -71,10 +82,7 @@ namespace QuantConnect.Securities
         /// </remarks>
         public SecurityType Type 
         {
-            get 
-            {
-                return _config.SecurityType;
-            }
+            get { return _symbol.ID.SecurityType; }
         }
 
         /// <summary>
@@ -83,10 +91,7 @@ namespace QuantConnect.Securities
         /// <remarks>Tick, second or minute resolution for QuantConnect assets.</remarks>
         public Resolution Resolution 
         {
-            get 
-            {
-                return _config.Resolution;
-            }
+            get { return SubscriptionsBag.Select(x => x.Resolution).DefaultIfEmpty(Resolution.Daily).Min(); }
         }
 
         /// <summary>
@@ -94,10 +99,7 @@ namespace QuantConnect.Securities
         /// </summary>
         public bool IsFillDataForward 
         {
-            get 
-            {
-                return _config.FillDataForward;
-            }
+            get { return SubscriptionsBag.Any(x => x.FillDataForward); }
         }
 
         /// <summary>
@@ -105,18 +107,24 @@ namespace QuantConnect.Securities
         /// </summary>
         public bool IsExtendedMarketHours
         {
-            get 
-            {
-                return _config.ExtendedMarketHours;
-            }
+            get { return SubscriptionsBag.Any(x => x.ExtendedMarketHours); }
+        }
+
+        /// <summary>
+        /// Gets the data normalization mode used for this security
+        /// </summary>
+        public DataNormalizationMode DataNormalizationMode
+        {
+            get { return SubscriptionsBag.Select(x => x.DataNormalizationMode).DefaultIfEmpty(DataNormalizationMode.Adjusted).FirstOrDefault(); }
         }
 
         /// <summary>
         /// Gets the subscription configuration for this security
         /// </summary>
+        [Obsolete("This property returns only the first subscription. Use the 'Subscriptions' property for all of this security's subscriptions.")]
         public SubscriptionDataConfig SubscriptionDataConfig
         {
-            get { return _config; }
+            get { return SubscriptionsBag.FirstOrDefault(); }
         }
 
         /// <summary>
@@ -290,6 +298,19 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
+        /// Customizable price variation model used to define the minimum price variation of this security.
+        /// By default minimum price variation is a constant find in the symbol-properties-database.
+        /// </summary>
+        /// <seealso cref="AdjustedPriceVariationModel"/>
+        /// <seealso cref="SecurityPriceVariationModel"/>
+        /// <seealso cref="EquityPriceVariationModel"/>
+        public IPriceVariationModel PriceVariationModel
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Construct a new security vehicle based on the user options.
         /// </summary>
         public Security(SecurityExchangeHours exchangeHours, SubscriptionDataConfig config, Cash quoteCurrency, SymbolProperties symbolProperties)
@@ -303,16 +324,39 @@ namespace QuantConnect.Securities
                 new InteractiveBrokersFeeModel(),
                 new ConstantSlippageModel(0),
                 new ImmediateSettlementModel(),
-                Securities.VolatilityModel.Null, 
+                Securities.VolatilityModel.Null,
                 new SecurityMarginModel(1m),
-                new SecurityDataFilter())
+                new SecurityDataFilter(),
+                new SecurityPriceVariationModel())
         {
         }
 
         /// <summary>
         /// Construct a new security vehicle based on the user options.
         /// </summary>
-        protected Security(SubscriptionDataConfig config,
+        public Security(Symbol symbol, SecurityExchangeHours exchangeHours, Cash quoteCurrency, SymbolProperties symbolProperties)
+            : this(symbol,
+                quoteCurrency,
+                symbolProperties,
+                new SecurityExchange(exchangeHours),
+                new SecurityCache(),
+                new SecurityPortfolioModel(),
+                new ImmediateFillModel(),
+                new InteractiveBrokersFeeModel(),
+                new ConstantSlippageModel(0),
+                new ImmediateSettlementModel(),
+                Securities.VolatilityModel.Null,
+                new SecurityMarginModel(1m),
+                new SecurityDataFilter(),
+                new SecurityPriceVariationModel()
+                )
+        {
+        }
+
+        /// <summary>
+        /// Construct a new security vehicle based on the user options.
+        /// </summary>
+        protected Security(Symbol symbol,
             Cash quoteCurrency,
             SymbolProperties symbolProperties,
             SecurityExchange exchange,
@@ -324,7 +368,8 @@ namespace QuantConnect.Securities
             ISettlementModel settlementModel,
             IVolatilityModel volatilityModel,
             ISecurityMarginModel marginModel,
-            ISecurityDataFilter dataFilter
+            ISecurityDataFilter dataFilter,
+            IPriceVariationModel priceVariationModel
             )
         {
 
@@ -338,13 +383,15 @@ namespace QuantConnect.Securities
                 throw new ArgumentException("symbolProperties.QuoteCurrency must match the quoteCurrency.Symbol");
             }
 
-            _config = config;
+            _symbol = symbol;
+            SubscriptionsBag = new ConcurrentBag<SubscriptionDataConfig>();
             QuoteCurrency = quoteCurrency;
             SymbolProperties = symbolProperties;
-            IsTradable = !config.IsInternalFeed;
+            IsTradable = true;
             Cache = cache;
             Exchange = exchange;
             DataFilter = dataFilter;
+            PriceVariationModel = priceVariationModel;
             PortfolioModel = portfolioModel;
             MarginModel = marginModel;
             FillModel = fillModel;
@@ -353,6 +400,44 @@ namespace QuantConnect.Securities
             SettlementModel = settlementModel;
             VolatilityModel = volatilityModel;
             Holdings = new SecurityHolding(this);
+        }
+
+
+        /// <summary>
+        /// Temporary convenience constructor
+        /// </summary>
+        protected Security(SubscriptionDataConfig config,
+            Cash quoteCurrency,
+            SymbolProperties symbolProperties,
+            SecurityExchange exchange,
+            SecurityCache cache,
+            ISecurityPortfolioModel portfolioModel,
+            IFillModel fillModel,
+            IFeeModel feeModel,
+            ISlippageModel slippageModel,
+            ISettlementModel settlementModel,
+            IVolatilityModel volatilityModel,
+            ISecurityMarginModel marginModel,
+            ISecurityDataFilter dataFilter,
+            IPriceVariationModel priceVariationModel
+            )
+            : this(config.Symbol,
+                quoteCurrency,
+                symbolProperties,
+                exchange,
+                cache,
+                portfolioModel,
+                fillModel,
+                feeModel,
+                slippageModel,
+                settlementModel,
+                volatilityModel,
+                marginModel,
+                dataFilter,
+                priceVariationModel
+                )
+        {
+            SubscriptionsBag.Add(config);
         }
 
         /// <summary>
@@ -447,7 +532,7 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Access to the volume of the equity today
         /// </summary>
-        public virtual decimal Volume
+        public virtual long Volume
         {
             get { return Cache.Volume; }
         }
@@ -463,7 +548,7 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Gets the most recent bid size if available
         /// </summary>
-        public virtual decimal BidSize
+        public virtual long BidSize
         {
             get { return Cache.BidSize; }
         }
@@ -479,9 +564,17 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Gets the most recent ask size if available
         /// </summary>
-        public virtual decimal AskSize
+        public virtual long AskSize
         {
             get { return Cache.AskSize; }
+        }
+
+        /// <summary>
+        /// Access to the open interest of the security today
+        /// </summary>
+        public virtual long OpenInterest
+        {
+            get { return Cache.OpenInterest; }
         }
 
         /// <summary>
@@ -520,6 +613,8 @@ namespace QuantConnect.Securities
             //Add new point to cache:
             if (data == null) return;
             Cache.AddData(data);
+
+            if (data is OpenInterest || data.Price == 0m) return;
             Holdings.UpdateMarketPrice(Price);
             VolatilityModel.Update(this, data);
         }
@@ -534,6 +629,7 @@ namespace QuantConnect.Securities
             if (data == null) return;
             Cache.AddData(data);
 
+            if (data is OpenInterest || data.Price == 0m) return;
             Holdings.UpdateMarketPrice(Price);
         }
  
@@ -543,6 +639,10 @@ namespace QuantConnect.Securities
         /// <param name="leverage">Leverage for this asset</param>
         public void SetLeverage(decimal leverage)
         {
+            if (Symbol.ID.SecurityType == SecurityType.Future ||
+                Symbol.ID.SecurityType == SecurityType.Option)
+                return;
+
             MarginModel.SetLeverage(this, leverage);
         }
 
@@ -551,7 +651,22 @@ namespace QuantConnect.Securities
         /// </summary>
         public void SetDataNormalizationMode(DataNormalizationMode mode)
         {
-            _config.DataNormalizationMode = mode;
+            foreach (var subscription in SubscriptionsBag)
+            {
+                subscription.DataNormalizationMode = mode;
+            }
+
+            if (Type == SecurityType.Equity)
+            {
+                if (mode == DataNormalizationMode.Adjusted)
+                {
+                    PriceVariationModel = new AdjustedPriceVariationModel();
+                }
+                else
+                {
+                    PriceVariationModel = new EquityPriceVariationModel();
+                }
+            }
         }
 
         /// <summary>
@@ -564,6 +679,31 @@ namespace QuantConnect.Securities
         public override string ToString()
         {
             return Symbol.ToString();
+        }
+
+        /// <summary>
+        /// Adds the specified data subscription to this security.
+        /// </summary>
+        /// <param name="subscription">The subscription configuration to add. The Symbol and ExchangeTimeZone properties must match the existing Security object</param>
+        internal void AddData(SubscriptionDataConfig subscription)
+        {
+            if (subscription.Symbol != _symbol) throw new ArgumentException("Symbols must match.", "subscription.Symbol");
+            if (!subscription.ExchangeTimeZone.Equals(Exchange.TimeZone)) throw new ArgumentException("ExchangeTimeZones must match.", "subscription.ExchangeTimeZone");
+            SubscriptionsBag.Add(subscription);
+        }
+
+        /// <summary>
+        /// Adds the specified data subscriptions to this security.
+        /// </summary>
+        /// <param name="subscriptions">The subscription configuration to add. The Symbol and ExchangeTimeZone properties must match the existing Security object</param>
+        internal void AddData(SubscriptionDataConfigList subscriptions)
+        {
+            foreach (var subscription in subscriptions)
+            {
+                if (subscription.Symbol != _symbol) throw new ArgumentException("Symbols must match.", "subscription.Symbol");
+                if (!subscription.ExchangeTimeZone.Equals(Exchange.TimeZone)) throw new ArgumentException("ExchangeTimeZones must match.", "subscription.ExchangeTimeZone");
+                SubscriptionsBag.Add(subscription);
+            }
         }
     }
 }

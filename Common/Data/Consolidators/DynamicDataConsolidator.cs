@@ -68,7 +68,7 @@ namespace QuantConnect.Data.Consolidators
 
             // if we have volume, use it, otherwise just use zero
             var volume = data.HasProperty("Volume")
-                ? (decimal) Convert.ChangeType(data.GetProperty("Volume"), typeof (decimal))
+                ? (long) Convert.ChangeType(data.GetProperty("Volume"), typeof (long))
                 : 0L;
             
             if (workingBar == null)

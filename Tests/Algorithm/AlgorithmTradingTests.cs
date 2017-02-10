@@ -18,7 +18,7 @@ using NUnit.Framework;
 using QuantConnect.Algorithm;
 using QuantConnect.Data.Market;
 using QuantConnect.Securities;
-using Moq;
+using QuantConnect.Brokerages;
 
 namespace QuantConnect.Tests.Algorithm
 {
@@ -936,7 +936,59 @@ namespace QuantConnect.Tests.Algorithm
             Assert.AreEqual(-3000, actual);
         }
 
+        /*************************************************************************/
+        //  Rounding the order quantity to the nearest multiple of lot size test
+        /*************************************************************************/
 
+        [Test]
+        public void SetHoldings_Long_RoundOff()
+        {
+            var algo = new QCAlgorithm();
+            algo.AddSecurity(SecurityType.Forex, "EURUSD");
+            algo.SetCash(100000);
+            algo.SetBrokerageModel(BrokerageName.FxcmBrokerage);
+            algo.Securities[Symbols.EURUSD].TransactionModel = new ConstantFeeTransactionModel(0);
+            Security eurusd = algo.Securities[Symbols.EURUSD];
+            // Set Price to $26
+            Update(eurusd, 26);
+            // So 100000/26 = 3846, After Rounding off becomes 3000
+            var actual = algo.CalculateOrderQuantity(Symbols.EURUSD, 1m);
+            Assert.AreEqual(3000m, actual);
+
+        }
+
+        [Test]
+        public void SetHoldings_Short_RoundOff()
+        {
+            var algo = new QCAlgorithm();
+            algo.AddSecurity(SecurityType.Forex, "EURUSD");
+            algo.SetCash(100000);
+            algo.SetBrokerageModel(BrokerageName.FxcmBrokerage);
+            algo.Securities[Symbols.EURUSD].TransactionModel = new ConstantFeeTransactionModel(0);
+            Security eurusd = algo.Securities[Symbols.EURUSD];
+            // Set Price to $26
+            Update(eurusd, 26);
+            // So -100000/26 = -3846, After Rounding off becomes -3000
+            var actual = algo.CalculateOrderQuantity(Symbols.EURUSD, -1m);
+            Assert.AreEqual(-3000m, actual);
+        }
+
+        [Test]
+        public void SetHoldings_Long_ToZero_RoundOff()
+        {
+            var algo = new QCAlgorithm();
+            algo.AddSecurity(SecurityType.Forex, "EURUSD");
+            algo.SetCash(10000);
+            algo.SetBrokerageModel(BrokerageName.FxcmBrokerage);
+            algo.Securities[Symbols.EURUSD].TransactionModel = new ConstantFeeTransactionModel(0);
+            Security eurusd = algo.Securities[Symbols.EURUSD];
+            // Set Price to $25
+            Update(eurusd, 25);
+            // So 10000/25 = 400, After Rounding off becomes 0
+            var actual = algo.CalculateOrderQuantity(Symbols.EURUSD, 1m);
+            Assert.AreEqual(0m, actual);
+        }
+        
         //[Test]
         //public void SetHoldings_LongToLonger_PriceRise()
         //{
@@ -1041,70 +1093,6 @@ namespace QuantConnect.Tests.Algorithm
         //    //We want to be 50% long, this is currently +2000 holdings + 50% 50k = $25k/ $50-share=500
         //    Assert.AreEqual(2500, actual);
         //}
-
-        [Test]
-        public void OrderQuantityConversionTest()
-        {
-            Security msft;
-            var algo = GetAlgorithm(out msft, 1, 0);
-            //Set price to $25
-            Update(msft, 25);
-
-            algo.Portfolio.SetCash(150000);
-
-            var mock = new Mock<IOrderProcessor>();
-            var request = new Mock<Orders.SubmitOrderRequest>(null, null, null, null, null, null, null, null);
-            mock.Setup(m => m.Process(It.IsAny<Orders.OrderRequest>())).Returns(new Orders.OrderTicket(null, request.Object));
-            algo.Transactions.SetOrderProcessor(mock.Object);
-
-            algo.Buy(Symbols.MSFT, 1);
-            algo.Buy(Symbols.MSFT, 1.0);
-            algo.Buy(Symbols.MSFT, 1.0m);
-            algo.Buy(Symbols.MSFT, 1.0f);
-
-            algo.Sell(Symbols.MSFT, 1);
-            algo.Sell(Symbols.MSFT, 1.0);
-            algo.Sell(Symbols.MSFT, 1.0m);
-            algo.Sell(Symbols.MSFT, 1.0f);
-
-            algo.Order(Symbols.MSFT, 1);
-            algo.Order(Symbols.MSFT, 1.0);
-            algo.Order(Symbols.MSFT, 1.0m);
-            algo.Order(Symbols.MSFT, 1.0f);
-
-            algo.MarketOrder(Symbols.MSFT, 1);
-            algo.MarketOrder(Symbols.MSFT, 1.0);
-            algo.MarketOrder(Symbols.MSFT, 1.0m);
-            algo.MarketOrder(Symbols.MSFT, 1.0f);
-
-            algo.MarketOnOpenOrder(Symbols.MSFT, 1);
-            algo.MarketOnOpenOrder(Symbols.MSFT, 1.0);
-            algo.MarketOnOpenOrder(Symbols.MSFT, 1.0m);
-
-            algo.MarketOnCloseOrder(Symbols.MSFT, 1);
-            algo.MarketOnCloseOrder(Symbols.MSFT, 1.0);
-            algo.MarketOnCloseOrder(Symbols.MSFT, 1.0m);
-
-            algo.LimitOrder(Symbols.MSFT, 1, 1);
-            algo.LimitOrder(Symbols.MSFT, 1.0, 1);
-            algo.LimitOrder(Symbols.MSFT, 1.0m, 1);
-
-            algo.StopMarketOrder(Symbols.MSFT, 1, 1);
-            algo.StopMarketOrder(Symbols.MSFT, 1.0, 1);
-            algo.StopMarketOrder(Symbols.MSFT, 1.0m, 1);
-
-            algo.StopLimitOrder(Symbols.MSFT, 1, 1, 2);
-            algo.StopLimitOrder(Symbols.MSFT, 1.0, 1, 2);
-            algo.StopLimitOrder(Symbols.MSFT, 1.0m, 1, 2);
-
-            algo.SetHoldings(Symbols.MSFT, 1);
-            algo.SetHoldings(Symbols.MSFT, 1.0);
-            algo.SetHoldings(Symbols.MSFT, 1.0m);
-            algo.SetHoldings(Symbols.MSFT, 1.0f);
-
-            int expected = 32;
-            Assert.AreEqual(expected, algo.Transactions.LastOrderId);
-        }
 
 
         private QCAlgorithm GetAlgorithm(out Security msft, decimal leverage, decimal fee)

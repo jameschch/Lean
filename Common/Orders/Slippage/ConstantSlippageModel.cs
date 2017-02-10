@@ -36,7 +36,7 @@ namespace QuantConnect.Orders.Slippage
         /// <summary>
         /// Slippage Model. Return a decimal cash slippage approximation on the order.
         /// </summary>
-        public virtual decimal GetSlippageApproximation(Security asset, Order order)
+        public decimal GetSlippageApproximation(Security asset, Order order)
         {
             var lastData = asset.GetLastData();
             if (lastData == null) return 0;

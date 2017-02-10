@@ -25,7 +25,7 @@ namespace QuantConnect.Securities
     {
         //Working Variables
         private decimal _averagePrice;
-        private decimal _quantity;
+        private int     _quantity;
         private decimal _price;
         private decimal _totalSaleVolume;
         private decimal _profit;
@@ -46,6 +46,34 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
+        /// Create a new holding class instance copying the initial properties
+        /// </summary>
+        /// <param name="holding">The security being held</param>
+        protected SecurityHolding(SecurityHolding holding)
+        {
+            _security = holding._security;
+            _averagePrice = holding._averagePrice;
+            _quantity = holding._quantity;
+            _price = holding._price;
+            _totalSaleVolume = holding._totalSaleVolume;
+            _profit = holding._profit;
+            _lastTradeProfit = holding._lastTradeProfit;
+            _totalFees = holding._totalFees;
+        }
+
+
+        /// <summary>
+        /// The security being held
+        /// </summary>
+        protected Security Security
+        {
+            get
+            {
+                return _security;
+            }
+        }
+
+        /// <summary>
         /// Average price of the security holdings.
         /// </summary>
         public decimal AveragePrice
@@ -54,6 +82,10 @@ namespace QuantConnect.Securities
             {
                 return _averagePrice;
             }
+            protected set
+            {
+                _averagePrice = value;
+            }
         }
 
         /// <summary>
@@ -61,11 +93,15 @@ namespace QuantConnect.Securities
         /// </summary>
         /// <remarks>Positive indicates long holdings, negative quantity indicates a short holding</remarks>
         /// <seealso cref="AbsoluteQuantity"/>
-        public decimal Quantity
+        public int Quantity
         {
             get
             {
                 return _quantity;
+            }
+            protected set
+            {
+                _quantity = value;
             }
         }
 
@@ -130,6 +166,10 @@ namespace QuantConnect.Securities
             get
             {
                 return _price;
+            }
+            protected set
+            {
+                _price = value;
             }
         }
 
@@ -342,15 +382,6 @@ namespace QuantConnect.Securities
         /// Set the quantity of holdings and their average price after processing a portfolio fill.
         /// </summary>
         public virtual void SetHoldings(decimal averagePrice, int quantity) 
-        {
-            _averagePrice = averagePrice;
-            _quantity = quantity;
-        }
-
-        /// <summary>
-        /// Set the quantity of holdings and their average price after processing a portfolio fill.
-        /// </summary>
-        public virtual void SetHoldings(decimal averagePrice, decimal quantity)
         {
             _averagePrice = averagePrice;
             _quantity = quantity;
