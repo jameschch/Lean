@@ -125,7 +125,7 @@ namespace QuantConnect.Indicators
             }
             if (_peak != 0)
             {
-                System.Diagnostics.Debug.WriteLine(_filt[0] / _peak);
+               // System.Diagnostics.Debug.WriteLine(_filt[0] / _peak);
                 universal = (decimal)(_filt[0] / _peak);
             }
 

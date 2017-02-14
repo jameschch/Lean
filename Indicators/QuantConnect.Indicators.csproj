@@ -120,7 +120,9 @@
     <Compile Include="CyberCycle.cs" />
     <Compile Include="DonchianChannel.cs" />
     <Compile Include="DoubleExponentialMovingAverage.cs" />
+    <Compile Include="EhlersStochastic.cs" />
     <Compile Include="EmpiricalModeDecomposition.cs" />
+    <Compile Include="HurstExponent.cs" />
     <Compile Include="InverseFisherTransform.cs" />
     <Compile Include="MamaFama.cs" />
     <Compile Include="FractalAdaptiveMovingAverage.cs" />

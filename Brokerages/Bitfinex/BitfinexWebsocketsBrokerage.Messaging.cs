@@ -108,19 +108,8 @@ namespace QuantConnect.Brokerages.Bitfinex
                 }
                 else if (raw.@event == "info" && (raw.code == "20051" || raw.code == "20061"))
                 {
-                    //hard reset
-                    if (!_isReconnecting)
-                    {
-                        try
-                        {
-                            _isReconnecting = true;
-                            this.Reconnect();
-                        }
-                        finally
-                        {
-                            _isReconnecting = false;
-                        }
-                    }
+                    //hard reset - only close and allow reconnect timeout to handle
+                    WebSocket.Close();
                 }
 
                 Log.Trace("BitfinexWebsocketsBrokerage.OnMessage(): " + e.Data);
@@ -269,6 +258,7 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         public void OnError(object sender, ErrorEventArgs e)
         {
+            Log.Debug(e.Message);
             this.Reconnect();
         }
 
