@@ -256,3 +256,4 @@ Charts/
 
 #ignore config
 config.json
+/Indicators/EhlersStochastic.cs
