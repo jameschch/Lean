@@ -43,7 +43,7 @@ namespace QuantConnect.Securities.Cfd
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new ConstantFeeModel(0),
-                new ConstantSlippageModel(0),
+                new SpreadSlippageModel(),
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null,
                 new SecurityMarginModel(50m),

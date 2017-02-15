@@ -218,7 +218,6 @@ namespace QuantConnect.Util
         /// <returns>A new enumerable that can be enumerated multiple times without re-enumerating the source enumerable</returns>
         public static IEnumerable<T> Memoize<T>(this IEnumerable<T> enumerable)
         {
-            if (enumerable is MemoizingEnumerable<T>) return enumerable;
             return new MemoizingEnumerable<T>(enumerable);
         }
 

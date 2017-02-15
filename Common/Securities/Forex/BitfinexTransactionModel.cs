@@ -11,21 +11,34 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
 */
 
-namespace QuantConnect.Securities
+using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
+using QuantConnect.Orders.Fills;
+using QuantConnect.Orders.Slippage;
+using QuantConnect.Securities.Interfaces;
+using System;
+
+namespace QuantConnect.Securities.Forex
 {
     /// <summary>
-    /// Gets the minimum price variation of a given security  
+    /// Bitfinex Transaction Model Class. Provided for backwards compatibility
     /// </summary>
-    public interface IPriceVariationModel
+    /// <seealso cref="SecurityTransactionModel"/>
+    /// <seealso cref="ISecurityTransactionModel"/>
+    [Obsolete]
+    public class BitfinexTransactionModel : SecurityTransactionModel
     {
         /// <summary>
-        /// Get the minimum price variation from a security
+        /// Initializes a new instance of the <see cref="BitfinexTransactionModel"/> class
         /// </summary>
-        /// <param name="security">Security which we want the minimum price variation from</param>
-        /// <returns>Decimal minimum price variation of a given security</returns>
-        decimal GetMinimumPriceVariation(Security security);
+        public BitfinexTransactionModel()
+            : base(new ImmediateFillModel(), new BitfinexFeeModel(), new BitfinexSlippageModel())
+        {
+        }
+
+
     }
+
 }

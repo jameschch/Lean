@@ -81,13 +81,12 @@ namespace QuantConnect
         /// Extension method to convert a byte array into a string.
         /// </summary>
         /// <param name="bytes">Byte array to convert.</param>
-        /// <param name="encoding">The encoding to use for the conversion. Defaults to Encoding.ASCII</param>
         /// <returns>String from bytes.</returns>
-        public static string GetString(this byte[] bytes, Encoding encoding = null)
+        public static string GetString(this byte[] bytes) 
         {
-            if (encoding == null) encoding = Encoding.ASCII;
-
-            return encoding.GetString(bytes);
+            var chars = new char[bytes.Length / sizeof(char)];
+            Buffer.BlockCopy(bytes, 0, chars, 0, bytes.Length);
+            return new string(chars);
         }
 
         /// <summary>
@@ -107,23 +106,6 @@ namespace QuantConnect
         }
 
         /// <summary>
-        /// Encrypt the token:time data to make our API hash.
-        /// </summary>
-        /// <param name="data">Data to be hashed by SHA256</param>
-        /// <returns>Hashed string.</returns>
-        public static string ToSHA256(this string data)
-        {
-            var crypt = new SHA256Managed();
-            var hash = new StringBuilder();
-            var crypto = crypt.ComputeHash(Encoding.UTF8.GetBytes(data), 0, Encoding.UTF8.GetByteCount(data));
-            foreach (var theByte in crypto)
-            {
-                hash.Append(theByte.ToString("x2"));
-            }
-            return hash.ToString();
-        }
-
-        /// <summary>
         /// Extension method to automatically set the update value to same as "add" value for TryAddUpdate. 
         /// This makes the API similar for traditional and concurrent dictionaries.
         /// </summary>
@@ -135,21 +117,6 @@ namespace QuantConnect
         public static void AddOrUpdate<K, V>(this ConcurrentDictionary<K, V> dictionary, K key, V value)
         {
             dictionary.AddOrUpdate(key, value, (oldkey, oldvalue) => value);
-        }
-
-        /// <summary>
-        /// Extension method to automatically add/update lazy values in concurrent dictionary. 
-        /// </summary>
-        /// <typeparam name="TKey">Key type for dictionary</typeparam>
-        /// <typeparam name="TValue">Value type for dictonary</typeparam>
-        /// <param name="dictionary">Dictionary object we're operating on</param>
-        /// <param name="key">Key we want to add or update.</param>
-        /// <param name="addValueFactory">The function used to generate a value for an absent key</param>
-        /// <param name="updateValueFactory">The function used to generate a new value for an existing key based on the key's existing value</param>
-        public static TValue AddOrUpdate<TKey, TValue>(this ConcurrentDictionary<TKey, Lazy<TValue>> dictionary, TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
-        {
-            var result = dictionary.AddOrUpdate(key, new Lazy<TValue>(() => addValueFactory(key)), (key2, old) => new Lazy<TValue>(() => updateValueFactory(key2, old.Value)));
-            return result.Value;
         }
 
         /// <summary>
@@ -323,46 +290,6 @@ namespace QuantConnect
             }
             if (last != 0) last = last + 1;
             csv.Add(str.Substring(last));
-            return csv;
-        }
-
-        /// <summary>
-        /// Breaks the specified string into csv components, works correctly with commas in data fields 
-        /// </summary>
-        /// <param name="str">The string to be broken into csv</param>
-        /// <param name="size">The expected size of the output list</param>
-        /// <returns>A list of the csv pieces</returns>
-        public static List<string> ToCsvData(this string str, int size = 4)
-        {
-            var csv = new List<string>(size);
-
-            int last = -1;
-            bool textDataField = false;
-
-            for (var i = 0; i < str.Length; i++)
-            {
-                switch (str[i])
-                {
-                    case '"':
-                        textDataField = !textDataField;
-                        break;
-                    case ',':
-                        if (!textDataField)
-                        {
-                            csv.Add(str.Substring(last + 1, (i - last)).Trim(' ', ','));
-                            last = i;
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            if (last != str.Length - 1)
-            {
-                csv.Add(str.Substring(last + 1).Trim());
-            }
-
             return csv;
         }
 

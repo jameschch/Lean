@@ -7,11 +7,8 @@ namespace QuantConnect.Orders.Slippage
     /// <summary>
     /// Approximates slippage given available data
     /// </summary>
-    public class BitfinexSlippageModel : ConstantSlippageModel
+    public class BitfinexSlippageModel : SpreadSlippageModel
     {
-
-        public BitfinexSlippageModel() : base(0)
-        { }
 
         /// <summary>
         /// Returns a decimal cash slippage approximation on the order.

@@ -39,12 +39,6 @@ namespace QuantConnect.Data
             get;
             set;
         }
-
-        DateTime EndTime
-        {
-            get;
-            set;
-        }
         
         
         /// <summary>

@@ -301,7 +301,7 @@ namespace QuantConnect.Securities
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new InteractiveBrokersFeeModel(),
-                new ConstantSlippageModel(0),
+                new SpreadSlippageModel(),
                 new ImmediateSettlementModel(),
                 Securities.VolatilityModel.Null, 
                 new SecurityMarginModel(1m),
@@ -511,10 +511,9 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Update any security properties based on the latest market data and time
+        /// Update any security properties based on the lastest market data and time
         /// </summary>
         /// <param name="data">New data packet from LEAN</param>
-        /// 
         public void SetMarketPrice(BaseData data) 
         {
             //Add new point to cache:
@@ -524,19 +523,6 @@ namespace QuantConnect.Securities
             VolatilityModel.Update(this, data);
         }
 
-        /// <summary>
-        /// Update any security properties based on the latest realtime data and time
-        /// </summary>
-        /// <param name="data">New data packet from LEAN</param>
-        public void SetRealTimePrice(BaseData data)
-        {
-            //Add new point to cache:
-            if (data == null) return;
-            Cache.AddData(data);
-
-            Holdings.UpdateMarketPrice(Price);
-        }
- 
         /// <summary>
         /// Set the leverage parameter for this security
         /// </summary>

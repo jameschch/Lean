@@ -144,7 +144,7 @@ namespace QuantConnect.Brokerages
         /// <returns>The new slippage model for this brokerage</returns>
         public override ISlippageModel GetSlippageModel(Security security)
         {
-            return new ConstantSlippageModel(0);
+            return new SpreadSlippageModel();
         }
     }
 }

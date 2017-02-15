@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  * 
@@ -11,25 +11,34 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
 */
 
-namespace QuantConnect.Securities
+using QuantConnect.Data.Market;
+using QuantConnect.Securities;
+
+namespace QuantConnect.Orders.Slippage
 {
     /// <summary>
-    /// Provides default implementation of <see cref="IPriceVariationModel"/>
-    /// for use in defining the minimum price variation.
+    /// A slippage model that uses half of the bid/ask spread if available,
+    /// if not available, zero slippage is assumed.
     /// </summary>
-    public class SecurityPriceVariationModel : IPriceVariationModel
+    public class SpreadSlippageModel : ISlippageModel
     {
         /// <summary>
-        /// Get the minimum price variation from a security
+        /// Slippage Model. Return a decimal cash slippage approximation on the order.
         /// </summary>
-        /// <param name="security">Security which we want the minimum price variation from</param>
-        /// <returns>Decimal minimum price variation of a given security</returns>
-        public virtual decimal GetMinimumPriceVariation(Security security)
+        public virtual decimal GetSlippageApproximation(Security asset, Order order)
         {
-            return security.SymbolProperties.MinimumPriceVariation;
+            var lastData = asset.GetLastData();
+            var lastTick = lastData as Tick;
+
+            // if we have tick data use the spread
+            if (lastTick != null)
+            {
+                return (lastTick.AskPrice - lastTick.BidPrice) / 2;
+            }
+
+            return 0m;
         }
     }
 }

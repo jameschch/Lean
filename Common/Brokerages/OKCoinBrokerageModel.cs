@@ -109,7 +109,6 @@ namespace QuantConnect.Brokerages
             return true;
         }
 
-        //todo: use extnsion method
         private int NumberOfDecimals(decimal quantity)
         {
             return BitConverter.GetBytes(decimal.GetBits(quantity)[3])[2];

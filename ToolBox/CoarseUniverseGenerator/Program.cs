@@ -22,6 +22,7 @@ using System.Threading;
 using Ionic.Zip;
 using Newtonsoft.Json.Linq;
 using QuantConnect.Data.Auxiliary;
+using QuantConnect.Securities;
 using QuantConnect.Util;
 using Log = QuantConnect.Logging.Log;
 
@@ -77,6 +78,7 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                 ProcessEquityDirectories(dataDirectory, ignoreMaplessSymbols);
             }
             while (WaitUntilTimeInUpdateMode(updateMode, updateTime));
+            Console.ReadKey();
         }
 
         /// <summary>
@@ -129,7 +131,6 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
         /// <param name="mapFileResolver"></param>
         /// <param name="exclusions">The symbols to be excluded from processing</param>
         /// <param name="ignoreMapless">Ignore the symbols without a map file.</param>
-        /// <param name="startDate">The starting date for processing</param>
         /// <param name="symbolResolver">Function used to provide symbol resolution. Default resolution uses the zip file name to resolve
         /// the symbol, specify null for this behavior.</param>
         /// <returns>A collection of the generated coarse files</returns>
@@ -157,13 +158,6 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
             }
             var market = dailyFolderDirectoryInfo.Name.ToLower();
 
-            var fundamentalDirectoryInfo = new DirectoryInfo(coarseFolder).Parent;
-            if (fundamentalDirectoryInfo == null)
-            {
-                throw new Exception("Unable to resolve fundamental path for coarse folder: " + coarseFolder);
-            }
-            var fineFundamentalFolder = Path.Combine(fundamentalDirectoryInfo.FullName, "fine");
-
             // open up each daily file to get the values and append to the daily coarse files
             foreach (var file in Directory.EnumerateFiles(dailyFolder))
             {
@@ -189,22 +183,10 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                         continue;
                     }
 
-                    // check if symbol has any fine fundamental data
-                    var firstFineSymbolDate = DateTime.MaxValue;
-                    if (Directory.Exists(fineFundamentalFolder))
-                    {
-                        var fineSymbolFolder = Path.Combine(fineFundamentalFolder, symbol.ToLower());
-
-                        var firstFineSymbolFileName = Directory.Exists(fineSymbolFolder) ? Directory.GetFiles(fineSymbolFolder).OrderBy(x => x).FirstOrDefault() : string.Empty;
-                        if (firstFineSymbolFileName.Length > 0)
-                        {
-                            firstFineSymbolDate = DateTime.ParseExact(Path.GetFileNameWithoutExtension(firstFineSymbolFileName), "yyyyMMdd", CultureInfo.InvariantCulture);
-                        }
-                    }
-
                     ZipFile zip;
                     using (var reader = Compression.Unzip(file, out zip))
                     {
+                        Console.WriteLine("Started processing " + file);
                         // 30 period EMA constant
                         const decimal k = 2m / (30 + 1);
 
@@ -266,11 +248,8 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                                 continue;
                             }
 
-                            // check if symbol has fine fundamental data for the current date
-                            var hasFundamentalDataForDate = date >= firstFineSymbolDate;
-
-                            // sid,symbol,close,volume,dollar volume,has fundamental data
-                            var coarseFileLine = sid + "," + symbol + "," + close + "," + volume + "," + Math.Truncate(dollarVolume) + "," + hasFundamentalDataForDate;
+                            // sid,symbol,close,volume,dollar volume
+                            var coarseFileLine = sid + "," + symbol + "," + close + "," + volume + "," + Math.Truncate(dollarVolume);
 
                             StreamWriter writer;
                             if (!writers.TryGetValue(coarseFile, out writer))
@@ -282,7 +261,7 @@ namespace QuantConnect.ToolBox.CoarseUniverseGenerator
                         }
                     }
 
-                    if (symbols%1000 == 0)
+                    if (symbols % 1000 == 0)
                     {
                         Log.Trace("CoarseGenerator.ProcessDailyFolder(): Completed processing {0} symbols. Current elapsed: {1} seconds", symbols, (DateTime.UtcNow - start).TotalSeconds.ToString("0.00"));
                     }
