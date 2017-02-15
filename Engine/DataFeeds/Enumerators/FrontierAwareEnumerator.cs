@@ -89,10 +89,15 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators
 
             underlyingCurrent = _enumerator.Current;
 
-            if (underlyingCurrent != null && underlyingCurrent.EndTime <= localFrontier)
+            if (underlyingCurrent != null && underlyingCurrent.Symbol.ID.Market != "empty")
             {
                 _needsMoveNext = true;
                 _current = underlyingCurrent;
+                //tolerate 90 second timeslip between local and data. Otherwise warn.
+                if (underlyingCurrent.EndTime > localFrontier.AddSeconds(90))
+                {
+                    Logging.Log.Error("Data timestamp was later than local. Check the markets hours: " + underlyingCurrent.Symbol.ToString());
+                }
             }
             else
             {
