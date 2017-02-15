@@ -170,10 +170,9 @@ namespace QuantConnect.Brokerages.Bitfinex
             foreach (var item in data)
             {
                 var msg = new WalletMessage(item);
-                if (msg.Name == this.Wallet)
+                if (msg.WLT_NAME == this.Wallet)
                 {
-                    //todo: look into this
-                    //this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE));
+                    this.OnAccountChanged(new Securities.AccountEvent(msg.WLT_CURRENCY.ToUpper(), msg.WLT_BALANCE));
                 }
             }
         }

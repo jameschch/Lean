@@ -27,10 +27,10 @@ namespace QuantConnect.Brokerages.Bitfinex
     public class WalletMessage : BaseMessage
     {
 
-        const int _name = 0;
-        const int _currency = 1;
-        const int _balance = 2;
-        const int _interestUnsettled = 3;
+        const int _wlt_name = 0;
+        const int _wlt_currency = 1;
+        const int _wlt_balance = 2;
+        const int _wlt_interest_unsettled = 3;
 
         /// <summary>
         /// Constructor for Wallet Message
@@ -38,27 +38,28 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <param name="values"></param>
         public WalletMessage(string[] values) : base(values)
         {
-            Name = AllValues[_name];
-            Balance = GetDecimal(_balance);
-            Currency = AllValues[_currency];
+            WLT_NAME = AllValues[_wlt_name];
+            WLT_BALANCE = GetDecimal(_wlt_balance);
+            WLT_CURRENCY = AllValues[_wlt_currency];
         }
 
         /// <summary>
         /// Wallet Name
         /// </summary>
- 		public string Name { get; set; }
+ 		public string WLT_NAME { get; set; }
         /// <summary>
         /// Wallet Currency
         /// </summary>
-        public string Currency { get; set; }
+        public string WLT_CURRENCY { get; set; }
         /// <summary>
         /// Wallet Balance
         /// </summary>
-        public decimal Balance { get; set; }
+        public decimal WLT_BALANCE { get; set; }
         /// <summary>
         /// Wallet Interest Unsettled
         /// </summary>
-        public string InterestUnsettled { get; set; }
+        public string WLT_INTEREST_UNSETTLED { get; set; }
+
 
     }
 }
