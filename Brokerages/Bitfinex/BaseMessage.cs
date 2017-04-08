@@ -107,10 +107,35 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
+        public long GetLong(int key)
+        {
+            return long.Parse(AllValues[key]);
+        }
+
+        /// <summary>
+        /// Returns typed value from untyped json array
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
         public int TryGetInt(int key)
         {
             int parsed;
             if (int.TryParse(AllValues[key], out parsed))
+            {
+                return parsed;
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Returns typed value from untyped json array
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public long TryGetLong(int key)
+        {
+            long parsed;
+            if (long.TryParse(AllValues[key], out parsed))
             {
                 return parsed;
             }

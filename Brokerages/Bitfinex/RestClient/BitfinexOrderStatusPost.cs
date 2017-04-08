@@ -10,6 +10,6 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest.Json
       /// retrieving the current status of an order.
       /// </summary>
       [JsonProperty("order_id")]
-      public int OrderId { get; set; }
+      public long OrderId { get; set; }
    }
 }

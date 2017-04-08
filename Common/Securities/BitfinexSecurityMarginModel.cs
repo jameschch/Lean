@@ -30,7 +30,7 @@ namespace QuantConnect.Securities
         /// <remarks>Bitfinex will not liquidate a position at maximum leverage unless debt/equity ratio limit of 15% is reached.</remarks>
         public BitfinexSecurityMarginModel() : base(0.33m, 0.01m)
         {
-        
+
         }
 
         /// <summary>
@@ -43,6 +43,8 @@ namespace QuantConnect.Securities
         /// <returns>An order object representing a liquidation order to be executed to bring the account within margin requirements</returns>
         public override SubmitOrderRequest GenerateMarginCallOrder(Security security, decimal totalPortfolioValue, decimal totalMargin)
         {
+            const decimal maximumShortRatio = 1.45m;
+
             if (!security.Holdings.Invested)
             {
                 return null;
@@ -57,12 +59,12 @@ namespace QuantConnect.Securities
 
             //Will force liquidate when Ticker to Position price ratio > 1.5           
             decimal ratio = security.Holdings.Price / security.Holdings.AveragePrice;
-            if ((security.Holdings.IsShort && ratio < 1.5m) || (security.Holdings.IsLong && ratio > 0.75m))
+            if ((security.Holdings.IsShort && ratio < maximumShortRatio) || (security.Holdings.IsLong && ratio > 0.75m))
             {
                 return null;
             }
 
-            var delta = security.Holdings.IsShort ? ratio - 1.5m : 0.75m - ratio;
+            var delta = security.Holdings.IsShort ? ratio - maximumShortRatio : 0.75m - ratio;
 
             var quantity = security.Holdings.AbsoluteQuantity * Math.Abs(delta);
             quantity = Math.Max(security.SymbolProperties.LotSize, Math.Min(security.Holdings.AbsoluteQuantity, quantity));
@@ -75,9 +77,26 @@ namespace QuantConnect.Securities
                 quantity *= -1;
             }
 
+            Logging.Log.Debug("margin call was attempted");
+
             return new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol, quantity, 0, 0, DateTime.UtcNow, "Margin Call");
         }
 
+        /// <summary>
+        /// Gets the margin currently alloted to the specified holding
+        /// </summary>
+        /// <param name="security">The security to compute maintenance margin for</param>
+        /// <returns>The maintenance margin required for the </returns>
+        public override decimal GetMaintenanceMargin(Security security)
+        {
+            return security.Holdings.AbsoluteHoldingsValue * GetMaintenanceMarginRequirement(security) - security.Holdings.UnrealizedProfit;
+        }
+
+        private decimal DebtToEquityRatio(Security security)
+        {
+            decimal ratio = security.Holdings.Price / security.Holdings.AveragePrice;
+            return ratio;
+        }
 
     }
 }

@@ -10,7 +10,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest.Json
    public class BitfinexMarginPositionResponse
    {
       [JsonProperty("id")]
-      public int Id { get; set; }
+      public long Id { get; set; }
 
       [JsonProperty("symbol")]
       public string Symbol { get; set; }

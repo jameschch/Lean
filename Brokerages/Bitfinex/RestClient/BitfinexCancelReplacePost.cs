@@ -10,7 +10,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest.Json
    public class BitfinexCancelReplacePost : BitfinexNewOrderPost
    {
       [JsonProperty("order_id")]
-      public int CancelOrderId { get; set; }
+      public long CancelOrderId { get; set; }
 
    }
 }

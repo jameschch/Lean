@@ -209,6 +209,7 @@
     <Compile Include="Indicators\AccumulationDistributionTests.cs" />
     <Compile Include="Indicators\AverageDirectionalIndexTests.cs" />
     <Compile Include="Indicators\EmpiricalModeDecompositionTests.cs" />
+    <Compile Include="Indicators\HurstExponentTests.cs" />
     <Compile Include="Indicators\SwissArmyKnifeTests.cs" />
     <Compile Include="Indicators\FractalAdaptiveMovingAverageTests.cs" />
     <Compile Include="Indicators\KaufmanAdaptiveMovingAverageTests.cs" />

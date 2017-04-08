@@ -3,7 +3,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest.Json
 {
     public class BitfinexCancelReplaceOrderResponse : BitfinexNewOrderResponse
     {
-        public int OriginalOrderId { get; set; }
+        public long OriginalOrderId { get; set; }
 
         public override string ToString()
         {

@@ -59,7 +59,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// List of unknown orders
         /// </summary>
-        protected readonly FixedSizeHashQueue<int> UnknownOrderIDs = new FixedSizeHashQueue<int>(1000);
+        protected readonly FixedSizeHashQueue<long> UnknownOrderIDs = new FixedSizeHashQueue<long>(1000);
         /// <summary>
         /// Name of wallet
         /// </summary>
@@ -87,7 +87,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         const string _stop = "stop";
         const string usd = "usd";
 
-        public ConcurrentDictionary<int, BitfinexFill> FillSplit { get; set; }
+        public ConcurrentDictionary<long, BitfinexFill> FillSplit { get; set; }
         #endregion
 
         /// <summary>
@@ -101,7 +101,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             Wallet = wallet;
             _restClient = restClient;
             SecurityProvider = securityProvider;
-            FillSplit = new ConcurrentDictionary<int, BitfinexFill>();
+            FillSplit = new ConcurrentDictionary<long, BitfinexFill>();
         }
 
         /// <summary>
@@ -257,13 +257,13 @@ namespace QuantConnect.Brokerages.Bitfinex
 
                 foreach (var id in order.BrokerId)
                 {
-                    var response = _restClient.CancelOrder(int.Parse(id));
+                    var response = _restClient.CancelOrder(long.Parse(id));
                     if (response.Id > 0)
                     {
                         Order cached;
                         this.CachedOrderIDs.TryRemove(order.Id, out cached);
-                        const int orderFee = 0;
-                        OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, orderFee, "Bitfinex Cancel Order Event") { Status = OrderStatus.Canceled });
+
+                        OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "Bitfinex Cancel Order Event") { Status = OrderStatus.Canceled });
                     }
                     else
                     {

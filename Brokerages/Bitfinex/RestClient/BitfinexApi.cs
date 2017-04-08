@@ -108,7 +108,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
             }
         }
 
-        public virtual BitfinexOrderStatusResponse CancelOrder(int orderId)
+        public virtual BitfinexOrderStatusResponse CancelOrder(long orderId)
         {
             var cancelPost = new BitfinexOrderStatusPost();
             cancelPost.Request = OrderCancelRequestUrl;
@@ -125,7 +125,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest
             return orderCancelResponseObj;
         }
 
-        public virtual BitfinexCancelReplaceOrderResponse CancelReplaceOrder(int cancelOrderId, BitfinexNewOrderPost newOrder)
+        public virtual BitfinexCancelReplaceOrderResponse CancelReplaceOrder(long cancelOrderId, BitfinexNewOrderPost newOrder)
         {
             var replaceOrder = new BitfinexCancelReplacePost()
             {

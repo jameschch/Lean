@@ -180,7 +180,13 @@ namespace QuantConnect.Brokerages.Bitfinex
         private void PopulateTrade(string term, string[] data)
         {
             var msg = new TradeMessage(term, data);
-            int brokerId = msg.TrdOrdId;
+
+            if (!msg.IsTradeUpdate)
+            {
+                return;
+            }
+
+            long brokerId = msg.TrdOrdId;
 
             var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(brokerId.ToString()));
 
@@ -204,7 +210,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                 (
                     cached.First().Key, Symbol.Create(msg.TrdPair, SecurityType.Forex, Market.Bitfinex), msg.TrdTimestamp, OrderStatus.PartiallyFilled,
                     msg.TrdAmountExecuted > 0 ? OrderDirection.Buy : OrderDirection.Sell,
-                    msg.TrdPriceExecuted, 0,
+                    msg.TrdPriceExecuted, msg.TrdAmountExecuted,
                     0, "Bitfinex Fill Event"
                 );
                 fill.FillPrice = msg.TrdPriceExecuted;
@@ -213,7 +219,8 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     fill.Status = OrderStatus.Filled;
                     fill.OrderFee = Math.Abs(split.TotalFee());
-                    fill.FillQuantity = split.TotalQuantity;
+                    decimal remaining = split.OrderQuantity - (split.TotalQuantity() - msg.TrdAmountExecuted);
+                    fill.FillQuantity = remaining > 0 ? remaining : 0;
                     FilledOrderIDs.Add(cached.First().Key);
 
                     Order outOrder = cached.First().Value;

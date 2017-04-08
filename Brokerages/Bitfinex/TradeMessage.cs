@@ -76,14 +76,14 @@ namespace QuantConnect.Brokerages.Bitfinex
             TrdSeq = AllValues[_trd_seq];
             TrdPair = AllValues[_trd_pair];
             TrdTimestamp = GetDateTime(_trd_timestamp);
-            TrdOrdId = GetInt(_trd_ord_id);
+            TrdOrdId = GetLong(_trd_ord_id);
             TrdAmountExecuted = GetDecimal(_trd_amount_executed);
             TrdPriceExecuted = GetDecimal(_trd_price_executed);
             OrdType = AllValues[_ord_type];
             OrdPrice = TryGetDecimal(_ord_price);
             if (AllValues.Length == 11)
             {
-                TrdId = TryGetInt(_trd_id);
+                TrdId = TryGetLong(_trd_id);
                 Fee = TryGetDecimal(_fee);
                 FeeCurrency = AllValues[_fee_currency];
             }
@@ -98,7 +98,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Trade Id
         /// </summary>
-        public int TrdId { get; set; }
+        public long TrdId { get; set; }
         /// <summary>
         /// Currency Pair
         /// </summary>
@@ -110,7 +110,7 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Order Id
         /// </summary>
-        public int TrdOrdId { get; set; }
+        public long TrdOrdId { get; set; }
         /// <summary>
         /// Amount Executed
         /// </summary>

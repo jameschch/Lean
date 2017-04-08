@@ -108,13 +108,12 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
 
             unit.OnMessage(unit, BitfinexTestsHelpers.GetArgs(json));
             Assert.IsTrue(raised.WaitOne(1000));
-
         }
 
         [Test()]
         public void OnMessageTradeExponentTest()
         {
-            string brokerId = "2";
+            string brokerId = "2256717409";
             string json = "[0,\"tu\", [\"abc123\",\"1\",\"BTCUSD\",\"1453989092 \",\"" + brokerId + "\",\"3\",\"4\",\"<ORD_TYPE>\",\"5\",\"0.000006\",\"USD\"]]";
             BitfinexTestsHelpers.AddOrder(unit, 1, brokerId, 3);
             ManualResetEvent raised = new ManualResetEvent(false);
@@ -324,11 +323,8 @@ namespace QuantConnect.Brokerages.Bitfinex.Tests
         public void OnMessageTradeSplitFillTest()
         {
             int expectedQuantity = 2;
-
             BitfinexTestsHelpers.AddOrder(unit, 1, "700658426", expectedQuantity);
-
             ManualResetEvent raised = new ManualResetEvent(false);
-
             decimal expectedFee = 1.72366541m;
             decimal actualFee = 0;
             decimal actualQuantity = 0;

@@ -40,7 +40,7 @@ namespace QuantConnect.Brokerages.Bitfinex
             }
         }
 
-        Dictionary<int, TradeMessage> messages = new Dictionary<int, TradeMessage>();
+        Dictionary<long, TradeMessage> messages = new Dictionary<long, TradeMessage>();
 
         /// <summary>
         /// Creates instance of BitfinexFill
@@ -61,11 +61,6 @@ namespace QuantConnect.Brokerages.Bitfinex
             if (!messages.ContainsKey(msg.TrdId))
             {
                 messages.Add(msg.TrdId, msg);
-                return true;
-            }
-            else if (msg.IsTradeUpdate)
-            {
-                messages[msg.TrdId] = msg;
                 return true;
             }
 
@@ -95,7 +90,15 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// Total amount executed across all fills
         /// </summary>
         /// <returns></returns>
-        public decimal TotalQuantity
+        public decimal TotalQuantity()
+        {
+            return messages.Sum(m => m.Value.TrdAmountExecuted);
+        }
+
+        /// <summary>
+        /// Original order quantity
+        /// </summary>
+        public decimal OrderQuantity
         {
             get { return _order.Quantity; }
         }

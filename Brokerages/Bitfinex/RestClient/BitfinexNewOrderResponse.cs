@@ -8,7 +8,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest.Json
     public class BitfinexNewOrderResponse
     {
         [JsonProperty("id")]
-        public int Id { get; set; }
+        public long Id { get; set; }
 
         [JsonProperty("symbol")]
         public string Symbol { get; set; }
@@ -50,7 +50,7 @@ namespace QuantConnect.Brokerages.Bitfinex.Rest.Json
         public string ExecutedAmount { get; set; }
 
         [JsonProperty("order_id")]
-        public int OrderId { get; set; }
+        public long OrderId { get; set; }
 
        public override string ToString()
        {
