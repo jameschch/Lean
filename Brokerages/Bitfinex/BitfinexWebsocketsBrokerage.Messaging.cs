@@ -214,13 +214,14 @@ namespace QuantConnect.Brokerages.Bitfinex
                     0, "Bitfinex Fill Event"
                 );
                 fill.FillPrice = msg.TrdPriceExecuted;
+                fill.FillPriceCurrency = cached.First().Value.PriceCurrency;
 
                 if (split.IsCompleted())
                 {
                     fill.Status = OrderStatus.Filled;
                     fill.OrderFee = Math.Abs(split.TotalFee());
-                    decimal remaining = split.OrderQuantity - (split.TotalQuantity() - msg.TrdAmountExecuted);
-                    fill.FillQuantity = remaining > 0 ? remaining : 0;
+                    //decimal remaining = split.OrderQuantity - (split.TotalQuantity() - msg.TrdAmountExecuted);
+                    fill.FillQuantity = msg.TrdAmountExecuted;
                     FilledOrderIDs.Add(cached.First().Key);
 
                     Order outOrder = cached.First().Value;
