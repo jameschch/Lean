@@ -214,7 +214,9 @@
     <Compile Include="QuantQuoteConverter\Program.cs" />
     <Compile Include="IDataDownloader.cs" />
     <Compile Include="RawFileProcessor.cs" />
+    <Compile Include="YahooDownloader\Historical.cs" />
     <Compile Include="YahooDownloader\Program.cs" />
+    <Compile Include="YahooDownloader\Token.cs" />
     <Compile Include="YahooDownloader\YahooDataDownloader.cs" />
     <Compile Include="CsvDataProcessor.cs" />
     <Compile Include="ZipStreamProvider.cs" />

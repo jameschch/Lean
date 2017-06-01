@@ -28,10 +28,13 @@ namespace QuantConnect.ToolBox.YahooDownloader
     /// </summary>
     public class YahooDataDownloader : IDataDownloader
     {
+
+
+
         //Initialize
-        private string _urlPrototype = @"http://ichart.finance.yahoo.com/table.csv?s={0}&a={1}&b={2}&c={3}&d={4}&e={5}&f={6}&g={7}&ignore=.csv";
-        private string _urlEventsPrototype = @"http://ichart.finance.yahoo.com/x?s={0}&a={1}&b={2}&c={3}&d={4}&e={5}&f={6}&g={7}&y=0&z=30000";
-        private const string splitString = "SPLIT";
+        private const string events = "div|split";
+        private const string history = "history";
+
         /// <summary>
         /// Get historical data enumerable for a single symbol, type and resolution given this start and end time (in UTC).
         /// </summary>
@@ -52,31 +55,18 @@ namespace QuantConnect.ToolBox.YahooDownloader
                 throw new ArgumentException("The end date must be greater or equal than the start date.");
 
             // Note: Yahoo syntax requires the month zero-based (0-11)
-            var url = string.Format(_urlPrototype, symbol.Value, startUtc.Month - 1, startUtc.Day, startUtc.Year, endUtc.Month - 1, endUtc.Day, endUtc.Year, "d");
 
-            using (var cl = new WebClient())
+            var data = Historical.Get(symbol.Value, startUtc, endUtc, history);
+
+            foreach (var item in data)
             {
-                var data = cl.DownloadString(url);
-                var lines = data.Split('\n');
-
-                for (var i = lines.Length - 1; i >= 1; i--)
-                {
-                    var str = lines[i].Split(',');
-                    if (str.Length < 6) continue;
-                    var ymd = str[0].Split('-');
-                    var year = ymd[0].ToInt32();
-                    var month = ymd[1].ToInt32();
-                    var day = ymd[2].ToInt32();
-                    var open = str[1].ToDecimal();
-                    var high = str[2].ToDecimal();
-                    var low = str[3].ToDecimal();
-                    var close = str[4].ToDecimal();
-                    var volume = str[5].ToInt64();
-                    yield return new TradeBar(new DateTime(year, month, day), symbol, open, high, low, close, volume, TimeSpan.FromDays(1));
-                }
+                yield return new TradeBar(item.Date, symbol, item.Open, item.High, item.Low, item.Close, (long)item.Volume, TimeSpan.FromDays(1));
             }
-        }
 
+            //todo:
+            //var eventData = Historical.Get(symbol.Value, startUtc, endUtc, events);
+
+        }
 
         /// <summary>
         /// Download Dividend and Split data from Yahoo
@@ -87,64 +77,45 @@ namespace QuantConnect.ToolBox.YahooDownloader
         /// <returns></returns>
         public Queue<BaseData> DownloadSplitAndDividendData(Symbol symbol, DateTime startUtc, DateTime endUtc)
         {
-            var url = string.Format( _urlEventsPrototype, symbol.ID.Symbol.ToLower(), startUtc.Month, startUtc.Day, startUtc.Year, endUtc.Month, endUtc.Day, endUtc.Year, "v");
-            using (var cl = new WebClient())
+            var data = Historical.GetRaw(symbol.Value, startUtc, endUtc, events);
+
+            var parsed = new List<BaseData>();
+
+            bool isSplit = false;
+
+            foreach (var item in data.Split('\n'))
             {
-                var data = cl.DownloadString(url);
-
-                return GetSplitsAndDividendsFromYahoo(data);
-            }
-        }
-
-        /// <summary>
-        /// Parse the data returned from Yahoo
-        /// </summary>
-        /// <param name="data">string downloaded from yahoo</param>
-        /// <returns>Queue of dividends and splits</returns>
-        private Queue<BaseData> GetSplitsAndDividendsFromYahoo(string data)
-        {
-            var lines = data.Split('\n');
-
-            var yahooSplits = new List<BaseData>();
-
-            foreach (var line in lines)
-            {
-                var values = line.Split(',');
-
-                if (values.Length == 3)
+                if (item == "Date,Stock Splits")
                 {
-                    yahooSplits.Add(ParseYahooEvent(values));
+                    isSplit = true;
+                    continue;
+                }
+                if (item == "")
+                {
+                    break;
+                }
+
+                string[] values = item.Split(',');
+
+                if (isSplit)
+                {
+                    parsed.Add(new Split
+                    {
+                        Time = DateTime.ParseExact(values[0].Replace("-", String.Empty), DateFormat.EightCharacter, CultureInfo.InvariantCulture),
+                        Value = ParseAmount(values[1])
+                    });
+                }
+                else
+                {
+                    parsed.Add(new Dividend
+                    {
+                        Time = DateTime.ParseExact(values[0].Replace("-", String.Empty), DateFormat.EightCharacter, CultureInfo.InvariantCulture),
+                        Value = Decimal.Parse(values[1])
+                    });
                 }
             }
 
-            return new Queue<BaseData>(yahooSplits.OrderByDescending(x => x.Time));
-        }
-
-        /// <summary>
-        /// Create yahoo event that represents dividend or split
-        /// </summary>
-        /// <param name="values">Represents single line from yahoo data</param>
-        /// <returns>A single yahoo event</returns>
-        private BaseData ParseYahooEvent(string[] values)
-        {
-
-            if (values[0] == splitString)
-            {
-                return new Split()
-                {
-                    Time = DateTime.ParseExact(values[1].Replace(" ", String.Empty), DateFormat.EightCharacter, CultureInfo.InvariantCulture),
-                    Value = values[0] == splitString ? ParseAmount(values[2]) : Decimal.Parse(values[2])
-                };
-            }
-            else
-            {
-                return new Dividend()
-                {
-                    Time = DateTime.ParseExact(values[1].Replace(" ", String.Empty), DateFormat.EightCharacter, CultureInfo.InvariantCulture),
-                    Value = values[0] == splitString ? ParseAmount(values[2]) : Decimal.Parse(values[2])
-                };
-            }
-            
+            return new Queue<BaseData>(parsed.OrderByDescending(x => x.Time));
         }
 
         /// <summary>
@@ -154,8 +125,9 @@ namespace QuantConnect.ToolBox.YahooDownloader
         /// <returns>Decimal representing the split ratio</returns>
         private decimal ParseAmount(string splitFactor)
         {
-            var factors = splitFactor.Split(':');
-            return Decimal.Parse(factors[1]) / Decimal.Parse(factors[0]);
+            var factors = splitFactor.Split('/');
+            return Decimal.Parse(factors[0]) / Decimal.Parse(factors[1]);
         }
+
     }
 }
