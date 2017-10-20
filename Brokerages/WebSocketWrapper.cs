@@ -12,8 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
-
 using System;
+using System.Threading;
 using WebSocketSharp;
 
 namespace QuantConnect.Brokerages
@@ -23,7 +23,8 @@ namespace QuantConnect.Brokerages
     /// </summary>
     public class WebSocketWrapper : IWebSocket
     {
-        private WebSocket _wrapped;
+        private Timer timer;
+        private WebSocket wrapped;
         private string _url;
 
         /// <summary>
@@ -32,17 +33,19 @@ namespace QuantConnect.Brokerages
         /// <param name="url"></param>
         public void Initialize(string url)
         {
-            if (_wrapped != null)
+            if (wrapped != null)
             {
                 throw new InvalidOperationException("WebSocketWrapper has already been initialized for: " + _url);
             }
 
             _url = url;
-            _wrapped = new WebSocket(url);
+            wrapped = new WebSocket(url);
+            timer = new Timer(_ => wrapped.Ping());
+            timer.Change(TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
 
-            _wrapped.OnOpen += (sender, args) => OnOpen();
-            _wrapped.OnMessage += (sender, args) => OnMessage(new WebSocketMessage(args.Data));
-            _wrapped.OnError += (sender, args) => OnError(new WebSocketError(args.Message, args.Exception));
+            wrapped.OnOpen += (sender, args) => OnOpen();
+            wrapped.OnMessage += (sender, args) => OnMessage(new WebSocketMessage(args.Data));
+            wrapped.OnError += (sender, args) => OnError(new WebSocketError(args.Message, args.Exception));
         }
 
         /// <summary>
@@ -61,7 +64,7 @@ namespace QuantConnect.Brokerages
         {
             if (!IsOpen)
             {
-                _wrapped.Connect();
+                wrapped.Connect();
             }
         }
 
@@ -76,7 +79,10 @@ namespace QuantConnect.Brokerages
         /// <summary>
         /// Wraps IsAlive
         /// </summary>
-        public bool IsOpen => _wrapped.IsAlive;
+        public bool IsOpen
+        {
+            get { return wrapped.IsAlive; }
+        }
 
         /// <summary>
         /// Wraps message event
@@ -98,7 +104,6 @@ namespace QuantConnect.Brokerages
         /// </summary>
         protected virtual void OnMessage(WebSocketMessage e)
         {
-            //Logging.Log.Trace("WebSocketWrapper.OnMessage(): " + e.Message);
             Message?.Invoke(this, e);
         }
 
@@ -108,7 +113,6 @@ namespace QuantConnect.Brokerages
         /// <param name="e"></param>
         protected virtual void OnError(WebSocketError e)
         {
-            Logging.Log.Error(e.Exception, "WebSocketWrapper.OnError(): " + e.Message);
             Error?.Invoke(this, e);
         }
 
@@ -117,7 +121,6 @@ namespace QuantConnect.Brokerages
         /// </summary>
         protected virtual void OnOpen()
         {
-            Logging.Log.Trace($"WebSocketWrapper.OnOpen(): Connection opened({IsOpen}): {_url}");
             Open?.Invoke(this, EventArgs.Empty);
         }
     }

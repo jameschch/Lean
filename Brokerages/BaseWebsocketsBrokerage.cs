@@ -115,8 +115,8 @@ namespace QuantConnect.Brokerages
         /// </summary>
         public override void Connect()
         {
-            if (IsConnected)
-                return;
+            WebSocket.Message += OnMessage;
+            WebSocket.Error += OnError;
 
             Log.Trace("BaseWebSocketsBrokerage.Connect(): Connecting...");
             WebSocket.Connect();
@@ -267,7 +267,7 @@ namespace QuantConnect.Brokerages
             finally
             {
                 WebSocket.Error += this.OnError;
-                this.Subscribe(subscribed);
+                this.Subscribe(null, subscribed);
             }
         }
 

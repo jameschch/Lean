@@ -14,6 +14,7 @@
 */
 
 using Newtonsoft.Json;
+using QuantConnect.Interfaces;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
 using RestSharp;
@@ -21,7 +22,6 @@ using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
-using System.Net;
 
 namespace QuantConnect.Brokerages.GDAX
 {
@@ -192,7 +192,37 @@ namespace QuantConnect.Brokerages.GDAX
                 Order order;
                 if (item.Type == "market")
                 {
-                    order = new MarketOrder { Price = item.Price };
+                    var orders = JsonConvert.DeserializeObject<Messages.Order[]>(response.Content);
+                    foreach (var item in orders)
+                    {
+                        Order order = null;
+                        if (item.Type == "market")
+                        {
+                            order = new MarketOrder { Price = item.Price };
+                        }
+                        else if (item.Type == "limit")
+                        {
+                            order = new LimitOrder { LimitPrice = item.Price };
+                        }
+                        else if (item.Type == "stop")
+                        {
+                            order = new StopMarketOrder { StopPrice = item.Price };
+                        }
+                        else
+                        {
+                            OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, (int)response.StatusCode,
+                                "GDAXBrokerage.GetOpenOrders: Unsupported order type returned from brokerage: " + item.Type));
+                            continue;
+                        }
+
+                        order.Quantity = item.Side == "sell" ? -item.Size : item.Size;
+                        order.BrokerId = new List<string> { item.Id.ToString() };
+                        order.Symbol = ConvertProductId(item.ProductId);
+                        order.Time = DateTime.UtcNow;
+                        order.Status = ConvertOrderStatus(item);
+                        order.Price = item.Price;
+                        list.Add(order);
+                    }
                 }
                 else if (item.Type == "limit")
                 {

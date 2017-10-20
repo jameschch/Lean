@@ -21,9 +21,9 @@ using QuantConnect.Orders;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using QuantConnect.Packets;
 using System.Threading;
 using RestSharp;
 using System.Text.RegularExpressions;
@@ -136,31 +136,6 @@ namespace QuantConnect.Brokerages.GDAX
         /// <param name="sender"></param>
         /// <param name="e"></param>
         public override void OnMessage(object sender, WebSocketMessage e)
-        {
-            // Verify if we're allowed to handle the streaming packet yet; while we're placing an order we delay the
-            // stream processing a touch.
-            try
-            {
-                if (_streamLocked)
-                {
-                    _messageBuffer.Enqueue(e);
-                    return;
-                }
-            }
-            catch (Exception err)
-            {
-                Log.Error(err);
-            }
-
-            OnMessageImpl(sender, e);
-        }
-
-        /// <summary>
-        /// Implementation of the OnMessage event
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void OnMessageImpl(object sender, WebSocketMessage e)
         {
             try
             {
@@ -355,26 +330,8 @@ namespace QuantConnect.Brokerages.GDAX
                 return;
             }
 
-            Log.Trace($"GDAXBrokerage.OrderMatch(): Match: {message.ProductId} {data}");
-
-            var order = currentOrder.Value;
-
-            if (order.Type == OrderType.Market)
-            {
-                // Fill events for this order will be delayed until we receive messages for a different order,
-                // so we can know which is the last fill.
-                // The market order total filled quantity can be less than the total order quantity,
-                // details here: https://github.com/QuantConnect/Lean/issues/1751
-
-                // do not process market order fills immediately, save off the order ids
-                _pendingGdaxMarketOrderId = order.BrokerId[0];
-                _pendingLeanMarketOrderId = order.Id;
-            }
-
-            if (!FillSplit.ContainsKey(order.Id))
-            {
-                FillSplit[order.Id] = new GDAXFill(order);
-            }
+            OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1,
+                $"GDAXWebsocketsBrokerage.OrderDone: Encountered done message prior to match filling order brokerId: {message.OrderId} orderId: {cached.FirstOrDefault().Key}"));
 
             var split = FillSplit[order.Id];
             split.Add(message);
@@ -467,11 +424,8 @@ namespace QuantConnect.Brokerages.GDAX
                     Time = DateTime.UtcNow,
                     Symbol = symbol,
                     TickType = TickType.Quote,
-                    AskSize = askSize,
-                    BidSize = bidSize
-                });
-            }
-        }
+                    //todo: tick volume
+                };
 
         /// <summary>
         /// Emits a new trade tick from a match message
@@ -515,6 +469,25 @@ namespace QuantConnect.Brokerages.GDAX
                 else
                 {
                     this.ChannelList[item.Value] = new Channel { Name = item.Value, Symbol = item.Value };
+
+                    //emit baseline tick
+                    var message = GetTick(item);
+
+                    lock (_tickLocker)
+                    {
+                        Tick updating = new Tick
+                        {
+                            AskPrice = message.AskPrice,
+                            BidPrice = message.BidPrice,
+                            Value = (message.AskPrice + message.BidPrice) / 2m,
+                            Time = DateTime.UtcNow,
+                            Symbol = item,
+                            TickType = TickType.Quote
+                            //todo: tick volume
+                        };
+
+                        this.Ticks.Add(updating);
+                    }
                 }
             }
 

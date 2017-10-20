@@ -28,14 +28,14 @@ namespace QuantConnect.Tests.Brokerages.GDAX
 
         public static Security GetSecurity(decimal price = 1m, SecurityType securityType = SecurityType.Crypto, Resolution resolution = Resolution.Minute)
         {
-            return new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.Utc), CreateConfig(securityType, resolution), new Cash(CashBook.AccountCurrency, 1000, price),
+            return new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.Utc), CreateConfig(), new Cash(CashBook.AccountCurrency, 1000, price),
                 new SymbolProperties("BTCUSD", CashBook.AccountCurrency, 1, 1, 0.01m));
         }
 
         private static SubscriptionDataConfig CreateConfig(SecurityType securityType = SecurityType.Crypto, Resolution resolution = Resolution.Minute)
         {
-            return new SubscriptionDataConfig(typeof(TradeBar), Symbol.Create("BTCUSD", securityType, Market.GDAX), resolution, TimeZones.Utc, TimeZones.Utc,
-            false, true, false);
+            return new SubscriptionDataConfig(typeof(TradeBar), Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX), Resolution.Minute, TimeZones.Utc, TimeZones.Utc,
+                false, true, false);
         }
 
         public static void AddOrder(GDAXBrokerage unit, int id, string brokerId, decimal quantity)
