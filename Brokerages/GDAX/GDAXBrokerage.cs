@@ -75,17 +75,7 @@ namespace QuantConnect.Brokerages.GDAX
             {
                 var raw = JsonConvert.DeserializeObject<Messages.Order>(response.Content);
 
-                if (raw?.Id == null)
-                {
-                    var errorMessage = $"Error parsing response from place order: {response.Content}";
-                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "GDAX Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
-                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, (int)response.StatusCode, errorMessage));
-
-                    UnlockStream();
-                    return true;
-                }
-
-                if (raw.Status == "rejected")
+                if (raw == null || raw.Id == null)
                 {
                     var errorMessage = "Reject reason: " + raw.RejectReason;
                     OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "GDAX Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
@@ -113,7 +103,19 @@ namespace QuantConnect.Brokerages.GDAX
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "GDAX Order Event") { Status = OrderStatus.Submitted });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1, "Order completed successfully orderid:" + order.Id));
 
-                UnlockStream();
+                if (order.Type == OrderType.Market)
+                {
+                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, (decimal) raw.FillFees, "GDAX Order Event")
+                    {
+                        Status = OrderStatus.Filled,
+                        FillPrice = raw.FilledSize,
+                        FillQuantity = raw.ExecutedValue / raw.FilledSize
+                    });
+                    Orders.Order outOrder = null;
+                    CachedOrderIDs.TryRemove(order.Id, out outOrder);
+                }
+
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1, "GDAXBrokerage.PlaceOrder: Order completed successfully orderid:" + order.Id.ToString()));
                 return true;
             }
 
