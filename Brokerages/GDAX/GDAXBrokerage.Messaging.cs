@@ -28,8 +28,6 @@ using System.Threading;
 using RestSharp;
 using System.Text.RegularExpressions;
 using QuantConnect.Logging;
-using QuantConnect.Orders.Fees;
-using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages.GDAX
 {
@@ -190,7 +188,8 @@ namespace QuantConnect.Brokerages.GDAX
             {
                 var message = JsonConvert.DeserializeObject<Messages.Snapshot>(data);
 
-                var symbol = ConvertProductId(message.ProductId);
+            var symbol = ConvertProductId(message.ProductId);
+            Log.Trace($"GDAXBrokerage.OrderMatch(): Match event for {message.ProductId} Data:{Environment.NewLine}{data}");
 
                 OrderBook orderBook;
                 if (!_orderBooks.TryGetValue(symbol, out orderBook))
@@ -226,8 +225,8 @@ namespace QuantConnect.Brokerages.GDAX
             }
             catch (Exception e)
             {
-                Log.Error(e);
-                throw;
+                Log.Trace("GDAXBrokerage.Messaging.OrderMatch(): No match found");
+                return;
             }
         }
 
@@ -288,12 +287,13 @@ namespace QuantConnect.Brokerages.GDAX
 
         private void OrderMatch(string data)
         {
-            // deserialize the current match (trade) message
-            var message = JsonConvert.DeserializeObject<Messages.Matched>(data, JsonSettings);
+            Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order completed with data {data}");
+            var message = JsonConvert.DeserializeObject<Messages.Done>(data, JsonSettings);
 
             if (_isDataQueueHandler)
             {
-                EmitTradeTick(message);
+                Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order cancelled. Remaining {message.RemainingSize}");
+                return;
             }
 
             // check the list of currently active orders, if the current trade is ours we are either a maker or a taker
@@ -306,27 +306,7 @@ namespace QuantConnect.Brokerages.GDAX
                 // order fill for other order of ours (less likely but may happen)
                 currentOrder.Value.BrokerId[0] != _pendingGdaxMarketOrderId))
             {
-                // process all fills for our pending market order
-                var fills = FillSplit[_pendingLeanMarketOrderId];
-                var fillMessages = fills.Messages;
-
-                for (var i = 0; i < fillMessages.Count; i++)
-                {
-                    var fillMessage = fillMessages[i];
-                    var isFinalFill = i == fillMessages.Count - 1;
-
-                    // emit all order events with OrderStatus.PartiallyFilled except for the last one which has OrderStatus.Filled
-                    EmitFillOrderEvent(fillMessage, fills.Order.Symbol, fills, isFinalFill);
-                }
-
-                // clear the pending market order
-                _pendingGdaxMarketOrderId = null;
-                _pendingLeanMarketOrderId = 0;
-            }
-
-            if (currentOrder.Value == null)
-            {
-                // not our order, nothing else to do here
+                Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order could not locate order in cache with order id {message.OrderId}");
                 return;
             }
 
