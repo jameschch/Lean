@@ -269,12 +269,49 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns></returns>
         public override List<Holding> GetAccountHoldings()
         {
-            /*
-             * On launching the algorithm the cash balances are pulled and stored in the cashbook.
-             * There are no pre-existing currency swaps as we don't know the entire historical breakdown that brought us here.
-             * Attempting to figure this out would be growing problem; every new trade would need to be processed.
-             */
-            return new List<Holding>();
+            var list = new List<Holding>();
+
+            var req = new RestRequest("/orders?status=active", Method.GET);
+            GetAuthenticationToken(req);
+            var response = RestClient.Execute(req);
+            if (response != null)
+            {
+                foreach (var item in JsonConvert.DeserializeObject<Messages.Order[]>(response.Content))
+                {
+
+                    decimal conversionRate;
+                    if (!item.ProductId.EndsWith("USD", StringComparison.InvariantCultureIgnoreCase))
+                    {
+
+                        var baseSymbol = (item.ProductId.Substring(0, 3) + "USD").ToLower();
+                        var tick = this.GetTick(Symbol.Create(baseSymbol, SecurityType.Crypto, Market.GDAX));
+                        conversionRate = tick.Price;
+                    }
+                    else
+                    {
+                        var tick = this.GetTick(ConvertProductId(item.ProductId));
+                        conversionRate = tick.Price;
+                    }
+
+                    list.Add(new Holding
+                    {
+                        Symbol = ConvertProductId(item.ProductId),
+                        Quantity = item.Side == "sell" ? -item.FilledSize : item.FilledSize,
+                        Type = SecurityType.Crypto,
+                        CurrencySymbol = item.ProductId.Substring(0, 3).ToUpper(),
+                        ConversionRate = conversionRate,
+                        MarketPrice = item.Price,
+                        //todo: check this
+                        AveragePrice = item.FilledSize > 0 ? item.ExecutedValue / item.FilledSize : 0
+                    });
+                }
+
+            }
+            else
+            {
+                Logging.Log.Error("GDAXBrokerage.GetAccountHoldings(): Null response.");
+            }
+            return list;
         }
 
         /// <summary>
