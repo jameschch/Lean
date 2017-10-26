@@ -70,6 +70,10 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Dropbox\algo\Jtc.Algorithm_upstream\Jtc.Algorithm.csproj">
+      <Project>{8871b670-a83f-4d53-aaf1-15a43c0f6183}</Project>
+      <Name>Jtc.Algorithm</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Algorithm.CSharp\QuantConnect.Algorithm.CSharp.csproj">
       <Project>{39a81c16-a1e8-425e-a8f2-1433adb80228}</Project>
       <Name>QuantConnect.Algorithm.CSharp</Name>
