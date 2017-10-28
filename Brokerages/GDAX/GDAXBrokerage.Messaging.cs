@@ -144,7 +144,7 @@ namespace QuantConnect.Brokerages.GDAX
 
                 if (raw.Type == "heartbeat")
                 {
-                    Log.Trace("GDAXBrokerage.OnMessage.heartbeat()");
+                    //Log.Trace("GDAXBrokerage.OnMessage.heartbeat()");
                     return;
                 }
                 else if (raw.Type == "ticker")
