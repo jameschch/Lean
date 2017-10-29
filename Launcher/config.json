@@ -9,20 +9,20 @@
   "environment": "backtesting",// "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
 
   // algorithm class selector
-  "algorithm-type-name": "BasicTemplateAlgorithm",
+  "algorithm-type-name": "GenTreeMin",
 
   // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
   "algorithm-language": "CSharp",
 
   //Physical DLL location
-  "algorithm-location": "QuantConnect.Algorithm.CSharp.dll",
+  "algorithm-location": "Jtc.Algorithm.dll",
   //"algorithm-location": "../../../Algorithm.Python/BasicTemplateAlgorithm.py",
   //"algorithm-location": "QuantConnect.Algorithm.FSharp.dll",
   //"algorithm-location": "QuantConnect.Algorithm.VisualBasic.dll",
   //"algorithm-location": "QuantConnect.Algorithm.Java.dll",
 
   // engine
-  "data-folder": "../../../Data/",
+  "data-folder": "../../../../Data/",
 
   // handlers
   "log-handler": "QuantConnect.Logging.CompositeLogHandler",
@@ -92,9 +92,9 @@
   "iqfeed-version": "1.0",
 
   // gdax configuration
-  "gdax-api-secret": "",
-  "gdax-api-key": "",
-  "gdax-passphrase": "",
+  "gdax-api-secret": "YJtSl1YtL6MsKTRh+dTm1Z0owvvOcA0gSeQfn3/7ag+qT8leRlwPsQ8w5cSP3lzWQCbOd8vtQcTnBnEK/CmwUg==",
+  "gdax-api-key": "b74851361b394c73e0d05d22fc1ddd35",
+  "gdax-passphrase": "uyg75I7Tdfiyty",
 
   // Required to access data from Quandl
   // To get your access token go to https://www.quandl.com/account/api
@@ -261,7 +261,7 @@
       "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
       "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
       "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
-      "history-provider": "BrokerageHistoryProvider"
+      //"history-provider": "BrokerageHistoryProvider"
     },
 
   }

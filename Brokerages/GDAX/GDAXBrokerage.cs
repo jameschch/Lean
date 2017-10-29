@@ -272,7 +272,7 @@ namespace QuantConnect.Brokerages.GDAX
         {
             lock (Ticks)
             {
-                var copy = Ticks.ToArray();
+                var copy = new List<Data.Market.Tick> (Ticks);
                 Ticks.Clear();
                 return copy;
             }
