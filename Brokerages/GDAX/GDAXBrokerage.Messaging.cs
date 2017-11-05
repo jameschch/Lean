@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using QuantConnect.Data.Market;
@@ -46,6 +47,7 @@ namespace QuantConnect.Brokerages.GDAX
         private CancellationTokenSource _canceller = new CancellationTokenSource();
         private ConcurrentQueue<WebSocketMessage> _messageBuffer = new ConcurrentQueue<WebSocketMessage>();
         private volatile bool _streamLocked;
+        private readonly ConcurrentDictionary<int, decimal> _orderFees = new ConcurrentDictionary<int, decimal>();
 
         /// <summary>
         /// Rest client used to call missing conversion rates
@@ -144,12 +146,11 @@ namespace QuantConnect.Brokerages.GDAX
 
                 if (raw.Type == "heartbeat")
                 {
-                    //Log.Trace("GDAXBrokerage.OnMessage.heartbeat()");
                     return;
                 }
                 else if (raw.Type == "ticker")
                 {
-                    EmitTick(e.Message);
+                    EmitQuoteTick(e.Message);
                     return;
                 }
                 else if (raw.Type == "error")
@@ -157,6 +158,7 @@ namespace QuantConnect.Brokerages.GDAX
                     Log.Error($"GDAXBrokerage.OnMessage.error(): Data: {Environment.NewLine}{e.Message}");
                     var error = JsonConvert.DeserializeObject<Messages.Error>(e.Message, JsonSettings);
                     OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, $"GDAXBrokerage.OnMessage: {error.Message} {error.Reason}"));
+                    return;
                 }
                 else if (raw.Type == "done")
                 {
@@ -176,9 +178,9 @@ namespace QuantConnect.Brokerages.GDAX
 
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1, ("GDAXWebsocketsBrokerage.OnMessage: Unexpected message format: " + e.Message)));
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, $"Parsing wss message failed. Data: {e.Message} Exception: {ex.ToString()}"));
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, $"Parsing wss message failed. Data: {e.Message} Exception: {exception}"));
                 throw;
             }
         }
@@ -186,34 +188,39 @@ namespace QuantConnect.Brokerages.GDAX
         private void OrderMatch(string data)
         {
             var message = JsonConvert.DeserializeObject<Messages.Matched>(data, JsonSettings);
-            var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(message.MakerOrderId) || o.Value.BrokerId.Contains(message.TakerOrderId));
+
+            EmitTradeTick(message);
+
+            var cached = CachedOrderIDs
+                .Where(o => o.Value.BrokerId.Contains(message.MakerOrderId) || o.Value.BrokerId.Contains(message.TakerOrderId))
+                .ToList();
 
             var symbol = ConvertProductId(message.ProductId);
 
-            if (!cached.Any())
+            if (cached.Count == 0)
             {
                 return;
             }
 
             Log.Trace($"GDAXBrokerage.OrderMatch(): Match: {message.ProductId} {data}");
-            var orderId = cached.First().Key;
-            var orderObj = cached.First().Value;
+            var orderId = cached[0].Key;
+            var order = cached[0].Value;
 
             if (!FillSplit.ContainsKey(orderId))
             {
-                FillSplit[orderId] = new GDAXFill(orderObj);
+                FillSplit[orderId] = new GDAXFill(order);
             }
 
             var split = FillSplit[orderId];
             split.Add(message);
 
             //is this the total order at once? Is this the last split fill?
-            var status = Math.Abs(message.Size) == Math.Abs(cached.Single().Value.Quantity) || Math.Abs(split.OrderQuantity) == Math.Abs(split.TotalQuantity())
+            var status = Math.Abs(message.Size) == Math.Abs(order.Quantity) || Math.Abs(split.OrderQuantity) == Math.Abs(split.TotalQuantity())
                 ? OrderStatus.Filled : OrderStatus.PartiallyFilled;
 
             OrderDirection direction;
             // Messages are always from the perspective of the market maker. Flip it in cases of a market order.
-            if (orderObj.Type == OrderType.Market)
+            if (order.Type == OrderType.Market)
             {
                 direction = message.Side == "sell" ? OrderDirection.Buy : OrderDirection.Sell;
             }
@@ -222,19 +229,32 @@ namespace QuantConnect.Brokerages.GDAX
                 direction = message.Side == "sell" ? OrderDirection.Sell : OrderDirection.Buy;
             }
 
+            decimal totalOrderFee;
+            if (!_orderFees.TryGetValue(orderId, out totalOrderFee))
+            {
+                totalOrderFee = GetFee(order);
+                _orderFees[orderId] = totalOrderFee;
+            }
+
+            // apply order fee on a pro rata basis
+            var orderFee = totalOrderFee * Math.Abs(message.Size) / Math.Abs(order.Quantity);
+
             var orderEvent = new OrderEvent
             (
-                cached.First().Key, symbol, message.Time, status,
+                orderId, symbol, message.Time, status,
                 direction,
                 message.Price, direction == OrderDirection.Sell ? -message.Size : message.Size,
-                GetFee(cached.First().Value), $"GDAX Match Event {direction}"
+                orderFee, $"GDAX Match Event {direction}"
             );
 
             //if we're filled we won't wait for done event
             if (orderEvent.Status == OrderStatus.Filled)
             {
-                Orders.Order outOrder = null;
-                CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
+                Order outOrder;
+                CachedOrderIDs.TryRemove(orderId, out outOrder);
+
+                decimal outOrderFee;
+                _orderFees.TryRemove(orderId, out outOrderFee);
             }
 
             OnOrderEvent(orderEvent);
@@ -253,30 +273,33 @@ namespace QuantConnect.Brokerages.GDAX
             }
 
             //is this our order?
-            var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(message.OrderId));
+            var cached = CachedOrderIDs.Where(o => o.Value.BrokerId.Contains(message.OrderId)).ToList();
 
-            if (!cached.Any() || cached.Single().Value.Status == OrderStatus.Filled)
+            if (cached.Count == 0 || cached[0].Value.Status == OrderStatus.Filled)
             {
                 Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order could not locate order in cache with order id {message.OrderId}");
                 return;
             }
 
-            OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1,
-                $"GDAXWebsocketsBrokerage.OrderDone: Encountered done message prior to match filling order brokerId: {message.OrderId} orderId: {cached.FirstOrDefault().Key}"));
+            var orderId = cached[0].Key;
+            var order = cached[0].Value;
 
-            var split = this.FillSplit[cached.First().Key];
+            OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1,
+                $"GDAXWebsocketsBrokerage.OrderDone: Encountered done message prior to match filling order brokerId: {message.OrderId} orderId: {orderId}"));
+
+            var split = FillSplit[orderId];
 
             //should have already been filled but match message may have been missed. Let's say we've filled now
             var orderEvent = new OrderEvent
             (
-                cached.First().Key, ConvertProductId(message.ProductId), message.Time, OrderStatus.Filled,
+                orderId, ConvertProductId(message.ProductId), message.Time, OrderStatus.Filled,
                 message.Side == "sell" ? OrderDirection.Sell : OrderDirection.Buy,
                 message.Price, message.Side == "sell" ? -split.TotalQuantity() : split.TotalQuantity(),
-                GetFee(cached.First().Value), "GDAX Fill Event"
+                GetFee(order), "GDAX Fill Event"
             );
 
-            Orders.Order outOrder = null;
-            CachedOrderIDs.TryRemove(cached.First().Key, out outOrder);
+            Order outOrder;
+            CachedOrderIDs.TryRemove(orderId, out outOrder);
 
             OnOrderEvent(orderEvent);
         }
@@ -288,53 +311,60 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns></returns>
         public Tick GetTick(Symbol symbol)
         {
-            var req = new RestRequest(string.Format("/products/{0}/ticker", ConvertSymbol(symbol)), Method.GET);
+            var req = new RestRequest($"/products/{ConvertSymbol(symbol)}/ticker", Method.GET);
             var response = RestClient.Execute(req);
+            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            {
+                throw new Exception($"GDAXBrokerage.GetFee: request failed: [{(int)response.StatusCode}] {response.StatusDescription}, Content: {response.Content}, ErrorMessage: {response.ErrorMessage}");
+            }
+
             var tick = JsonConvert.DeserializeObject<Messages.Tick>(response.Content);
             return new Tick(tick.Time, symbol, tick.Bid, tick.Ask) { Quantity = tick.Volume };
         }
 
         /// <summary>
-        /// Converts a ticker message and emits data as a new tick
+        /// Converts a ticker message and emits data as a new quote tick
         /// </summary>
         /// <param name="data"></param>
-        private void EmitTick(string data)
+        private void EmitQuoteTick(string data)
         {
-
             var message = JsonConvert.DeserializeObject<Messages.Ticker>(data, JsonSettings);
 
             var symbol = ConvertProductId(message.ProductId);
 
             lock (_tickLocker)
             {
-                Tick updating = new Tick
+                Ticks.Add(new Tick
                 {
                     AskPrice = message.BestAsk,
                     BidPrice = message.BestBid,
                     Value = (message.BestAsk + message.BestBid) / 2m,
                     Time = DateTime.UtcNow,
                     Symbol = symbol,
-                    TickType = TickType.Quote,
+                    TickType = TickType.Quote
                     //todo: tick volume
-                };
-
-                this.Ticks.Add(updating);
-
-                lock (_tickLocker)
-                {
-                    Tick last = new Tick
-                    {
-                        Value = message.Price,
-                        Time = DateTime.UtcNow,
-                        Symbol = symbol,
-                        TickType = TickType.Trade,
-                        Quantity = message.Side == "sell" ? -message.LastSize : message.LastSize
-                    };
-
-                    this.Ticks.Add(last);
-                }
+                });
             }
+        }
 
+        /// <summary>
+        /// Emits a new trade tick from a match message
+        /// </summary>
+        private void EmitTradeTick(Messages.Matched message)
+        {
+            var symbol = ConvertProductId(message.ProductId);
+
+            lock (_tickLocker)
+            {
+                Ticks.Add(new Tick
+                {
+                    Value = message.Price,
+                    Time = DateTime.UtcNow,
+                    Symbol = symbol,
+                    TickType = TickType.Trade,
+                    Quantity = message.Size
+                });
+            }
         }
 
         #region IDataQueueHandler
@@ -459,9 +489,14 @@ namespace QuantConnect.Brokerages.GDAX
             }
 
             var raw = JsonConvert.DeserializeObject<JObject>(response.Content);
-            var parsing = raw.SelectToken("rates." + currency);
+            var rate = raw.SelectToken("rates." + currency).Value<decimal>();
+            if (rate == 0)
+            {
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, (int)response.StatusCode, "GetConversionRate: zero value returned from conversion rate service."));
+                return 0;
+            }
 
-            return parsing.Value<decimal>();
+            return 1m / rate;
         }
 
         private bool IsSubscribeAvailable(Symbol symbol)
@@ -476,7 +511,10 @@ namespace QuantConnect.Brokerages.GDAX
         /// <param name="symbols"></param>
         public void Unsubscribe(LiveNodePacket job, IEnumerable<Symbol> symbols)
         {
-            WebSocket.Send(JsonConvert.SerializeObject(new { type = "unsubscribe", channels = _channelNames }));
+            if (WebSocket.IsOpen)
+            {
+                WebSocket.Send(JsonConvert.SerializeObject(new {type = "unsubscribe", channels = _channelNames}));
+            }
         }
         #endregion
 
