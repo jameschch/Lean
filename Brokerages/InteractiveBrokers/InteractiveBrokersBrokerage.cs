@@ -202,6 +202,8 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             // set up event handlers
             _client.UpdatePortfolio += HandlePortfolioUpdates;
             _client.OrderStatus += HandleOrderStatusUpdates;
+            _client.OpenOrder += HandleOpenOrder;
+            _client.OpenOrderEnd += HandleOpenOrderEnd;
             _client.UpdateAccountValue += HandleUpdateAccountValue;
             _client.ExecutionDetails += HandleExecutionDetails;
             _client.CommissionReport += HandleCommissionReport;
@@ -1034,11 +1036,13 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             // we also need to check for negative values, IB returns -1 on Saturday
             if (rate <= 0)
             {
+                string errorMessage;
                 bool pacingViolation;
                 const int pacingDelaySeconds = 60;
 
                 do
                 {
+                    errorMessage = string.Empty;
                     pacingViolation = false;
                     manualResetEvent.Reset();
 
@@ -1070,6 +1074,10 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                             // pacing violation happened
                             pacingViolation = true;
                         }
+                        else
+                        {
+                            errorMessage = $"Code: {args.Code} - ErrorMessage: {args.Message}";
+                        }
                     };
 
                     Log.Trace("InteractiveBrokersBrokerage.GetUsdConversion(): Requesting historical data for " + currencyPair);
@@ -1100,7 +1108,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                         var mostRecentQuote = ordered.FirstOrDefault();
                         if (mostRecentQuote == null)
                         {
-                            throw new Exception("Unable to get recent quote for " + currencyPair);
+                            throw new Exception("Unable to get recent quote for " + currencyPair + " - " + errorMessage);
                         }
 
                         rate = Convert.ToDecimal(mostRecentQuote.Bar.Close);
@@ -1186,13 +1194,20 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
                 // invalidate the order
                 var order = _orderProvider.GetOrderByBrokerageId(requestId);
-                const int orderFee = 0;
-                var orderEvent = new OrderEvent(order, DateTime.UtcNow, orderFee)
+                if (order != null)
                 {
-                    Status = OrderStatus.Invalid,
-                    Message = message
-                };
-                OnOrderEvent(orderEvent);
+                    const int orderFee = 0;
+                    var orderEvent = new OrderEvent(order, DateTime.UtcNow, orderFee)
+                    {
+                        Status = OrderStatus.Invalid,
+                        Message = message
+                    };
+                    OnOrderEvent(orderEvent);
+                }
+                else
+                {
+                    Log.Error($"InteractiveBrokersBrokerage.HandleError.InvalidateOrder(): Unable to locate order with BrokerageID {requestId}");
+                }
             }
 
             OnMessage(new BrokerageMessageEvent(brokerageMessageType, errorCode, errorMsg));
@@ -1377,6 +1392,22 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             {
                 Log.Error("InteractiveBrokersBrokerage.HandleOrderStatusUpdates(): " + err);
             }
+        }
+
+        /// <summary>
+        /// Handle OpenOrder event from IB
+        /// </summary>
+        private static void HandleOpenOrder(object sender, IB.OpenOrderEventArgs e)
+        {
+            Log.Trace($"InteractiveBrokersBrokerage.HandleOpenOrder(): {e}");
+        }
+
+        /// <summary>
+        /// Handle OpenOrderEnd event from IB
+        /// </summary>
+        private static void HandleOpenOrderEnd(object sender, EventArgs e)
+        {
+            Log.Trace("InteractiveBrokersBrokerage.HandleOpenOrderEnd()");
         }
 
         /// <summary>
