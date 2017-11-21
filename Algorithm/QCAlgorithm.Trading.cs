@@ -941,20 +941,65 @@ namespace QuantConnect.Algorithm
             var security = Securities[symbol];
 
             // can't order it if we don't have data
-            if (security.Price == 0)
-            {
-                Error($"The order quantity for {symbol.Value} cannot be calculated: the price of the security is zero.");
-                return 0;
-            }
+            if (price == 0) return 0;
 
-            // this is the value in account currency that we want our holdings to have
+            // if targeting zero, simply return the negative of the quantity
+            if (target == 0) return -security.Holdings.Quantity;
+
+            // this is the value in dollars that we want our holdings to have
             var targetPortfolioValue = target * Portfolio.TotalPortfolioValue;
+            var currentHoldingsValue = security.Holdings.HoldingsValue;
 
-            var result = security.BuyingPowerModel.GetMaximumOrderQuantityForTargetValue(Portfolio, security, targetPortfolioValue);
-            if (result.Quantity == 0 && result.IsError)
+            // remove directionality, we'll work in the land of absolutes
+            var targetOrderValue = Math.Abs(targetPortfolioValue - currentHoldingsValue);
+            var direction = targetPortfolioValue > currentHoldingsValue ? OrderDirection.Buy : OrderDirection.Sell;
+
+            // determine the unit price in terms of the account currency
+            var unitPrice = new MarketOrder(symbol, 1, UtcTime).GetValue(security);
+            if (unitPrice == 0) return 0;
+
+            // calculate the total margin available
+            var marginRemaining = Portfolio.GetMarginRemaining(symbol, direction);
+            if (marginRemaining <= 0) return 0;
+
+            // continue iterating while we do not have enough margin for the order
+            decimal marginRequired;
+            decimal orderValue;
+            decimal orderFees;
+            var feeToPriceRatio = 0m;
+
+            // compute the initial order quantity
+            var orderQuantity = targetOrderValue / unitPrice;
+
+            // rounding off Order Quantity to the nearest multiple of Lot Size
+            orderQuantity -= orderQuantity % security.SymbolProperties.LotSize;
+
+            do
             {
-                Error($"The order quantity for {symbol.Value} cannot be calculated: Reason: {result.Reason}.");
-            }
+                // reduce order quantity by feeToPriceRatio, since it is faster than by lot size
+                // if it becomes nonpositive, return zero
+                orderQuantity -= feeToPriceRatio;
+                if (orderQuantity <= 0) return 0;
+
+                // generate the order
+                var order = new MarketOrder(security.Symbol, orderQuantity, UtcTime);
+                orderValue = order.GetValue(security);
+                orderFees = security.FeeModel.GetOrderFee(security, order);
+
+                // calculate feeToPriceRatio, if lower than lot size, use lot size instead
+                feeToPriceRatio = orderFees / unitPrice;
+                if (feeToPriceRatio < security.SymbolProperties.LotSize)
+                {
+                    feeToPriceRatio = security.SymbolProperties.LotSize;
+                }
+
+                // calculate the margin required for the order
+                marginRequired = security.MarginModel.GetInitialMarginRequiredForOrder(security, order);
+
+            } while (marginRequired > marginRemaining || orderValue + orderFees > targetOrderValue);
+
+            var remainder = orderQuantity % security.SymbolProperties.LotSize;
+            if (remainder > 0) orderQuantity -= remainder;
 
             return result.Quantity;
         }
