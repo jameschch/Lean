@@ -568,7 +568,7 @@ namespace QuantConnect.Brokerages.GDAX
             var response = RateClient.Execute(new RestSharp.RestRequest(Method.GET));
             if (response.StatusCode != System.Net.HttpStatusCode.OK)
             {
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, (int)response.StatusCode, "GetConversionRate: error returned from conversion rate service."));
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, (int)response.StatusCode, "GetConversionRate: error returned from conversion rate service."));
                 return 0;
             }
 
@@ -576,7 +576,7 @@ namespace QuantConnect.Brokerages.GDAX
             var rate = raw.SelectToken("rates." + currency).Value<decimal>();
             if (rate == 0)
             {
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, (int)response.StatusCode, "GetConversionRate: zero value returned from conversion rate service."));
+                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, (int)response.StatusCode, "GetConversionRate: zero value returned from conversion rate service."));
                 return 0;
             }
 

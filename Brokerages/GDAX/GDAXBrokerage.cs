@@ -161,7 +161,7 @@ namespace QuantConnect.Brokerages.GDAX
 
             if (response.StatusCode != System.Net.HttpStatusCode.OK)
             {
-                throw new Exception($"GDAXBrokerage.GetOpenOrders: request failed: [{(int) response.StatusCode}] {response.StatusDescription}, Content: {response.Content}, ErrorMessage: {response.ErrorMessage}");
+                throw new Exception($"GDAXBrokerage.GetOpenOrders: request failed: [{(int)response.StatusCode}] {response.StatusDescription}, Content: {response.Content}, ErrorMessage: {response.ErrorMessage}");
             }
 
             var orders = JsonConvert.DeserializeObject<Messages.Order[]>(response.Content);
@@ -251,7 +251,7 @@ namespace QuantConnect.Brokerages.GDAX
                     {
                         list.Add(new Cash(item.Currency, item.Balance, 1));
                     }
-                    else if (new[] {"GBP", "EUR"}.Contains(item.Currency))
+                    else if (new[] { "GBP", "EUR" }.Contains(item.Currency))
                     {
                         var rate = GetConversionRate(item.Currency);
                         list.Add(new Cash(item.Currency.ToUpper(), item.Balance, rate));
@@ -276,7 +276,9 @@ namespace QuantConnect.Brokerages.GDAX
         {
             lock (Ticks)
             {
-                var copy = new List<Data.Market.Tick> (Ticks);
+                //workaround for mono bug on ToArray.
+                var copy = new List<Data.Market.Tick>();
+                Ticks.ForEach(t => copy.Add(t));
                 Ticks.Clear();
                 return copy;
             }
