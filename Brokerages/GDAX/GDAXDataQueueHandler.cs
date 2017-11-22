@@ -40,14 +40,16 @@ namespace QuantConnect.Brokerages.GDAX
         protected override string[] ChannelNames { get; } = { "heartbeat", "level2", "matches" };
 
         /// <summary>
-        /// Get the next ticks from the live trading data queue
+        /// Get queued tick data
         /// </summary>
-        /// <returns>IEnumerable list of ticks since the last update.</returns>
-        public IEnumerable<BaseData> GetNextTicks()
+        /// <returns></returns>
+        public IEnumerable<Data.BaseData> GetNextTicks()
         {
             lock (Ticks)
             {
-                var copy = Ticks.ToArray();
+                //workaround for mono bug on ToArray.
+                var copy = new List<Data.Market.Tick>();
+                Ticks.ForEach(t => copy.Add(t));
                 Ticks.Clear();
                 return copy;
             }
