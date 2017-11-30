@@ -18,6 +18,7 @@ using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Packets;
 using RestSharp;
+using System.Linq;
 
 namespace QuantConnect.Brokerages.GDAX
 {
@@ -43,7 +44,7 @@ namespace QuantConnect.Brokerages.GDAX
         /// Get queued tick data
         /// </summary>
         /// <returns></returns>
-        public IEnumerable<Data.BaseData> GetNextTicks()
+        public IEnumerable<BaseData> GetNextTicks()
         {
             lock (Ticks)
             {

@@ -80,7 +80,7 @@ namespace QuantConnect.Brokerages.GDAX
 
             WebSocket.Open += (sender, args) =>
             {
-                var tickers = new[] {"LTCUSD", "LTCEUR", "LTCBTC", "BTCUSD", "BTCEUR", "BTCGBP", "ETHBTC", "ETHUSD", "ETHEUR"};
+                var tickers = new[] {/*"LTCUSD", "LTCEUR", "LTCBTC", */"BTCUSD", "BTCEUR", "BTCGBP", "ETHBTC", "ETHUSD", "ETHEUR"};
                 Subscribe(tickers.Select(ticker => Symbol.Create(ticker, SecurityType.Crypto, Market.GDAX)));
             };
 
