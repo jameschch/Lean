@@ -45,6 +45,10 @@
     <Reference Include="DynamicInterop, Version=0.7.4.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DynamicInterop.0.7.4\lib\net40\DynamicInterop.dll</HintPath>
     </Reference>
+    <Reference Include="GeneticTree.Erik, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\GeneticTree_Erik\GeneticTree\bin\Debug\GeneticTree.Erik.dll</HintPath>
+    </Reference>
     <Reference Include="RDotNet, Version=1.6.5.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.dll</HintPath>
     </Reference>
@@ -73,6 +77,10 @@
     <ProjectReference Include="..\..\Dropbox\algo\Jtc.Algorithm_upstream\Jtc.Algorithm.csproj">
       <Project>{8871b670-a83f-4d53-aaf1-15a43c0f6183}</Project>
       <Name>Jtc.Algorithm</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\GeneticTreeAlgorithm\GeneticTree\GeneticTree.csproj">
+      <Project>{a5e74210-46c2-4d27-8da7-bad70c2b5d67}</Project>
+      <Name>GeneticTree</Name>
     </ProjectReference>
     <ProjectReference Include="..\Algorithm.CSharp\QuantConnect.Algorithm.CSharp.csproj">
       <Project>{39a81c16-a1e8-425e-a8f2-1433adb80228}</Project>

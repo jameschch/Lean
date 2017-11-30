@@ -256,3 +256,6 @@ Charts/
 
 # QuantConnect plugin files
 QuantConnectProjects.xml
+
+#LEAN config
+config.json
