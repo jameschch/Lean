@@ -30,6 +30,7 @@ using System.Threading;
 
 namespace QuantConnect.Tests.Brokerages.GDAX
 {
+
     [TestFixture]
     public class GDAXBrokerageTests
     {
@@ -111,8 +112,9 @@ namespace QuantConnect.Tests.Brokerages.GDAX
         [Test]
         public void ConnectTest()
         {
-            _wss.Setup(m => m.Connect()).Callback(() => { _wss.Setup(m => m.IsOpen).Returns(true); }).Verifiable();
             _wss.Setup(m => m.IsOpen).Returns(false);
+            _wss.Setup(w => w.Connect()).Callback(() => _wss.Setup(w => w.IsOpen).Returns(true)).Verifiable();
+
             _unit.Connect();
             _wss.Verify();
         }
@@ -120,8 +122,11 @@ namespace QuantConnect.Tests.Brokerages.GDAX
         [Test]
         public void DisconnectTest()
         {
+            _wss.Setup(m => m.IsOpen).Returns(false);
+            _wss.Setup(w => w.Connect()).Callback(() => _wss.Setup(w => w.IsOpen).Returns(true)).Verifiable();
             _wss.Setup(m => m.Close()).Verifiable();
-            _wss.Setup(m => m.IsOpen).Returns(true);
+
+            _unit.Connect();
             _unit.Disconnect();
             _wss.Verify();
         }
@@ -154,14 +159,11 @@ namespace QuantConnect.Tests.Brokerages.GDAX
                 Assert.IsTrue(actualQuantity != orderQuantity);
                 Assert.AreEqual(OrderStatus.Filled, e.Status);
                 Assert.AreEqual(expectedQuantity, e.FillQuantity);
-                // fill quantity = 5.23512
-                // fill price = 400.23
-                // partial order fee = (400.23 * 5.23512 * 0.0025) = 5.238130194
-                Assert.AreEqual(5.238130194m, actualFee);
+                Assert.AreEqual(0.00858216m, Math.Round(actualFee, 8));
                 raised.Set();
             };
 
-            _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
+            _unit.OnMessage(_unit, new WebSocketMessage(json));
 
             // not our order, market order is completed even if not totally filled
             json = json.Replace(id, Guid.NewGuid().ToString());
@@ -310,7 +312,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
             Assert.Throws<NotSupportedException>(() => _unit.UpdateOrder(new LimitOrder()));
         }
 
-        [Test]
+        [Test, Ignore("Obsolete. Now uses order book")]
         public void SubscribeTest()
         {
             string actual = null;
@@ -346,15 +348,17 @@ namespace QuantConnect.Tests.Brokerages.GDAX
             _unit.Unsubscribe(new List<Symbol> { Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX) });
             StringAssert.Contains("user", actual);
             StringAssert.Contains("heartbeat", actual);
+            //obsolete. now uses order book
+            //StringAssert.Contains("ticker", actual);
             StringAssert.Contains("matches", actual);
         }
 
-        [Test, Ignore("This test is obsolete, the 'ticker' channel is no longer used.")]
+        [Test, Ignore("Obsolete: Now uses order book updates")]
         public void OnMessageTickerTest()
         {
             string json = _tickerData;
 
-            _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
+            _unit.OnMessage(_unit, new WebSocketMessage(json));
 
             var actual = _unit.Ticks.First();
 
@@ -375,8 +379,6 @@ namespace QuantConnect.Tests.Brokerages.GDAX
         {
             _unit.PollTick(Symbol.Create("GBPUSD", SecurityType.Crypto, Market.GDAX));
             Thread.Sleep(1000);
-
-            // conversion rates are inverted: value = 1 / 1.234
             Assert.AreEqual(0.8103727714748784440842787682m, _unit.Ticks.First().Price);
         }
 
