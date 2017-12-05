@@ -104,37 +104,11 @@ namespace QuantConnect.Brokerages.GDAX
         }
 
         /// <summary>
-        /// Lock the streaming processing while we're sending orders as sometimes they fill before the REST call returns.
-        /// </summary>
-        public void LockStream()
-        {
-            Log.Trace("GDAXBrokerage.Messaging.LockStream(): Locking Stream");
-            _streamLocked = true;
-        }
-
-        /// <summary>
-        /// Unlock stream and process all backed up messages.
-        /// </summary>
-        public void UnlockStream()
-        {
-            Log.Trace("GDAXBrokerage.Messaging.UnlockStream(): Processing Backlog...");
-            while (_messageBuffer.Any())
-            {
-                WebSocketMessage e;
-                _messageBuffer.TryDequeue(out e);
-                OnMessageImpl(this, e);
-            }
-            Log.Trace("GDAXBrokerage.Messaging.UnlockStream(): Stream Unlocked.");
-            // Once dequeued in order; unlock stream.
-            _streamLocked = false;
-        }
-
-        /// <summary>
-        /// Wss message handler
+        /// Implementation of the OnMessage event
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        public override void OnMessage(object sender, WebSocketMessage e)
+        protected override void OnMessageImpl(object sender, WebSocketMessage e)
         {
             try
             {
