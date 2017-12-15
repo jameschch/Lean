@@ -39,6 +39,7 @@ using QuantConnect.Util;
 using System.Collections.Concurrent;
 using QuantConnect.Securities.Future;
 using QuantConnect.Securities.Crypto;
+using System.Net;
 
 namespace QuantConnect.Algorithm
 {
@@ -82,6 +83,7 @@ namespace QuantConnect.Algorithm
         // warmup resolution variables
         private TimeSpan? _warmupTimeSpan;
         private int? _warmupBarCount;
+        private Resolution? _warmupResolution;
         private Dictionary<string, string> _parameters = new Dictionary<string, string>();
 
         /// <summary>
@@ -152,6 +154,7 @@ namespace QuantConnect.Algorithm
             TradingCalendar = new TradingCalendar(Securities, _marketHoursDatabase);
 
             OptionChainProvider = new EmptyOptionChainProvider();
+            FutureChainProvider = new EmptyFutureChainProvider();
         }
 
         /// <summary>
@@ -295,6 +298,11 @@ namespace QuantConnect.Algorithm
         /// Gets the option chain provider, used to get the list of option contracts for an underlying symbol
         /// </summary>
         public IOptionChainProvider OptionChainProvider { get; private set; }
+
+        /// <summary>
+        /// Gets the future chain provider, used to get the list of future contracts for an underlying symbol
+        /// </summary>
+        public IFutureChainProvider FutureChainProvider { get; private set; }
 
         /// <summary>
         /// Gets the default order properties
@@ -480,25 +488,32 @@ namespace QuantConnect.Algorithm
             // if the benchmark hasn't been set yet, set it
             if (Benchmark == null)
             {
-                // apply the default benchmark if it hasn't been set
-                if (_benchmarkSymbol == null || _benchmarkSymbol == QuantConnect.Symbol.Empty)
+                if (_benchmarkSymbol != null && _benchmarkSymbol != QuantConnect.Symbol.Empty)
                 {
-                    _benchmarkSymbol = QuantConnect.Symbol.Create("SPY", SecurityType.Equity, Market.USA);
-                }
+                    // if the requested benchmark symbol wasn't already added, then add it now
+                    // we do a simple compare here for simplicity, also it avoids confusion over
+                    // the desired market.
+                    Security security;
+                    if (!Securities.TryGetValue(_benchmarkSymbol, out security))
+                    {
+                        // add the security as an internal feed so the algorithm doesn't receive the data
+                        security = CreateBenchmarkSecurity();
+                        AddToUserDefinedUniverse(security);
+                    }
 
-                // if the requested benchmark symbol wasn't already added, then add it now
-                // we do a simple compare here for simplicity, also it avoids confusion over
-                // the desired market.
-                Security security;
-                if (!Securities.TryGetValue(_benchmarkSymbol, out security))
+                    // just return the current price
+                    Benchmark = new SecurityBenchmark(security);
+                }
+                else
                 {
-                    // add the security as an internal feed so the algorithm doesn't receive the data
-                    security = CreateBenchmarkSecurity();
-                    AddToUserDefinedUniverse(security);
+                    var start = StartDate;
+                    var startingCapital = Portfolio.TotalPortfolioValue;
+                    Benchmark = new FuncBenchmark(dt =>
+                    {
+                        var years = (dt - start).TotalDays / 365.25;
+                        return startingCapital * (decimal) Math.Exp(0.02 * years);
+                    });
                 }
-
-                // just return the current price
-                Benchmark = new SecurityBenchmark(security);
             }
 
             // add option underlying securities if not present
@@ -511,6 +526,15 @@ namespace QuantConnect.Algorithm
                     // if it wasn't manually added, add a subscription for underlying updates
                     equity = AddEquity(underlying.Value, option.Resolution, underlying.ID.Market, false);
                 }
+                // In the options trading, the strike price, the options settlement and exercise are
+                // all based on the raw price of the underlying asset instead of the adjusted price. 
+                // In order to select the accurate contracts, we need to set
+                // the data normalization mode of the underlying asset to be raw
+                else if (equity.DataNormalizationMode != DataNormalizationMode.Raw)
+                {
+                    Debug($"Warning: The {underlying.ToString()} equity security was set the raw price normalization mode to work with options.");
+                }
+                equity.SetDataNormalizationMode(DataNormalizationMode.Raw);
 
                 // set the underlying property on the option chain
                 option.Underlying = equity;
@@ -522,7 +546,6 @@ namespace QuantConnect.Algorithm
                     equity.VolatilityModel = new StandardDeviationOfReturnsVolatilityModel(periods);
                 }
             }
-
         }
 
         /// <summary>
@@ -603,6 +626,15 @@ namespace QuantConnect.Algorithm
         public void SetOptionChainProvider(IOptionChainProvider optionChainProvider)
         {
             OptionChainProvider = optionChainProvider;
+        }
+
+        /// <summary>
+        /// Sets the future chain provider, used to get the list of future contracts for an underlying symbol
+        /// </summary>
+        /// <param name="futureChainProvider">The future chain provider</param>
+        public void SetFutureChainProvider(IFutureChainProvider futureChainProvider)
+        {
+            FutureChainProvider = futureChainProvider;
         }
 
         /// <summary>
@@ -1808,6 +1840,31 @@ namespace QuantConnect.Algorithm
         public void SetStatus(AlgorithmStatus status)
         {
             Status = status;
+        }
+
+        /// <summary>
+        /// Downloads the requested resource as a <see cref="string"/>.
+        /// The resource to download is specified as a <see cref="string"/> containing the URI.
+        /// </summary>
+        /// <param name="address">A string containing the URI to download</param>
+        /// <param name="headers">Defines header values to add to the request</param>
+        /// <param name="userName">The user name associated with the credentials</param>
+        /// <param name="password">The password for the user name associated with the credentials</param>
+        /// <returns>The requested resource as a <see cref="string"/></returns>
+        public string Download(string address, IEnumerable<KeyValuePair<string, string>> headers = null, string userName = null, string password = null)
+        {
+            using (var client = new WebClient { Credentials = new NetworkCredential(userName, password) })
+            {
+                client.Proxy = WebRequest.GetSystemWebProxy();
+                if (headers != null)
+                {
+                    foreach (var header in headers)
+                    {
+                        client.Headers.Add(header.Key, header.Value);
+                    }
+                }
+                return client.DownloadString(address);
+            }
         }
     }
 }
