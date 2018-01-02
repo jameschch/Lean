@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
@@ -30,6 +31,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Wss message handler
         /// </summary>
+        /// 
+        #region Declarations
+        private readonly ConcurrentDictionary<Symbol, OrderBook> _orderBooks = new ConcurrentDictionary<Symbol, OrderBook>();
+        #endregion
         /// <param name="sender"></param>
         /// <param name="e"></param>
         protected override void OnMessageImpl(object sender, WebSocketMessage e)
@@ -48,6 +53,23 @@ namespace QuantConnect.Brokerages.Bitfinex
                         //heartbeat
                         _lastHeartbeatUtcTime = DateTime.UtcNow;
                         return;
+                    }
+                    else if (ChannelList.ContainsKey(id) && ChannelList[id].Name == "book")
+                    {
+                        if (raw[1].Type == JTokenType.Array)
+                        {
+                            //order book snapshot
+                            var data = raw[1].ToObject(typeof(string[][]));
+                            PopulateOrderBook(data, ChannelList[id].Symbol);
+                            return;
+                        }
+                        else
+                        {
+                            //order book update
+                            var data = raw.ToObject(typeof(string[]));
+                            L2Update(data, ChannelList[id].Symbol);
+                        }
+                        
                     }
                     else if (ChannelList.ContainsKey(id) && ChannelList[id].Name == "ticker")
                     {
@@ -84,7 +106,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                         return;
                     }
                 }
-                else if ((raw.channel == "ticker" || raw.channel == "trades") && raw.@event == "subscribed")
+                else if ((raw.channel == "ticker" || raw.channel == "trades" || raw.channel == "book") && raw.@event == "subscribed")
                 {
                     var channel = (string)raw.channel;
                     var currentChannelId = (string)raw.chanId;
@@ -126,6 +148,18 @@ namespace QuantConnect.Brokerages.Bitfinex
                 Log.Error(ex, string.Format("Parsing wss message failed. Data: {0}", e.Message));
                 throw;
             }
+        }
+
+        private void PopulateOrderBook(string[][] data, string symbol)
+        {
+            //to do
+            return;
+        }
+
+        private void L2Update(string[] data, string symbol)
+        {
+            //to do
+            return;
         }
 
         private void PopulateTicker(string response, string symbol)
@@ -299,6 +333,13 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     @event = "subscribe",
                     channel = "trades",
+                    pair = item.Value
+                }));
+
+                WebSocket.Send(JsonConvert.SerializeObject(new
+                {
+                    @event = "subscribe",
+                    channel = "book",
                     pair = item.Value
                 }));
 
