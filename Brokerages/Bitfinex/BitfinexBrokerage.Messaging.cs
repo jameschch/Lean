@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -141,7 +142,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                     return;
                 }
 
-                Log.Trace("BitfinexBrokerage.OnMessage(): " + e.Message);
+                //Log.Trace("BitfinexBrokerage.OnMessage(): " + e.Message);
             }
             catch (Exception ex)
             {
@@ -152,14 +153,91 @@ namespace QuantConnect.Brokerages.Bitfinex
 
         private void PopulateOrderBook(string[][] data, string symbol)
         {
-            //to do
-            return;
+            OrderBook orderBook;
+            if (!_orderBooks.TryGetValue(symbol, out orderBook))
+            {
+                orderBook = new OrderBook(symbol);
+                _orderBooks[symbol] = orderBook;
+            }
+            else
+            {
+                orderBook.BestBidAskUpdated -= OnBestBidAskUpdated;
+                orderBook.Clear();
+            }
+
+            foreach (var item in data)
+            {
+                var msg = new Messages.OrderBook(item);
+                // Positive values -> bid
+                if (msg.Price > 0)
+                {
+                    orderBook.UpdateAskRow(msg.Price, msg.Amount);
+                }
+                // negative values -> ask.
+                else if (msg.Price < 0)
+                {
+                    orderBook.UpdateBidRow(msg.Price, msg.Amount);
+                }
+
+                orderBook.BestBidAskUpdated += OnBestBidAskUpdated;
+            }
+                return;
+        }
+
+        private void OnBestBidAskUpdated(object sender, BestBidAskUpdatedEventArgs e)
+        {
+            EmitQuoteTick(e.Symbol, e.BestBidPrice, e.BestBidSize, e.BestAskPrice, e.BestAskSize);
         }
 
         private void L2Update(string[] data, string symbol)
         {
-            //to do
+            var orderBook = _orderBooks[symbol];
+
+            var msg = new Messages.L2Update(data);
+
+            // Positive values -> bid
+            if (msg.Price > 0)
+            {
+                if (msg.Count == 0)
+                {
+                    orderBook.RemoveAskRow(msg.Price);
+                }
+                else
+                {
+                    orderBook.UpdateAskRow(msg.Price, msg.Amount);
+                }
+            }
+            // negative values -> ask.
+            else if (msg.Price < 0)
+            {
+                if (msg.Count == 0)
+                {
+                    orderBook.RemoveBidRow(msg.Price);
+                }
+                else
+                {
+                    orderBook.UpdateBidRow(msg.Price, msg.Amount);
+                }
+            }
             return;
+        }
+
+        private void EmitQuoteTick(Symbol symbol, decimal bidPrice, decimal bidSize, decimal askPrice, decimal askSize)
+        {
+            lock (Ticks)
+            {
+                Ticks.Add(new Tick
+                {
+                    AskPrice = askPrice,
+                    BidPrice = bidPrice,
+                    Value = (askPrice + bidPrice) / 2m,
+                    Time = DateTime.UtcNow,
+                    Symbol = symbol,
+                    TickType = TickType.Quote,
+                    AskSize = askSize,
+                    BidSize = bidSize
+                });
+            }
         }
 
         private void PopulateTicker(string response, string symbol)
@@ -340,7 +418,10 @@ namespace QuantConnect.Brokerages.Bitfinex
                 {
                     @event = "subscribe",
                     channel = "book",
-                    pair = item.Value
+                    pair = item.Value,
+                    prec = "P0",  // default P0
+                    freq = "F0",  // default F0
+                    length = "5"  // default 25
                 }));
 
                 Log.Trace("BitfinexBrokerage.Subscribe(): Sent subcribe for " + item.Value);
