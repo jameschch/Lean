@@ -171,12 +171,16 @@
     <Compile Include="Backtesting\BasicOptionAssignmentSimulation.cs" />
     <Compile Include="Backtesting\IBacktestingMarketSimulation.cs" />
     <Compile Include="BaseWebsocketsBrokerage.cs" />
+    <Compile Include="Bitfinex\BestBidAskUpdatedEventArgs.cs" />
     <Compile Include="Bitfinex\Messages\BaseMessage.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerage.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerage.Messaging.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerage.Utility.cs" />
     <Compile Include="Bitfinex\BitfinexBrokerageFactory.cs" />
     <Compile Include="Bitfinex\BitfinexFill.cs" />
+    <Compile Include="Bitfinex\Messages\L2Update.cs" />
+    <Compile Include="Bitfinex\Messages\OrderBook.cs" />
+    <Compile Include="Bitfinex\OrderBook.cs" />
     <Compile Include="Bitfinex\Rest\BalanceResponse.cs" />
     <Compile Include="Bitfinex\Rest\CancelPost.cs" />
     <Compile Include="Bitfinex\Rest\CancelReplaceResponse.cs" />

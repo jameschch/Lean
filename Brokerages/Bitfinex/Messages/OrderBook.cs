@@ -20,10 +20,9 @@ namespace QuantConnect.Brokerages.Bitfinex.Messages
     /// </summary>
     public class OrderBook : BaseMessage
     {
-        private const int _channelId = 0;
-        private const int _price = 1;
-        private const int _count = 2;
-        private const int _amount = 3;
+        private const int _price = 0;
+        private const int _count = 1;
+        private const int _amount = 2;
 
         /// <summary>
         /// Ticker Message constructor
@@ -32,16 +31,10 @@ namespace QuantConnect.Brokerages.Bitfinex.Messages
         public OrderBook(string[] values)
             : base(values)
         {
-            ChannelId = GetInt(_channelId);
             Price = TryGetDecimal(_price);
             Count = GetInt(_count);
             Amount = TryGetDecimal(_amount);
         }
-
-        /// <summary>
-        /// Channel Id
-        /// </summary>
-        public int ChannelId { get; set; }
 
         /// <summary>
         /// Price
