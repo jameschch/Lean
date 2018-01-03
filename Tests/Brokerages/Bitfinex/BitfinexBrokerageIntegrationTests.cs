@@ -23,7 +23,7 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
     {
         #region Properties
 
-        protected override Symbol Symbol => Symbol.Create("BTCUSD", SecurityType.Forex, Market.Bitfinex);
+        protected override Symbol Symbol => Symbol.Create("BTCUSD", SecurityType.Crypto, Market.Bitfinex);
 
         /// <summary>
         ///     Gets a high price for the specified symbol so a limit sell won't fill
