@@ -4,6 +4,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 14.0.0.0
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Lean.Launcher", "Launcher\QuantConnect.Lean.Launcher.csproj", "{09E7B916-E58B-4021-BD8B-C10B4446E226}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A5E74210-46C2-4D27-8DA7-BAD70C2B5D67} = {A5E74210-46C2-4D27-8DA7-BAD70C2B5D67}
+		{8871B670-A83F-4D53-AAF1-15A43C0F6183} = {8871B670-A83F-4D53-AAF1-15A43C0F6183}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuantConnect.Lean.Engine", "Engine\QuantConnect.Lean.Engine.csproj", "{12156F46-D07E-4E3D-AD2B-7409E82AB62F}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -55,6 +59,9 @@ EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "QuantConnect.Algorithm.PythonTools", "Algorithm.Python\QuantConnect.Algorithm.PythonTools.pyproj", "{4A5DED1F-3E34-40E2-B1F2-9A8A02195508}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jtc.Algorithm", "..\Dropbox\algo\Jtc.Algorithm_upstream\Jtc.Algorithm.csproj", "{8871B670-A83F-4D53-AAF1-15A43C0F6183}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A5E74210-46C2-4D27-8DA7-BAD70C2B5D67} = {A5E74210-46C2-4D27-8DA7-BAD70C2B5D67}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GeneticTree", "..\GeneticTreeAlgorithm\GeneticTree\GeneticTree.csproj", "{A5E74210-46C2-4D27-8DA7-BAD70C2B5D67}"
 EndProject

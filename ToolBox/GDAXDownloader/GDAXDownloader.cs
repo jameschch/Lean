@@ -128,12 +128,12 @@ namespace QuantConnect.ToolBox.GDAXDownloader
                     {
                         Time = Time.UnixTimeStampToDateTime(epochs),
                         Symbol = symbol,
-                        Low = decimal.Parse(datapoint[1].ToString()),
-                        High = decimal.Parse(datapoint[2].ToString()),
-                        Open = decimal.Parse(datapoint[3].ToString()),
-                        Close = decimal.Parse(datapoint[4].ToString()),
-                        Volume = decimal.Parse(datapoint[5].ToString()),
-                        Value = decimal.Parse(datapoint[4].ToString()),
+                        Low = decimal.Parse(datapoint[1].ToString(), System.Globalization.NumberStyles.Any),
+                        High = decimal.Parse(datapoint[2].ToString(), System.Globalization.NumberStyles.Any),
+                        Open = decimal.Parse(datapoint[3].ToString(), System.Globalization.NumberStyles.Any),
+                        Close = decimal.Parse(datapoint[4].ToString(), System.Globalization.NumberStyles.Any),
+                        Volume = decimal.Parse(datapoint[5].ToString(), System.Globalization.NumberStyles.Any),
+                        Value = decimal.Parse(datapoint[4].ToString(), System.Globalization.NumberStyles.Any),
                         DataType = MarketDataType.TradeBar,
                         Period = new TimeSpan(0, 0, (int)granularity),
                         EndTime = Time.UnixTimeStampToDateTime(epochs).AddSeconds(granularity)
