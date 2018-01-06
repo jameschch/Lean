@@ -95,6 +95,39 @@ namespace QuantConnect.Brokerages.Bitfinex
                         PopulateTrade(term, data);
                         return;
                     }
+                    else if (id == "0" && (term == "on" || term == "ou" || term == "oc"))
+                    {
+                        //order updates
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Order update");
+                        var data = raw[2].ToObject(typeof(string[]));
+                        UpdateOrder(term, data);
+                        return;
+
+                    }
+                    else if (id == "0" && term == "os")
+                    {
+                        //order snapshot
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Order Snapshot");
+                        var data = raw[2].ToObject(typeof(string[][]));
+                        PopulateOrder(data);
+
+                    }
+                    else if (id == "0" && (term == "pn" || term == "pu" || term == "pc"))
+                    {
+                        //position updates
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Order update");
+                        var data = raw[2].ToObject(typeof(string[]));
+                        return;
+
+                    }
+                    else if (id == "0" && term == "ps")
+                    {
+                        //position snapshot
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Position Snapshot");
+                        //var data = raw[2].ToObject(typeof(string[][]));
+                        return;
+
+                    }
                     else if (term == "ws")
                     {
                         //wallet
@@ -277,6 +310,51 @@ namespace QuantConnect.Brokerages.Bitfinex
                     DataType = MarketDataType.Tick,
                     Quantity = msg.Amount
                 });
+            }
+        }
+
+        private void UpdateOrder(string term, string[] data)
+        {
+            var msg = new Messages.OrderUpdate(data);
+            OrderDirection direction = msg.OrderAmount < 0 ? OrderDirection.Sell : OrderDirection.Buy;
+            Symbol symbol = Symbol.Create(msg.OrderPair.ToUpper(), SecurityType.Crypto, BrokerageMarket);
+
+            Log.Trace(msg.ToString());
+            // order new
+            if (term == "on")
+            {
+            //    var orderEvent = new OrderEvent
+            //(
+            //    orderId, symbol, DateTime.UtcNow, OrderStatus.New,
+            //    direction, msg.OrderPrice, msg.OrderAmount, 0, "Bitfinex New Order Event"
+            //);
+            //    OnOrderEvent(orderEvent);
+                return;
+            }
+            // todo - order update
+            else if (term == "ou")
+            {
+                return;
+            }
+            // order cancel
+            else if (term == "oc")
+            {
+            //    var orderEvent = new OrderEvent
+            //(
+            //    orderId, symbol, DateTime.UtcNow, OrderStatus.Canceled,
+            //    direction, msg.OrderPrice, msg.OrderAmount, 0, "Bitfinex Cancel Order Event"
+            //);
+            //OnOrderEvent(orderEvent);
+            return;
+            }
+        }
+
+        private void PopulateOrder(string[][] data)
+        {
+            foreach (var item in data)
+            {
+                var msg = new Messages.OrderUpdate(item);
+                Log.Trace(msg.ToString());
             }
         }
 
