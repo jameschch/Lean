@@ -367,10 +367,11 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
             _unit.Subscribe(new[] { Symbol.Create("BTCUSD", SecurityType.Crypto, Market.Bitfinex), Symbol.Create("UNIVERSE", SecurityType.Crypto, Market.Bitfinex),
                 Symbol.Create("ETHBTC", SecurityType.Crypto, Market.Bitfinex)});
 
-            Assert.AreEqual(4, actualSymbols.Count);
-            Assert.AreEqual(4, actualChannels.Count);
+            Assert.AreEqual(6, actualSymbols.Count);
+            Assert.AreEqual(6, actualChannels.Count);
             CollectionAssert.Contains(actualChannels, "ticker");
             CollectionAssert.Contains(actualChannels, "trades");
+            CollectionAssert.Contains(actualChannels, "book");
             CollectionAssert.Contains(actualSymbols, "BTCUSD");
             CollectionAssert.Contains(actualSymbols, "ETHBTC");
         }

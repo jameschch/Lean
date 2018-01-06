@@ -14,7 +14,9 @@
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -30,6 +32,10 @@ namespace QuantConnect.Brokerages.Bitfinex
         /// <summary>
         /// Wss message handler
         /// </summary>
+        /// 
+        #region Declarations
+        private readonly ConcurrentDictionary<Symbol, OrderBook> _orderBooks = new ConcurrentDictionary<Symbol, OrderBook>();
+        #endregion
         /// <param name="sender"></param>
         /// <param name="e"></param>
         protected override void OnMessageImpl(object sender, WebSocketMessage e)
@@ -48,6 +54,23 @@ namespace QuantConnect.Brokerages.Bitfinex
                         //heartbeat
                         _lastHeartbeatUtcTime = DateTime.UtcNow;
                         return;
+                    }
+                    else if (ChannelList.ContainsKey(id) && ChannelList[id].Name == "book")
+                    {
+                        if (raw[1].Type == JTokenType.Array)
+                        {
+                            //order book snapshot
+                            var data = raw[1].ToObject(typeof(string[][]));
+                            PopulateOrderBook(data, ChannelList[id].Symbol);
+                            return;
+                        }
+                        else
+                        {
+                            //order book update
+                            var data = raw.ToObject(typeof(string[]));
+                            L2Update(data, ChannelList[id].Symbol);
+                        }
+                        
                     }
                     else if (ChannelList.ContainsKey(id) && ChannelList[id].Name == "ticker")
                     {
@@ -72,6 +95,39 @@ namespace QuantConnect.Brokerages.Bitfinex
                         PopulateTrade(term, data);
                         return;
                     }
+                    else if (id == "0" && (term == "on" || term == "ou" || term == "oc"))
+                    {
+                        //order updates
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Order update");
+                        var data = raw[2].ToObject(typeof(string[]));
+                        UpdateOrder(term, data);
+                        return;
+
+                    }
+                    else if (id == "0" && term == "os")
+                    {
+                        //order snapshot
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Order Snapshot");
+                        var data = raw[2].ToObject(typeof(string[][]));
+                        PopulateOrder(data);
+
+                    }
+                    else if (id == "0" && (term == "pn" || term == "pu" || term == "pc"))
+                    {
+                        //position updates
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Order update");
+                        var data = raw[2].ToObject(typeof(string[]));
+                        return;
+
+                    }
+                    else if (id == "0" && term == "ps")
+                    {
+                        //position snapshot
+                        Log.Trace("BitfinexBrokerage.OnMessage(): Position Snapshot");
+                        //var data = raw[2].ToObject(typeof(string[][]));
+                        return;
+
+                    }
                     else if (term == "ws")
                     {
                         //wallet
@@ -84,7 +140,7 @@ namespace QuantConnect.Brokerages.Bitfinex
                         return;
                     }
                 }
-                else if ((raw.channel == "ticker" || raw.channel == "trades") && raw.@event == "subscribed")
+                else if ((raw.channel == "ticker" || raw.channel == "trades" || raw.channel == "book") && raw.@event == "subscribed")
                 {
                     var channel = (string)raw.channel;
                     var currentChannelId = (string)raw.chanId;
@@ -119,12 +175,101 @@ namespace QuantConnect.Brokerages.Bitfinex
                     return;
                 }
 
-                Log.Trace("BitfinexBrokerage.OnMessage(): " + e.Message);
+                //Log.Trace("BitfinexBrokerage.OnMessage(): " + e.Message);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, string.Format("Parsing wss message failed. Data: {0}", e.Message));
                 throw;
+            }
+        }
+
+        private void PopulateOrderBook(string[][] data, string symbol)
+        {
+            OrderBook orderBook;
+            if (!_orderBooks.TryGetValue(symbol, out orderBook))
+            {
+                orderBook = new OrderBook(symbol);
+                _orderBooks[symbol] = orderBook;
+            }
+            else
+            {
+                orderBook.BestBidAskUpdated -= OnBestBidAskUpdated;
+                orderBook.Clear();
+            }
+
+            foreach (var item in data)
+            {
+                var msg = new Messages.OrderBook(item);
+                // Positive values -> bid
+                if (msg.Price > 0)
+                {
+                    orderBook.UpdateAskRow(msg.Price, msg.Amount);
+                }
+                // negative values -> ask.
+                else if (msg.Price < 0)
+                {
+                    orderBook.UpdateBidRow(msg.Price, msg.Amount);
+                }
+
+                orderBook.BestBidAskUpdated += OnBestBidAskUpdated;
+            }
+                return;
+        }
+
+        private void OnBestBidAskUpdated(object sender, BestBidAskUpdatedEventArgs e)
+        {
+            EmitQuoteTick(e.Symbol, e.BestBidPrice, e.BestBidSize, e.BestAskPrice, e.BestAskSize);
+        }
+
+        private void L2Update(string[] data, string symbol)
+        {
+            var orderBook = _orderBooks[symbol];
+
+            var msg = new Messages.L2Update(data);
+
+            // Positive values -> bid
+            if (msg.Price > 0)
+            {
+                if (msg.Count == 0)
+                {
+                    orderBook.RemoveAskRow(msg.Price);
+                }
+                else
+                {
+                    orderBook.UpdateAskRow(msg.Price, msg.Amount);
+                }
+            }
+            // negative values -> ask.
+            else if (msg.Price < 0)
+            {
+                if (msg.Count == 0)
+                {
+                    orderBook.RemoveBidRow(msg.Price);
+                }
+                else
+                {
+                    orderBook.UpdateBidRow(msg.Price, msg.Amount);
+                }
+            }
+            return;
+        }
+
+        private void EmitQuoteTick(Symbol symbol, decimal bidPrice, decimal bidSize, decimal askPrice, decimal askSize)
+        {
+            lock (Ticks)
+            {
+                Ticks.Add(new Tick
+                {
+                    AskPrice = askPrice,
+                    BidPrice = bidPrice,
+                    Value = (askPrice + bidPrice) / 2m,
+                    Time = DateTime.UtcNow,
+                    Symbol = symbol,
+                    TickType = TickType.Quote,
+                    AskSize = askSize,
+                    BidSize = bidSize
+                });
             }
         }
 
@@ -165,6 +310,51 @@ namespace QuantConnect.Brokerages.Bitfinex
                     DataType = MarketDataType.Tick,
                     Quantity = msg.Amount
                 });
+            }
+        }
+
+        private void UpdateOrder(string term, string[] data)
+        {
+            var msg = new Messages.OrderUpdate(data);
+            OrderDirection direction = msg.OrderAmount < 0 ? OrderDirection.Sell : OrderDirection.Buy;
+            Symbol symbol = Symbol.Create(msg.OrderPair.ToUpper(), SecurityType.Crypto, BrokerageMarket);
+
+            Log.Trace(msg.ToString());
+            // order new
+            if (term == "on")
+            {
+            //    var orderEvent = new OrderEvent
+            //(
+            //    orderId, symbol, DateTime.UtcNow, OrderStatus.New,
+            //    direction, msg.OrderPrice, msg.OrderAmount, 0, "Bitfinex New Order Event"
+            //);
+            //    OnOrderEvent(orderEvent);
+                return;
+            }
+            // todo - order update
+            else if (term == "ou")
+            {
+                return;
+            }
+            // order cancel
+            else if (term == "oc")
+            {
+            //    var orderEvent = new OrderEvent
+            //(
+            //    orderId, symbol, DateTime.UtcNow, OrderStatus.Canceled,
+            //    direction, msg.OrderPrice, msg.OrderAmount, 0, "Bitfinex Cancel Order Event"
+            //);
+            //OnOrderEvent(orderEvent);
+            return;
+            }
+        }
+
+        private void PopulateOrder(string[][] data)
+        {
+            foreach (var item in data)
+            {
+                var msg = new Messages.OrderUpdate(item);
+                Log.Trace(msg.ToString());
             }
         }
 
@@ -301,6 +491,16 @@ namespace QuantConnect.Brokerages.Bitfinex
                     @event = "subscribe",
                     channel = "trades",
                     pair = item.Value
+                }));
+
+                WebSocket.Send(JsonConvert.SerializeObject(new
+                {
+                    @event = "subscribe",
+                    channel = "book",
+                    pair = item.Value,
+                    prec = "P0",  // default P0
+                    freq = "F0",  // default F0
+                    length = "5"  // default 25
                 }));
 
                 Log.Trace("BitfinexBrokerage.Subscribe(): Sent subcribe for " + item.Value);

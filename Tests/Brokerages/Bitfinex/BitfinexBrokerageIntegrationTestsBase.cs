@@ -57,13 +57,13 @@ namespace QuantConnect.Tests.Brokerages.Bitfinex
 
         protected override IBrokerage CreateBrokerage(IOrderProvider orderProvider, ISecurityProvider securityProvider)
         {
-            var restClient = new RestClient("https://api.gdax.com");
+            var restClient = new RestClient("https://api.bitfinex.com");
             var webSocketClient = new WebSocketWrapper();
 
             var algorithm = new Mock<IAlgorithm>();
             algorithm.Setup(a => a.BrokerageModel).Returns(new BitfinexBrokerageModel(AccountType.Cash));
 
-            return new BitfinexBrokerage(Config.Get("gdax-url", "wss://ws-feed.gdax.com"), webSocketClient, restClient, Config.Get("bitfinex-api-key"), Config.Get("bitfinex-api-secret"),
+            return new BitfinexBrokerage(Config.Get("bitfinex-wss", "wss://api2.bitfinex.com:3000/ws"), webSocketClient, restClient, Config.Get("bitfinex-api-key"), Config.Get("bitfinex-api-secret"),
                 algorithm.Object);
         }
 
