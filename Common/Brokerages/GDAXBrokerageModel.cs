@@ -149,14 +149,14 @@ namespace QuantConnect.Brokerages
             return base.CanSubmitOrder(security, order, out message);
         }
 
-        /// <summary>
-        /// GDAX fills order using the latest Trade or Quote data
-        /// </summary>
-        /// <param name="security">The security to get fill model for</param>
-        /// <returns>The new fill model for this brokerage</returns>
-        public override IFillModel GetFillModel(Security security)
-        {
-            return new LatestPriceFillModel();
-        }
+        ///// <summary>
+        ///// GDAX fills order using the latest Trade or Quote data
+        ///// </summary>
+        ///// <param name="security">The security to get fill model for</param>
+        ///// <returns>The new fill model for this brokerage</returns>
+        //public override IFillModel GetFillModel(Security security)
+        //{
+        //    return new LatestPriceFillModel();
+        //}
     }
 }
