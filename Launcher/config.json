@@ -6,10 +6,10 @@
   // two predefined environments, 'backtesting' and 'live', feel free
   // to add more!
 
-  "environment": "backtesting",// "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
+  "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
 
   // algorithm class selector
-  "algorithm-type-name": "GenTreeMin",
+  "algorithm-type-name": "RobotTree",
 
   // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
   "algorithm-language": "CSharp",
@@ -22,7 +22,9 @@
   //"algorithm-location": "QuantConnect.Algorithm.Java.dll",
 
   // engine
-  "data-folder": "../../../../Data/",
+  "data-folder":    "../../../../Data/",
+  "cache-location": "../../../../Data/	",
+  "data-directory": "../../../../Data/	",
 
   // handlers
   "log-handler": "QuantConnect.Logging.CompositeLogHandler",
@@ -34,7 +36,7 @@
   "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
 
   // limits on number of symbols to allow
-  "symbol-minute-limit": 10000, 
+  "symbol-minute-limit": 10000,
   "symbol-second-limit": 10000,
   "symbol-tick-limit": 10000,
 
@@ -62,7 +64,7 @@
   "ib-agent-description": "Individual",
   "ib-use-tws": false,
   "ib-tws-dir": "C:\\Jts",
-  "ib-trading-mode": "paper", 
+  "ib-trading-mode": "paper",
   "ib-controller-dir": "C:\\IBController",
 
   // tradier configuration
@@ -92,9 +94,9 @@
   "iqfeed-version": "1.0",
 
   // gdax configuration
-  "gdax-api-secret": "YJtSl1YtL6MsKTRh+dTm1Z0owvvOcA0gSeQfn3/7ag+qT8leRlwPsQ8w5cSP3lzWQCbOd8vtQcTnBnEK/CmwUg==",
-  "gdax-api-key": "b74851361b394c73e0d05d22fc1ddd35",
-  "gdax-passphrase": "uyg75I7Tdfiyty",
+  "gdax-api-secret": "",
+  "gdax-api-key": "",
+  "gdax-passphrase": "",
 
   // Required to access data from Quandl
   // To get your access token go to https://www.quandl.com/account/api
@@ -105,6 +107,17 @@
     "ema-fast": 10,
     "ema-slow": 20
   },
+
+  //log noise
+  "algorithm-path-python": "../../../Algorithm.Python/",
+  "lean-manager-type": "LocalLeanManager",
+  "security-data-feeds": "",
+  "version-id": "",
+  "algorithm-manager-time-loop-maximum": 20,
+  "forward-console-messages": true,
+  "ignore-version-checks": false,
+  "job-project-id": 0,
+  "send-via-api": false,
 
   "environments": {
 
@@ -156,17 +169,17 @@
 
     // defines the 'live-interactive' environment
     "live-interactive": {
-        "live-mode": true,
+      "live-mode": true,
 
-        // real brokerage implementations require the BrokerageTransactionHandler
-        "live-mode-brokerage": "InteractiveBrokersBrokerage",
-        "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
-        "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
-        "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
-        "data-queue-handler": "QuantConnect.Brokerages.InteractiveBrokers.InteractiveBrokersBrokerage",
-        "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
-        "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
-        "history-provider": "BrokerageHistoryProvider"
+      // real brokerage implementations require the BrokerageTransactionHandler
+      "live-mode-brokerage": "InteractiveBrokersBrokerage",
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
+      "data-queue-handler": "QuantConnect.Brokerages.InteractiveBrokers.InteractiveBrokersBrokerage",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": "BrokerageHistoryProvider"
     },
 
     // defines the 'live-interactive-iqfeed' environment
@@ -250,7 +263,7 @@
       "desktop-exe": "../../../UserInterface/bin/Release/QuantConnect.Views.exe"
     },
 
-      "live-gdax": {
+    "live-gdax": {
       "live-mode": true,
 
       // real brokerage implementations require the BrokerageTransactionHandler
