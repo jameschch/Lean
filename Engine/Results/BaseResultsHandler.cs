@@ -23,7 +23,7 @@ namespace QuantConnect.Lean.Engine.Results
         public virtual string SaveLogs(string id, IEnumerable<string> logs)
         {
             var path = $"{id}-log.txt";
-            File.WriteAllLines(path, logs);
+            //File.WriteAllLines(path, logs);
             return Path.Combine(Directory.GetCurrentDirectory(), path);
         }
 
@@ -34,16 +34,7 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="result">The results to save</param>
         public virtual void SaveResults(string name, Result result)
         {
-            File.WriteAllText(Path.Combine(Directory.GetCurrentDirectory(), name), JsonConvert.SerializeObject(result, Formatting.Indented));
-        }
-
-        /// <summary>
-        /// Sets the current alpha runtime statistics
-        /// </summary>
-        /// <param name="statistics">The current alpha runtime statistics</param>
-        public virtual void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
-        {
-            AlphaRuntimeStatistics = statistics;
+            //File.WriteAllText(Path.Combine(Directory.GetCurrentDirectory(), name), JsonConvert.SerializeObject(result));
         }
     }
 }
