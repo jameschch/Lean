@@ -100,7 +100,7 @@ namespace QuantConnect.ToolBox
 
 
             // Loop through all the data and write to file as we go
-            foreach (var data in source)
+            foreach (var data in source.Distinct().OrderBy(o => o.EndTime))
             {
                 // Ensure the data is sorted
                 if (data.Time < lastTime) throw new Exception("The data must be pre-sorted from oldest to newest");

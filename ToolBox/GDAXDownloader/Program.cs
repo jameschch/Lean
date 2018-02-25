@@ -78,7 +78,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
                 Log.Trace(err.Message);
                 Log.Trace(err.StackTrace);
             }
-            Console.ReadLine();
+           // Console.ReadLine();
         }
     }
 }
