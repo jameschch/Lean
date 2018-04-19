@@ -174,6 +174,27 @@ namespace QuantConnect
                 ID.Date == SecurityIdentifier.DefaultDate;
         }
 
+        /// <summary>
+        /// Determines if the specified <paramref name="symbol"/> is an underlying of this symbol instance
+        /// </summary>
+        /// <param name="symbol">The underlying to check for</param>
+        /// <returns>True if the specified <paramref name="symbol"/> is an underlying of this symbol instance</returns>
+        public bool HasUnderlyingSymbol(Symbol symbol)
+        {
+            var current = this;
+            while (current.HasUnderlying)
+            {
+                if (current.Underlying == symbol)
+                {
+                    return true;
+                }
+
+                current = current.Underlying;
+            }
+
+            return false;
+        }
+
         #region Properties
 
         /// <summary>
@@ -384,7 +405,7 @@ namespace QuantConnect
         /// <returns>True if both symbols are equal, otherwise false</returns>
         public static bool operator ==(Symbol left, Symbol right)
         {
-            if (ReferenceEquals(left, null)) return ReferenceEquals(right, null);
+            if (ReferenceEquals(left, null) || left.Equals(Empty)) return ReferenceEquals(right, null) || right.Equals(Empty);
             return left.Equals(right);
         }
 
@@ -396,8 +417,7 @@ namespace QuantConnect
         /// <returns>True if both symbols are not equal, otherwise false</returns>
         public static bool operator !=(Symbol left, Symbol right)
         {
-            if (ReferenceEquals(left, null)) return ReferenceEquals(right, null);
-            return !left.Equals(right);
+            return !(left == right);
         }
 
         #endregion

@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,6 +15,7 @@
 
 using System;
 using System.Linq;
+using com.fxcm.messaging.util.web;
 using NodaTime;
 using NUnit.Framework;
 using QuantConnect.Securities;
@@ -25,6 +26,24 @@ namespace QuantConnect.Tests.Common
     [TestFixture]
     public class TimeTests
     {
+        [Test]
+        public void UnixTimeStampSecondsToDateTimeHasSubMillisecondPrecision()
+        {
+            const double stamp = 1520711961.00055;
+            var expected = new DateTime(2018, 3, 10, 19, 59, 21, 0).AddTicks(5500);
+            var time = Time.UnixTimeStampToDateTime(stamp);
+            Assert.AreEqual(expected, time);
+        }
+
+        [Test]
+        public void UnixTimeStampMillisecondsToDateTimeHasSubMillisecondPrecision()
+        {
+            const double stamp = 1520711961000.55;
+            var expected = new DateTime(2018, 3, 10, 19, 59, 21, 0).AddTicks(5500);
+            var time = Time.UnixMillisecondTimeStampToDateTime(stamp);
+            Assert.AreEqual(expected, time);
+        }
+
         [Test]
         public void GetStartTimeForTradeBarsRoundsDown()
         {
@@ -113,6 +132,15 @@ namespace QuantConnect.Tests.Common
             var expected = new[] {start.AddDays(-2), start.AddDays(-1), start};
             var actual = Time.EachTradeableDayInTimeZone(exchange, start, end, dataTimeZone, true);
             CollectionAssert.AreEqual(expected, actual);
+        }
+
+        [Test]
+        public void MultipliesTimeSpans()
+        {
+            var interval = TimeSpan.FromSeconds(1);
+            var expected = TimeSpan.FromSeconds(5);
+            var actual = interval.Multiply(5d);
+            Assert.AreEqual(expected, actual);
         }
     }
 }

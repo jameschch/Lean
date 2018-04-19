@@ -41,16 +41,16 @@ class BasicTemplateOptionsHistoryAlgorithm(QCAlgorithm):
         self.SetCash(1000000)
 
         option = self.AddOption("GOOG")
+
         option.PriceModel = OptionPriceModels.CrankNicolsonFD()
         option.SetFilter(-2,2, timedelta(0), timedelta(180))
 
-        self.underlying = self.AddEquity(option.Symbol.Underlying.Value)
-        self.underlying.SetDataNormalizationMode(DataNormalizationMode.Raw)
-        self.SetBenchmark(self.underlying.Symbol)
+        self.SetBenchmark(lambda x: 1000000)
 
     def OnData(self,slice):
         if not self.Portfolio.Invested:
             for chain in slice.OptionChains:
+                volatility = self.Securities[chain.Key.Underlying].VolatilityModel.Volatility
                 for contract in chain.Value:
                     self.Log("{0},Bid={1} Ask={2} Last={3} OI={4} sigma={5:.3f} NPV={6:.3f} \
                               delta={7:.3f} gamma={8:.3f} vega={9:.3f} beta={10:.2f} theta={11:.2f} IV={12:.2f}".format(
@@ -59,7 +59,7 @@ class BasicTemplateOptionsHistoryAlgorithm(QCAlgorithm):
                     contract.AskPrice,
                     contract.LastPrice,
                     contract.OpenInterest,
-                    self.underlying.VolatilityModel.Volatility,
+                    volatility,
                     contract.TheoreticalPrice,
                     contract.Greeks.Delta,
                     contract.Greeks.Gamma,
@@ -68,17 +68,12 @@ class BasicTemplateOptionsHistoryAlgorithm(QCAlgorithm):
                     contract.Greeks.Theta / 365,
                     contract.ImpliedVolatility))
 
-    def OnOrderEvent(self, orderEvent):
-        # Order fill event handler. On an order fill update the resulting information is passed to this method.
-        # Order event details containing details of the events
-        self.Log(str(orderEvent))
-
     def OnSecuritiesChanged(self, changes):
-        if changes == SecurityChanges.None: return
         for change in changes.AddedSecurities:
-            history = self.History(change.Symbol, 10, Resolution.Hour).sort_index(level='time', ascending=False)[:3]
-
-            for i in range(len(history)):
-                self.Log("History: " + str(history.iloc[i].name[0])
-                        + ": " + str(history.iloc[i].name[1])
-                        + " > " + str(history.iloc[i]['close']))
+            # only print options price
+            if change.Symbol.Value == "GOOG": return
+            history = self.History(change.Symbol, 10, Resolution.Minute).sort_index(level='time', ascending=False)[:3]
+            for index, row in history.iterrows():
+                self.Log("History: " + str(index[3])
+                        + ": " + index[4].strftime("%m/%d/%Y %I:%M:%S %p")
+                        + " > " + str(row.close))

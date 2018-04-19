@@ -36,7 +36,7 @@ class OrderTicketDemoAlgorithm(QCAlgorithm):
     def Initialize(self):
         '''Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.'''
 
-        self.SetStartDate(2013,10,07)  #Set Start Date
+        self.SetStartDate(2013,10,7)   #Set Start Date
         self.SetEndDate(2013,10,11)    #Set End Date
         self.SetCash(100000)           #Set Strategy Cash
         # Find more symbols here: http://quantconnect.com/data
@@ -117,7 +117,7 @@ class OrderTicketDemoAlgorithm(QCAlgorithm):
             self.__openLimitOrders.append(newTicket)
 
             # submit another limit order to sell 10 shares at .1% above the bar's close
-            newTicket = self.LimitOrder(self.spy, 10, close * d.Decimal(1.001))
+            newTicket = self.LimitOrder(self.spy, -10, close * d.Decimal(1.001))
             self.__openLimitOrders.append(newTicket)
 
         # when we submitted new limit orders we placed them into this list,

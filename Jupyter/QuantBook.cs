@@ -25,10 +25,6 @@ using QuantConnect.Lean.Engine;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Python;
 using QuantConnect.Securities;
-using QuantConnect.Securities.Cfd;
-using QuantConnect.Securities.Crypto;
-using QuantConnect.Securities.Equity;
-using QuantConnect.Securities.Forex;
 using QuantConnect.Securities.Future;
 using QuantConnect.Securities.Option;
 using QuantConnect.Statistics;
@@ -76,6 +72,9 @@ namespace QuantConnect.Jupyter
                 var mapFileProvider = algorithmHandlers.MapFileProvider;
                 HistoryProvider = composer.GetExportedValueByTypeName<IHistoryProvider>(Config.Get("history-provider", "SubscriptionDataReaderHistoryProvider"));
                 HistoryProvider.Initialize(null, algorithmHandlers.DataProvider, _dataCacheProvider, mapFileProvider, algorithmHandlers.FactorFileProvider, null);
+
+                SetOptionChainProvider(new CachingOptionChainProvider(new BacktestingOptionChainProvider()));
+                SetFutureChainProvider(new CachingFutureChainProvider(new BacktestingFutureChainProvider()));
             }
             catch (Exception exception)
             {
@@ -83,70 +82,6 @@ namespace QuantConnect.Jupyter
             }
         }
 
-        /// <summary>
-        /// Gets the historical data for the specified symbols between the specified dates. The symbols must exist in the Securities collection.
-        /// </summary>
-        /// <param name="span">The span over which to retrieve recent historical data</param>
-        /// <param name="resolution">The resolution to request</param>
-        /// <returns>A pandas.DataFrame containing the requested historical data</returns>
-        public new PyObject History(TimeSpan span, Resolution? resolution = null)
-        {
-            return History(Securities.Keys.ToPython(), span, resolution);
-        }
-
-        /// <summary>
-        /// Get the history for all configured securities over the requested span.
-        /// This will use the resolution and other subscription settings for each security.
-        /// The symbols must exist in the Securities collection.
-        /// </summary>
-        /// <param name="periods">The number of bars to request</param>
-        /// <param name="resolution">The resolution to request</param>
-        /// <returns>A pandas.DataFrame containing the requested historical data</returns>
-        public new PyObject History(int periods, Resolution? resolution = null)
-        {
-            return History(Securities.Keys.ToPython(), periods, resolution);
-        }
-
-        /// <summary>
-        /// Gets the historical data for the specified symbol over the request span. The symbol must exist in the Securities collection.
-        /// </summary>
-        /// <typeparam name="T">The data type of the symbol</typeparam>
-        /// <param name="symbol">The symbol to retrieve historical data for</param>
-        /// <param name="span">The span over which to retrieve recent historical data</param>
-        /// <param name="resolution">The resolution to request</param>
-        /// <returns>An enumerable of slice containing the requested historical data</returns>
-        public new PyObject History<T>(Symbol symbol, TimeSpan span, Resolution? resolution = null)
-            where T : IBaseData
-        {
-            return PandasConverter.GetDataFrame(History<T>(symbol, Time - span, Time, resolution).Memoize());
-        }
-
-        /// <summary>
-        /// Gets the historical data for the specified symbol. The exact number of bars will be returned. 
-        /// The symbol must exist in the Securities collection.
-        /// </summary>
-        /// <param name="symbol">The symbol to retrieve historical data for</param>
-        /// <param name="periods">The number of bars to request</param>
-        /// <param name="resolution">The resolution to request</param>
-        /// <returns>An enumerable of slice containing the requested historical data</returns>
-        public new PyObject History(Symbol symbol, int periods, Resolution? resolution = null)
-        {
-            return History(symbol.ToPython(), periods, resolution);
-        }
-
-        /// <summary>
-        /// Gets the historical data for the specified symbol between the specified dates. The symbol must exist in the Securities collection.
-        /// </summary>
-        /// <param name="symbol">The symbol to retrieve historical data for</param>
-        /// <param name="start">The start time in the algorithm's time zone</param>
-        /// <param name="end">The end time in the algorithm's time zone</param>
-        /// <param name="resolution">The resolution to request</param>
-        /// <returns>An enumerable of slice containing the requested historical data</returns>
-        public new PyObject History(Symbol symbol, DateTime start, DateTime end, Resolution? resolution = null)
-        {
-            return History(symbol.ToPython(), start, end, resolution);
-        }
-        
         /// <summary>
         /// Get fundamental data from given symbols
         /// </summary>
@@ -213,70 +148,58 @@ namespace QuantConnect.Jupyter
         /// <param name="date">Date of the data</param>
         /// <param name="resolution">The resolution to request</param>
         /// <returns>A <see cref="OptionHistory"/> object that contains historical option data.</returns>
-        public OptionHistory GetOptionHistory(Symbol symbol, DateTime date, Resolution? resolution = null)
+        public OptionHistory GetOptionHistory(Symbol symbol, DateTime start, DateTime? end = null, Resolution? resolution = null)
         {
-            SetStartDate(date.AddDays(1));
+            if (!end.HasValue || end.Value.Date == start.Date)
+            {
+                end = start.AddDays(1);
+            }
+
             var option = Securities[symbol] as Option;
             var underlying = AddEquity(symbol.Underlying.Value, option.Resolution);
 
-            var provider = new BacktestingOptionChainProvider();
-            var allSymbols = provider.GetOptionContractList(symbol.Underlying, date);
-            
-            var requests = History(symbol.Underlying, TimeSpan.FromDays(1), resolution)
-                .SelectMany(x => option.ContractFilter.Filter(new OptionFilterUniverse(allSymbols, x)))
-                .Distinct()
-                .Select(x =>
-                     new HistoryRequest(date.AddDays(-1), 
-                                        date, 
-                                        typeof(QuoteBar), 
-                                        x, 
-                                        resolution ?? option.Resolution, 
-                                        underlying.Exchange.Hours,
-                                        MarketHoursDatabase.FromDataFolder().GetDataTimeZone(underlying.Symbol.ID.Market, underlying.Symbol, underlying.Type),
-                                        Resolution.Minute, 
-                                        underlying.IsExtendedMarketHours, 
-                                        underlying.IsCustomData(), 
-                                        DataNormalizationMode.Raw,
-                                        LeanData.GetCommonTickTypeForCommonDataTypes(typeof(QuoteBar), underlying.Type))
-                    );
+            var allSymbols = new List<Symbol>();
+            for (var date = start; date < end; date = date.AddDays(1))
+            {
+                if (option.Exchange.DateIsOpen(date))
+                {
+                    allSymbols.AddRange(OptionChainProvider.GetOptionContractList(symbol.Underlying, date));
+                }
+            }
+            var symbols = base.History(symbol.Underlying, start, end.Value, resolution)
+                .SelectMany(x => option.ContractFilter.Filter(new OptionFilterUniverse(allSymbols.Distinct(), x)))
+                .Distinct().Concat(new[] { symbol.Underlying });
 
-            requests = requests.Union(new[] { new HistoryRequest(underlying.Subscriptions.FirstOrDefault(), underlying.Exchange.Hours, date.AddDays(-1), date) });
-
-            return new OptionHistory(HistoryProvider.GetHistory(requests.OrderByDescending(x => x.Symbol.SecurityType), TimeZone).Memoize());
+            return new OptionHistory(History(symbols, start, end.Value, resolution));
         }
 
         /// <summary>
         /// Gets <see cref="FutureHistory"/> object for a given symbol, date and resolution
         /// </summary>
         /// <param name="symbol">The symbol to retrieve historical future data for</param>
-        /// <param name="date">Date of the data</param>
+        /// <param name="start">Date of the data</param>
         /// <param name="resolution">The resolution to request</param>
         /// <returns>A <see cref="FutureHistory"/> object that contains historical future data.</returns>
-        public FutureHistory GetFutureHistory(Symbol symbol, DateTime date, Resolution? resolution = null)
+        public FutureHistory GetFutureHistory(Symbol symbol, DateTime start, DateTime? end = null, Resolution? resolution = null)
         {
-            SetStartDate(date.AddDays(1));
+            if (!end.HasValue || end.Value.Date == start.Date)
+            {
+                end = start.AddDays(1);
+            }
+
             var future = Securities[symbol] as Future;
 
-            var provider = new BacktestingFutureChainProvider();
-            var allSymbols = provider.GetFutureContractList(future.Symbol, date);
+            var allSymbols = new List<Symbol>();
+            for (var date = start; date < end; date = date.AddDays(1))
+            {
+                if (future.Exchange.DateIsOpen(date))
+                {
+                    allSymbols.AddRange(FutureChainProvider.GetFutureContractList(future.Symbol, date));
+                }
+            }
+            var symbols = allSymbols.Distinct();
 
-            var requests = future.ContractFilter.Filter(new FutureFilterUniverse(allSymbols, new Tick { Time = date }))
-                .Select(x =>
-                     new HistoryRequest(date.AddDays(-1),
-                                        date,
-                                        typeof(QuoteBar),
-                                        x,
-                                        resolution ?? future.Resolution,
-                                        future.Exchange.Hours,
-                                        MarketHoursDatabase.FromDataFolder().GetDataTimeZone(future.Symbol.ID.Market, future.Symbol, future.Type),
-                                        Resolution.Minute,
-                                        future.IsExtendedMarketHours,
-                                        future.IsCustomData(),
-                                        DataNormalizationMode.Raw,
-                                        LeanData.GetCommonTickTypeForCommonDataTypes(typeof(QuoteBar), future.Type))
-                    );
-
-            return new FutureHistory(HistoryProvider.GetHistory(requests, TimeZone).Memoize());
+            return new FutureHistory(History(symbols, start, end.Value, resolution));
         }
 
         /// <summary>

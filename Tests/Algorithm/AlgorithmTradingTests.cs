@@ -947,6 +947,7 @@ namespace QuantConnect.Tests.Algorithm
             var algo = new QCAlgorithm();
             algo.AddSecurity(SecurityType.Forex, "EURUSD");
             algo.SetCash(100000);
+            algo.SetCash("BTC", 0, 8000);
             algo.SetBrokerageModel(BrokerageName.FxcmBrokerage);
             algo.Securities[Symbols.EURUSD].TransactionModel = new ConstantFeeTransactionModel(0);
             Security eurusd = algo.Securities[Symbols.EURUSD];
@@ -984,9 +985,9 @@ namespace QuantConnect.Tests.Algorithm
             btcusd.TransactionModel = new ConstantFeeTransactionModel(0);
             // Set Price to $26
             Update(btcusd, 26);
-            // So -100000/26 = 3846.153846153846, After Rounding off becomes -3846.15384615, since lot size is 0.00000001
+            // Cash model does not allow shorts
             actual = algo.CalculateOrderQuantity(Symbols.BTCUSD, -1m);
-            Assert.AreEqual(-3846.15384615m, actual);
+            Assert.AreEqual(0, actual);
         }
 
         [Test]
@@ -1115,6 +1116,8 @@ namespace QuantConnect.Tests.Algorithm
         {
             Security msft;
             var algo = GetAlgorithm(out msft, 1, 0);
+            algo.SetFinishedWarmingUp();
+
             //Set price to $25
             Update(msft, 25);
 
@@ -1195,7 +1198,7 @@ namespace QuantConnect.Tests.Algorithm
             algo.SetCash(100000);
             algo.Securities[Symbols.MSFT].TransactionModel = new ConstantFeeTransactionModel(fee);
             msft = algo.Securities[Symbols.MSFT];
-            msft.MarginModel = new SecurityMarginModel(initialMarginRequirement, maintenanceMarginRequirement);
+            msft.BuyingPowerModel = new SecurityMarginModel(initialMarginRequirement, maintenanceMarginRequirement);
             return algo;
         }
 

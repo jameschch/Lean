@@ -130,8 +130,8 @@ namespace QuantConnect
             DateTime time;
             try
             {
-                // Unix timestamp is seconds past epoch
-                time = EpochTime.AddSeconds(unixTimeStamp);
+                var ticks = unixTimeStamp * TimeSpan.TicksPerSecond;
+                time = EpochTime.AddTicks((long)ticks);
             }
             catch (Exception err)
             {
@@ -151,8 +151,8 @@ namespace QuantConnect
             DateTime time;
             try
             {
-                // Unix timestamp is seconds past epoch
-                time = EpochTime.AddMilliseconds(unixTimeStamp);
+                var ticks = unixTimeStamp * TimeSpan.TicksPerMillisecond;
+                time = EpochTime.AddTicks((long)ticks);
             }
             catch (Exception err)
             {
@@ -197,6 +197,7 @@ namespace QuantConnect
         {
             return TimeSpan.FromTicks(Math.Max(one.Ticks, two.Ticks));
         }
+
         /// <summary>
         /// Returns the timespan with the smaller value
         /// </summary>
@@ -219,6 +220,17 @@ namespace QuantConnect
         public static DateTime Min(DateTime one, DateTime two)
         {
             return one < two ? one : two;
+        }
+
+        /// <summary>
+        /// Multiplies the specified interval by the multiplier
+        /// </summary>
+        /// <param name="interval">The interval to be multiplied, such as TimeSpan.FromSeconds(1)</param>
+        /// <param name="multiplier">The number of times to multiply the interval</param>
+        /// <returns>The multiplied interval, such as 1s*5 = 5s</returns>
+        public static TimeSpan Multiply(this TimeSpan interval, double multiplier)
+        {
+            return TimeSpan.FromTicks((long) (interval.Ticks * multiplier));
         }
 
         /// <summary>
@@ -429,7 +441,7 @@ namespace QuantConnect
         {
             if (barSize <= TimeSpan.Zero)
             {
-                throw new ArgumentException("barSize must be greater than TimeSpan.Zero", "barSize");
+                throw new ArgumentException("barSize must be greater than TimeSpan.Zero", nameof(barSize));
             }
 
             var current = end.RoundDown(barSize);
@@ -443,6 +455,74 @@ namespace QuantConnect
                 }
             }
             return current;
+        }
+
+        /// <summary>
+        /// Determines the end time at which the requested number of bars of the given  will have elapsed.
+        /// NOTE: The start time is not discretized by barSize units like is done in <see cref="GetStartTimeForTradeBars"/>
+        /// </summary>
+        /// <param name="exchange">The exchange used to test for market open hours</param>
+        /// <param name="start">The end time of the last bar over the requested period</param>
+        /// <param name="barSize">The length of each bar</param>
+        /// <param name="barCount">The number of bars requested</param>
+        /// <param name="extendedMarketHours">True to allow extended market hours bars, otherwise false for only normal market hours</param>
+        /// <returns>The start time that would provide the specified number of bars ending at the specified end time, rounded down by the requested bar size</returns>
+        public static DateTime GetEndTimeForTradeBars(SecurityExchangeHours exchange, DateTime start, TimeSpan barSize, int barCount, bool extendedMarketHours)
+        {
+            if (barSize <= TimeSpan.Zero)
+            {
+                throw new ArgumentException("barSize must be greater than TimeSpan.Zero", nameof(barSize));
+            }
+
+            var current = start;
+            for (int i = 0; i < barCount;)
+            {
+                var previous = current;
+                current = current + barSize;
+                if (exchange.IsOpen(previous, current, extendedMarketHours))
+                {
+                    i++;
+                }
+            }
+            return current;
+        }
+
+        /// <summary>
+        /// Normalizes the current time within the specified period
+        /// time = start => 0
+        /// time = start + period => 1
+        /// </summary>
+        /// <param name="start">The start time of the range</param>
+        /// <param name="current">The current time we seek to normalize</param>
+        /// <param name="period">The time span of the range</param>
+        /// <returns>The normalized time</returns>
+        public static double NormalizeInstantWithinRange(DateTime start, DateTime current, TimeSpan period)
+        {
+            // normalization of a point time only has a value at that specific point
+            if (period == TimeSpan.Zero)
+            {
+                return start == current ? 1 : 0;
+            }
+
+            var delta = (current - start).TotalSeconds;
+            return delta / period.TotalSeconds;
+        }
+
+        /// <summary>
+        /// Normalizes the step size as a percentage of the period.
+        /// </summary>
+        /// <param name="period">The period to normalize against</param>
+        /// <param name="stepSize">The step size to be normaized</param>
+        /// <returns>The normalized step size as a percentage of the period</returns>
+        public static double NormalizeTimeStep(TimeSpan period, TimeSpan stepSize)
+        {
+            // normalization of a time step for an instantaneous period will always be zero
+            if (period == TimeSpan.Zero)
+            {
+                return 0;
+            }
+
+            return stepSize.TotalSeconds / period.TotalSeconds;
         }
     }
 }

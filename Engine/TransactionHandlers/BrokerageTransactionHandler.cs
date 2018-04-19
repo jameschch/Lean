@@ -552,8 +552,10 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 }
 
                 // if we were returned our balances, update everything and flip our flag as having performed sync today
-                foreach (var cash in _algorithm.Portfolio.CashBook.Values)
+                foreach (var kvp in _algorithm.Portfolio.CashBook)
                 {
+                    var cash = kvp.Value;
+
                     var balanceCash = balances.FirstOrDefault(balance => balance.Symbol == cash.Symbol);
                     //update the cash if the entry if found in the balances
                     if (balanceCash != null)
@@ -670,6 +672,9 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             // rounds the order prices
             RoundOrderPrices(order, security);
 
+            // save current security time and prices
+            order.OrderSubmissionData = new OrderSubmissionData(security.GetLastData());
+
             // update the ticket's internal storage with this new order reference
             ticket.SetOrder(order);
 
@@ -683,10 +688,10 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             }
 
             // check to see if we have enough money to place the order
-            bool sufficientCapitalForOrder;
+            HasSufficientBuyingPowerForOrderResult hasSufficientBuyingPowerResult;
             try
             {
-                sufficientCapitalForOrder = _algorithm.Transactions.GetSufficientCapitalForOrder(_algorithm.Portfolio, order);
+                hasSufficientBuyingPowerResult = security.BuyingPowerModel.HasSufficientBuyingPowerForOrder(_algorithm.Portfolio, security, order);
             }
             catch (Exception err)
             {
@@ -696,12 +701,13 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 return OrderResponse.Error(request, OrderResponseErrorCode.ProcessingError, "Error in GetSufficientCapitalForOrder");
             }
 
-            if (!sufficientCapitalForOrder)
+            if (!hasSufficientBuyingPowerResult.IsSufficient)
             {
                 order.Status = OrderStatus.Invalid;
-                var response = OrderResponse.Error(request, OrderResponseErrorCode.InsufficientBuyingPower, string.Format("Order Error: id: {0}, Insufficient buying power to complete order (Value:{1}).", order.Id, order.GetValue(security).SmartRounding()));
+                var errorMessage = $"Order Error: id: {order.Id}, Insufficient buying power to complete order (Value:{order.GetValue(security).SmartRounding()}), Reason: {hasSufficientBuyingPowerResult.Reason}";
+                var response = OrderResponse.Error(request, OrderResponseErrorCode.InsufficientBuyingPower, errorMessage);
                 _algorithm.Error(response.ErrorMessage);
-                HandleOrderEvent(new OrderEvent(order, _algorithm.UtcTime, 0m, "Insufficient buying power to complete order"));
+                HandleOrderEvent(new OrderEvent(order, _algorithm.UtcTime, 0m, errorMessage));
                 return response;
             }
 
@@ -741,7 +747,6 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 return response;
             }
 
-            order.Status = OrderStatus.Submitted;
             return OrderResponse.Success(request);
         }
 

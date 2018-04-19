@@ -25,7 +25,17 @@ namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
-        private readonly Dictionary<string, Chart> _charts = new Dictionary<string, Chart>();
+        private readonly ConcurrentDictionary<string, Chart> _charts = new ConcurrentDictionary<string, Chart>();
+
+        private static readonly Dictionary<string, List<string>> ReservedChartSeriesNames = new Dictionary<string, List<string>>
+        {
+            { "Strategy Equity", new List<string> { "Equity", "Daily Performance" } },
+            { "Meta", new List<string>() },
+            { "Alpha", new List<string> { "Direction Score", "Magnitude Score" } },
+            { "Alpha Count", new List<string> { "Count" } },
+            { "Alpha Assets", new List<string>() },
+            { "Alpha Asset Breakdown", new List<string>() }
+        };
 
         /// <summary>
         /// Access to the runtime statistics property. User provided statistics.
@@ -40,10 +50,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Plot(string,string,decimal)"/>
         public void AddChart(Chart chart)
         {
-            if (!_charts.ContainsKey(chart.Name))
-            {
-                _charts.Add(chart.Name, chart);
-            }
+            _charts.TryAdd(chart.Name, chart);
         }
 
         /// <summary>
@@ -57,7 +64,6 @@ namespace QuantConnect.Algorithm
             //By default plot to the primary chart:
             Plot("Strategy Equity", series, value);
         }
-
 
         /// <summary>
         /// Plot a chart using string series name, with int value. Alias of Plot();
@@ -151,23 +157,30 @@ namespace QuantConnect.Algorithm
         /// <param name="value">Value of the point</param>
         public void Plot(string chart, string series, decimal value)
         {
-            //Ignore the reserved chart names:
-            if ((chart == "Strategy Equity" && series == "Equity") || (chart == "Daily Performance") || (chart == "Meta"))
+            // Check if chart/series names are reserved
+            List<string> reservedSeriesNames;
+            if (ReservedChartSeriesNames.TryGetValue(chart, out reservedSeriesNames))
             {
-                throw new Exception("Algorithm.Plot(): 'Equity', 'Daily Performance' and 'Meta' are reserved chart names created for all charts.");
+                if (reservedSeriesNames.Count == 0)
+                {
+                    throw new Exception($"Algorithm.Plot(): '{chart}' is a reserved chart name.");
+                }
+                if (reservedSeriesNames.Contains(series))
+                {
+                    throw new Exception($"Algorithm.Plot(): '{series}' is a reserved series name for chart '{chart}'.");
+                }
             }
 
             // If we don't have the chart, create it:
-            if (!_charts.ContainsKey(chart))
-            {
-                _charts.Add(chart, new Chart(chart));
-            }
+            _charts.TryAdd(chart, new Chart(chart));
 
             var thisChart = _charts[chart];
             if (!thisChart.Series.ContainsKey(series))
             {
-                //Number of series in total.
-                var seriesCount = (from x in _charts.Values select x.Series.Count).Sum();
+                //Number of series in total, excluding reserved charts
+                var seriesCount = _charts.Select(x => x.Value).Sum(c => ReservedChartSeriesNames.TryGetValue(c.Name, out reservedSeriesNames)
+                    ? c.Series.Values.Count(s => reservedSeriesNames.Count > 0 && !reservedSeriesNames.Contains(s.Name))
+                    : c.Series.Count);
 
                 if (seriesCount > 10)
                 {
@@ -315,7 +328,7 @@ namespace QuantConnect.Algorithm
         /// <remarks>GetChartUpdates returns the latest updates since previous request.</remarks>
         public List<Chart> GetChartUpdates(bool clearChartData = false)
         {
-            var updates = _charts.Values.Select(chart => chart.GetUpdates()).ToList();
+            var updates = _charts.Select(x => x.Value).Select(chart => chart.GetUpdates()).ToList();
 
             if (clearChartData)
             {
@@ -330,7 +343,5 @@ namespace QuantConnect.Algorithm
             }
             return updates;
         }
-
-    } // End Partial Algorithm Template - Plotting.
-
-} // End QC Namespace
+    }
+}

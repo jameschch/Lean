@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,7 +26,7 @@ namespace QuantConnect.Securities
 {
     /// <summary>
     /// Represents options symbols universe used in filtering.
-    /// </summary> 
+    /// </summary>
     public class OptionFilterUniverse : IDerivativeSecurityFilterUniverse
     {
         /// <summary>
@@ -220,27 +220,61 @@ namespace QuantConnect.Securities
             _isDynamic = true;
 
             // find the current price in the list of strikes
+            var exactPriceFound = true;
             var index = _uniqueStrikes.BinarySearch(_underlying.Price);
+
+            // Return value of BinarySearch (from MSDN):
+            // The zero-based index of item in the sorted List<T>, if item is found;
+            // otherwise, a negative number that is the bitwise complement of the index of the next element that is larger than item
+            // or, if there is no larger element, the bitwise complement of Count.
             if (index < 0)
             {
                 // exact price not found
-                index = ~index;
+                exactPriceFound = false;
 
-                if (index >= _uniqueStrikes.Count)
+                if (index == ~_uniqueStrikes.Count)
                 {
-                    // price out of range: should never happen, return empty
+                    // there is no greater price, return empty
                     _allSymbols = Enumerable.Empty<Symbol>();
                     return this;
                 }
+
+                index = ~index;
             }
 
             // compute the bounds, no need to worry about rounding and such
             var indexMinPrice = index + minStrike;
+            var indexMaxPrice = index + maxStrike;
+            if (!exactPriceFound)
+            {
+                if (minStrike < 0 && maxStrike > 0)
+                {
+                    indexMaxPrice--;
+                }
+                else if (minStrike > 0)
+                {
+                    indexMinPrice--;
+                    indexMaxPrice--;
+                }
+            }
+
             if (indexMinPrice < 0)
             {
                 indexMinPrice = 0;
             }
-            var indexMaxPrice = index + maxStrike - 1;
+            else if (indexMinPrice >= _uniqueStrikes.Count)
+            {
+                // price out of range: return empty
+                _allSymbols = Enumerable.Empty<Symbol>();
+                return this;
+            }
+
+            if (indexMaxPrice < 0)
+            {
+                // price out of range: return empty
+                _allSymbols = Enumerable.Empty<Symbol>();
+                return this;
+            }
             if (indexMaxPrice >= _uniqueStrikes.Count)
             {
                 indexMaxPrice = _uniqueStrikes.Count - 1;
@@ -262,7 +296,7 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Applies filter selecting options contracts based on a range of expiration dates relative to the current day 
+        /// Applies filter selecting options contracts based on a range of expiration dates relative to the current day
         /// </summary>
         /// <param name="minExpiry">The minimum time until expiry to include, for example, TimeSpan.FromDays(10)
         /// would exclude contracts expiring in less than 10 days</param>
@@ -316,7 +350,7 @@ namespace QuantConnect.Securities
     public static class OptionFilterUniverseEx
     {
         /// <summary>
-        /// Filters universe 
+        /// Filters universe
         /// </summary>
         /// <param name="universe"></param>
         /// <param name="predicate"></param>
@@ -329,7 +363,7 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Maps universe 
+        /// Maps universe
         /// </summary>
         public static OptionFilterUniverse Select(this OptionFilterUniverse universe, Func<Symbol, Symbol> mapFunc)
         {
@@ -339,7 +373,7 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Binds universe 
+        /// Binds universe
         /// </summary>
         public static OptionFilterUniverse SelectMany(this OptionFilterUniverse universe, Func<Symbol, IEnumerable<Symbol>> mapFunc)
         {

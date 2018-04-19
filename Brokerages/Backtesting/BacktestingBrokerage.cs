@@ -85,10 +85,7 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <remarks>
         /// The BacktestingBrokerage is always connected
         /// </remarks>
-        public override bool IsConnected
-        {
-            get { return true; }
-        }
+        public override bool IsConnected => true;
 
         /// <summary>
         /// Gets all open orders on the account
@@ -106,9 +103,9 @@ namespace QuantConnect.Brokerages.Backtesting
         public override List<Holding> GetAccountHoldings()
         {
             // grab everything from the portfolio with a non-zero absolute quantity
-            return (from security in Algorithm.Portfolio.Securities.Values.OrderBy(x => x.Symbol)
-                    where security.Holdings.AbsoluteQuantity > 0
-                    select new Holding(security)).ToList();
+            return (from kvp in Algorithm.Portfolio.Securities.OrderBy(x => x.Value.Symbol)
+                    where kvp.Value.Holdings.AbsoluteQuantity > 0
+                    select new Holding(kvp.Value)).ToList();
         }
 
         /// <summary>
@@ -117,7 +114,7 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>The current cash balance for each currency available for trading</returns>
         public override List<Cash> GetCashBalance()
         {
-            return Algorithm.Portfolio.CashBook.Values.ToList();
+            return Algorithm.Portfolio.CashBook.Select(x => x.Value).ToList();
         }
 
         /// <summary>
@@ -286,26 +283,25 @@ namespace QuantConnect.Brokerages.Backtesting
                     }
 
                     // verify sure we have enough cash to perform the fill
-                    bool sufficientBuyingPower;
+                    HasSufficientBuyingPowerForOrderResult hasSufficientBuyingPowerResult;
                     try
                     {
-                        sufficientBuyingPower = Algorithm.Transactions.GetSufficientCapitalForOrder(Algorithm.Portfolio, order);
+                        hasSufficientBuyingPowerResult = security.BuyingPowerModel.HasSufficientBuyingPowerForOrder(Algorithm.Portfolio, security, order);
                     }
                     catch (Exception err)
                     {
                         // if we threw an error just mark it as invalid and remove the order from our pending list
+                        OnOrderEvent(new OrderEvent(order, Algorithm.UtcTime, 0m, err.Message) { Status = OrderStatus.Invalid });
                         Order pending;
                         _pending.TryRemove(order.Id, out pending);
-                        order.Status = OrderStatus.Invalid;
-                        OnOrderEvent(new OrderEvent(order, Algorithm.UtcTime, 0, "Error in GetSufficientCapitalForOrder"));
 
                         Log.Error(err);
-                        Algorithm.Error(string.Format("Order Error: id: {0}, Error executing margin models: {1}", order.Id, err.Message));
+                        Algorithm.Error($"Order Error: id: {order.Id}, Error executing margin models: {err.Message}");
                         continue;
                     }
 
                     //Before we check this queued order make sure we have buying power:
-                    if (sufficientBuyingPower)
+                    if (hasSufficientBuyingPowerResult.IsSufficient)
                     {
                         //Model:
                         var model = security.FillModel;
@@ -348,16 +344,19 @@ namespace QuantConnect.Brokerages.Backtesting
                         catch (Exception err)
                         {
                             Log.Error(err);
-                            Algorithm.Error(string.Format("Order Error: id: {0}, Transaction model failed to fill for order type: {1} with error: {2}",
-                                order.Id, order.Type, err.Message));
+                            Algorithm.Error($"Order Error: id: {order.Id}, Transaction model failed to fill for order type: {order.Type} with error: {err.Message}");
                         }
                     }
                     else
                     {
-                        //Flag order as invalid and push off queue:
-                        order.Status = OrderStatus.Invalid;
-                        Algorithm.Error(string.Format("Order Error: id: {0}, Insufficient buying power to complete order (Value:{1}).", order.Id,
-                            order.GetValue(security).SmartRounding()));
+                        // invalidate the order in the algorithm before removing
+                        var message = $"Insufficient buying power to complete order (Value:{order.GetValue(security).SmartRounding()}), Reason: {hasSufficientBuyingPowerResult.Reason}.";
+                        OnOrderEvent(new OrderEvent(order, Algorithm.UtcTime, 0m, message) { Status = OrderStatus.Invalid });
+                        Order pending;
+                        _pending.TryRemove(order.Id, out pending);
+
+                        Algorithm.Error($"Order Error: id: {order.Id}, {message}");
+                        continue;
                     }
 
                     foreach (var fill in fills)

@@ -1,37 +1,41 @@
 ![alt tag](Documentation/logo.white.small.png)
-Lean C# Algorithmic Trading Engine
+Lean Algorithmic Trading Engine
 =========
 
-[![Join the chat at https://www.quantconnect.com/slack](https://cdn.quantconnect.com/lean/i/slack-sm.png)](https://www.quantconnect.com/slack) &nbsp;&nbsp;&nbsp;&nbsp;
-[![Build Status](https://travis-ci.org/QuantConnect/Lean.svg?branch=feature%2Fremove-web-socket-4-net)](https://travis-ci.org/QuantConnect/Lean)
+[![Build Status](https://travis-ci.org/QuantConnect/Lean.svg?branch=feature%2Fremove-web-socket-4-net)](https://travis-ci.org/QuantConnect/Lean) &nbsp;&nbsp;&nbsp; [![Google Group](https://img.shields.io/badge/debug-Google%20Group-53c82b.svg)](https://groups.google.com/forum/#!forum/lean-engine) &nbsp;&nbsp;&nbsp; [![Slack Chat](https://img.shields.io/badge/chat-Slack-53c82b.svg)](https://www.quantconnect.com/slack)
 
-[Lean Home - lean.quantconnect.com][1] | [Documentation][2] | [Download Zip][3]
+
+[Lean Home - https://www.quantconnect.com/lean][1] | [Documentation][2] | [Download Zip][3]
 
 ----------
 
 ## Introduction ##
 
-Lean Engine is an open-source fully managed C# algorithmic trading engine built for desktop and cloud usage. It was designed in Mono and operates in Windows, Linux and Mac platforms. Lean drives the web based algorithmic trading platform [QuantConnect][4].
+Lean Engine is an open-source algorithmic trading engine built for easy strategy research, backtesting and live trading. We integrate with common data providers and brokerages so you can quickly deploy algorithmic trading strategies.
+
+The core of the LEAN Engine is written in C#; but it operates seamlessly on Linux, Mac and Windows operating systems. It supports algorithms written in Python 3.6, C# or F#. Lean drives the web based algorithmic trading platform [QuantConnect][4].
 
 ## System Overview ##
 
 ![alt tag](Documentation/2-Overview-Detailed-New.png)
 
-Lean outsourced key infrastructure management to plugins. The most important plugins are:
+The Engine is broken into many modular pieces which can be extended without touching other files. The modules are configured in config.json as set "environments". Through these environments you can control LEAN to operate in the mode required. 
 
- - **Result Processing**
+The most important plugins are:
+
+ - **Result Processing** (IResultHandler)
    > Handle all messages from the algorithmic trading engine. Decide what should be sent, and where the messages should go. The result processing system can send messages to a local GUI, or the web interface.
 
- - **Datafeed Sourcing**
+ - **Datafeed Sourcing** (IDataFeed)
    > Connect and download data required for the algorithmic trading engine. For backtesting this sources files from the disk, for live trading it connects to a stream and generates the data objects.
 
- - **Transaction Processing**
+ - **Transaction Processing** (ITransactionHandler)
    > Process new order requests; either using the fill models provided by the algorithm, or with an actual brokerage. Send the processed orders back to the algorithm's portfolio to be filled.
 
- - **Realtime Event Management**
+ - **Realtime Event Management** (IRealtimeHandler)
    > Generate real time events - such as end of day events. Trigger callbacks to real time event handlers. For backtesting this is mocked-up an works on simulated time. 
  
- - **Algorithm State Setup**
+ - **Algorithm State Setup** (ISetupHandler)
    > Configure the algorithm cash, portfolio and data requested. Initialize all state parameters required.
 
 For more information on the system design and contributing please see the Lean Website Documentation.
@@ -82,9 +86,9 @@ echo "deb http://download.mono-project.com/repo/ubuntu xenial main" | sudo tee /
 sudo apt-get update
 sudo apt-get install -y binutils mono-complete ca-certificates-mono referenceassemblies-pcl fsharp
 ```
-- Install Nuget and Python
+- Install Nuget
 ```
-sudo apt-get update && sudo apt-get install -y nuget python-pip
+sudo apt-get update && sudo apt-get install -y nuget
 ```
 - Restore NuGet packages then compile:
 ```
@@ -112,9 +116,10 @@ If after all you still receive connection refuse error, try changing the `ib-por
 
 - Install [Visual Studio](https://www.visualstudio.com/en-us/downloads/download-visual-studio-vs.aspx)
 - Open `QuantConnect.Lean.sln` in Visual Studio
+- Build the solution by clicking Build Menu -> Build Solution (this should trigger the Nuget package restore)
 - Press `F5` to run
 
-By default Visual Studio includes NuGet, if your version cannot find DLL references, install [Nuget](https://www.nuget.org/) and build again.
+Nuget packages not being restored is the most common build issue. By default Visual Studio includes NuGet, if your installation of Visual Studio (or your IDE) cannot find DLL references, install [Nuget](https://www.nuget.org/), run nuget on the solution and re-build the Solution again. 
 
 ### Python Support
 
@@ -130,24 +135,17 @@ sudo apt-get update && apt-get install -y r-base && apt-get install -y pandoc &&
 For Windows and macOs users:
 Please visit the official [R website](https://www.r-project.org/) to download R. 
 
-### QuantConnect plugin
+### QuantConnect Visual Studio Plugin
 
-To install QuantConnect plugin build the `VisualStudioPlugin` project in `Release` mode. Then go to `VisualStudioPlugin/bin/Release` and run `QuantConnect.VisualStudioPlugin.vsix` file. Restart VisualStudio.
-In VisualStudio go to Tools -> Options -> QuantConnect and set "<Path to Lean repo>/Data" value to "Price data path".
-
-VisualStudio plugin writes log data to the VisualStudio activity log, but only if VisualStudio is started with the `/log` parameter passed to it. To debug the QuantConnect plugin start VisualStudio with the following command:
-
-```
-devenv /log <path-to-log>
-```
+For more information please see the QuantConnect Visual Studio Plugin [Documentation][8]
 
 ## Issues and Feature Requests ##
 
 Please submit bugs and feature requests as an issue to the [Lean Repository][5]. Before submitting an issue please read others to ensure it is not a duplicate.
 
-## Mailing List ##
+## Mailing List ## 
 
-The mailing list for the project can be found on [Google Groups][6]
+The mailing list for the project can be found on [Google Groups][6]. Please use this to request assistance with your installations and setup questions.
 
 ## Contributors and Pull Requests ##
 
@@ -169,3 +167,4 @@ Ryan H, Pravin B, Jimmie B, Nick C, Sam C, Mattias S, Michael H, Mark M, Madhan,
   [5]: https://github.com/QuantConnect/Lean/issues
   [6]: https://groups.google.com/forum/#!forum/lean-engine
   [7]: https://github.com/QuantConnect/Lean/blob/master/CONTRIBUTING.md
+  [8]: https://github.com/QuantConnect/Lean/blob/master/VisualStudioPlugin/readme.md

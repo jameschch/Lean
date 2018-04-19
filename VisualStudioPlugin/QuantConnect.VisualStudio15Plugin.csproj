@@ -77,10 +77,20 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AuthorizationManager.cs" />
+    <Compile Include="DataGridItem.cs" />
+    <Compile Include="ErrorDialog.xaml.cs">
+      <DependentUpon>ErrorDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Credentials.cs" />
     <Compile Include="CredentialsManager.cs" />
-    <Compile Include="Log.cs" />
-    <Compile Include="LogInCommand.cs" />
+    <Compile Include="IBacktestObserver.cs" />
+    <Compile Include="ToolWindow1.cs" />
+    <Compile Include="ToolWindow1Command.cs" />
+    <Compile Include="ToolWindow1Control.xaml.cs">
+      <DependentUpon>ToolWindow1Control.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="VSActivityLog.cs" />
+    <Compile Include="AuthenticationCommand.cs" />
     <Compile Include="LogInDialog.xaml.cs" />
     <Compile Include="PathUtils.cs" />
     <Compile Include="ProjectFinder.cs" />
@@ -100,7 +110,15 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <Page Include="ErrorDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ProjectNameDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ToolWindow1Control.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -112,15 +130,23 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Content Include="icon_128x128.png">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <Resource Include="..\UserInterface\Icons\dialog-close-32.png">
+      <Link>Resources\dialog-close-32.png</Link>
+    </Resource>
+    <Resource Include="..\UserInterface\Icons\dialog-ok-apply-32.png">
+      <Link>Resources\dialog-ok-apply-32.png</Link>
+    </Resource>
+    <Content Include="..\UserInterface\Icons\icon_128x128.png">
+      <Link>icon_128x128.png</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="LICENSE.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="Resources\QuantConnectPackage.ico" />
+    <Resource Include="Resources\icon_128x128_resource.png" />
+    <Content Include="Resources\icon_16x16.png" />
     <Content Include="Resources\ToolMenuCommand.png" />
   </ItemGroup>
   <ItemGroup>
@@ -222,6 +248,7 @@
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="PresentationFramework.Aero2" />
     <Reference Include="stdole, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>

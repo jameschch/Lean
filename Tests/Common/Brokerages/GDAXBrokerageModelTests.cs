@@ -22,33 +22,39 @@ using System.Collections.Generic;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
+using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Common.Brokerages
 {
-    [TestFixture()]
+    [TestFixture]
     public class GDAXBrokerageModelTests
     {
+        private readonly GDAXBrokerageModel _unit = new GDAXBrokerageModel();
 
-        GDAXBrokerageModel _unit = new GDAXBrokerageModel();
-
-        [Test()]
+        [Test]
         public void GetLeverageTest()
         {
-            Assert.AreEqual(3, _unit.GetLeverage(GDAXTestsHelpers.GetSecurity()));
+            Assert.AreEqual(1, _unit.GetLeverage(GDAXTestsHelpers.GetSecurity()));
         }
 
-        [Test()]
+        [Test]
         public void GetFeeModelTest()
         {
             Assert.IsInstanceOf<GDAXFeeModel>(_unit.GetFeeModel(GDAXTestsHelpers.GetSecurity()));
         }
 
-        [Test()]
+        [Test]
+        public void GetBuyingPowerModelTest()
+        {
+            Assert.IsInstanceOf<CashBuyingPowerModel>(_unit.GetBuyingPowerModel(GDAXTestsHelpers.GetSecurity(), AccountType.Cash));
+        }
+
+        [Test]
         public void CanUpdateOrderTest()
         {
             BrokerageMessageEvent message;
-            Assert.AreEqual(false, _unit.CanUpdateOrder(GDAXTestsHelpers.GetSecurity(), Mock.Of<QuantConnect.Orders.Order>(),
-                new QuantConnect.Orders.UpdateOrderRequest(DateTime.UtcNow, 1, new QuantConnect.Orders.UpdateOrderFields()), out message));
+            Assert.AreEqual(false, _unit.CanUpdateOrder(GDAXTestsHelpers.GetSecurity(), Mock.Of<Order>(),
+                new UpdateOrderRequest(DateTime.UtcNow, 1, new UpdateOrderFields()), out message));
         }
 
         [TestCase(true)]
@@ -56,7 +62,7 @@ namespace QuantConnect.Tests.Common.Brokerages
         public void CanSubmitOrder_WhenBrokerageIdIsCorrect(bool isUpdate)
         {
             BrokerageMessageEvent message;
-            var order = new Mock<QuantConnect.Orders.Order>();
+            var order = new Mock<Order>();
             order.Object.Quantity = 10.0m;
 
             if (isUpdate)
@@ -72,7 +78,7 @@ namespace QuantConnect.Tests.Common.Brokerages
         public void CanSubmitOrder_WhenQuantityIsLargeEnough(decimal orderQuantity, bool isValidOrderQuantity)
         {
             BrokerageMessageEvent message;
-            var order = new Mock<QuantConnect.Orders.Order>();
+            var order = new Mock<Order>();
 
             order.Object.Quantity = orderQuantity;
 
@@ -88,7 +94,7 @@ namespace QuantConnect.Tests.Common.Brokerages
         public void CanOnlySubmitCryptoOrders(SecurityType securityType, bool isValidSecurityType)
         {
             BrokerageMessageEvent message;
-            var order = new Mock<QuantConnect.Orders.Order>();
+            var order = new Mock<Order>();
             order.Object.Quantity = 10.0m;
 
             Assert.AreEqual(isValidSecurityType, _unit.CanSubmitOrder(GDAXTestsHelpers.GetSecurity(1.0m, securityType), order.Object, out message));
@@ -110,7 +116,7 @@ namespace QuantConnect.Tests.Common.Brokerages
         }
 
         [Test]
-        public void FeeModelReturnsCorrectOrderFeeForTakerOrder()
+        public void FeeModelReturnsCorrectOrderFeeForTakerMarketOrder()
         {
             var security = GDAXTestsHelpers.GetSecurity();
             security.FeeModel = new GDAXFeeModel();
@@ -121,14 +127,129 @@ namespace QuantConnect.Tests.Common.Brokerages
         }
 
         [Test]
-        public void FeeModelReturnsCorrectOrderFeeForMakerOrder()
+        public void FeeModelReturnsCorrectOrderFeeForMakerLimitOrdersTickResolution()
         {
-            var security = GDAXTestsHelpers.GetSecurity();
+            var security = GDAXTestsHelpers.GetSecurity(resolution: Resolution.Tick);
             security.FeeModel = new GDAXFeeModel();
-            security.SetMarketPrice(new TradeBar { Symbol = security.Symbol, Close = 5000m });
-            var orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 5000m, DateTime.MinValue));
+            security.SetMarketPrice(new Tick { Symbol = security.Symbol, Value = 5000m });
+
+            var orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 4999.99m, DateTime.MinValue)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
 
             Assert.AreEqual(0, orderFee);
+
+            security.SetMarketPrice(new Tick { Symbol = security.Symbol, BidPrice = 5000m, AskPrice = 5000.01m });
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 5000m, DateTime.MinValue)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(0, orderFee);
+
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, -1, 5000.01m, DateTime.MinValue)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(0, orderFee);
+        }
+
+        [Test]
+        public void FeeModelReturnsCorrectOrderFeeForTakerLimitOrdersTickResolution()
+        {
+            var security = GDAXTestsHelpers.GetSecurity(resolution: Resolution.Tick);
+            security.FeeModel = new GDAXFeeModel();
+            security.SetMarketPrice(new Tick { Symbol = security.Symbol, Value = 5000m });
+            var orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 5000.01m, DateTime.MinValue)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            // marketable buy limit fill at 5000
+            Assert.AreEqual(12.5m, orderFee);
+
+            security.SetMarketPrice(new Tick { Symbol = security.Symbol, BidPrice = 5000m, AskPrice = 5000.01m });
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 5000.01m, DateTime.MinValue)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            // marketable buy limit fill at 5000.01
+            Assert.AreEqual(12.500025m, orderFee);
+
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, -1, 5000m, DateTime.MinValue)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            // marketable sell limit fill at 5000
+            Assert.AreEqual(12.5m, orderFee);
+        }
+
+        [Test]
+        public void FeeModelReturnsCorrectOrderFeeForMakerLimitOrdersMinuteResolution()
+        {
+            var time = new DateTime(2018, 4, 10);
+            var security = GDAXTestsHelpers.GetSecurity();
+
+            security.FeeModel = new GDAXFeeModel();
+            security.SetMarketPrice(new TradeBar { Symbol = security.Symbol, Close = 5000m, EndTime = time.AddSeconds(75) });
+
+            var orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 4999.99m, time)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(0, orderFee);
+
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, -1, 5000.01m, time)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(0, orderFee);
+        }
+
+        [Test]
+        public void FeeModelReturnsCorrectOrderFeeForTakerLimitOrdersMinuteResolution()
+        {
+            var time = new DateTime(2018, 4, 10);
+            var security = GDAXTestsHelpers.GetSecurity();
+
+            security.FeeModel = new GDAXFeeModel();
+            security.SetMarketPrice(new TradeBar { Symbol = security.Symbol, Close = 5000m, EndTime = time.AddMinutes(1) });
+
+            var orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 5000m, time)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(12.5m, orderFee);
+
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, 1, 5050m, time)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(12.5m, orderFee);
+
+            orderFee = security.FeeModel.GetOrderFee(security, new LimitOrder(security.Symbol, -1, 4950m, time)
+            {
+                OrderSubmissionData = new OrderSubmissionData(security.BidPrice, security.AskPrice, security.Price)
+            });
+
+            Assert.AreEqual(12.5m, orderFee);
+        }
+
+        [Test]
+        public void ThrowsWhenCalledWithMarginAccountType()
+        {
+            Assert.Throws<Exception>(() =>
+            {
+                new GDAXBrokerageModel(AccountType.Margin);
+            }, "The GDAX brokerage does not currently support Margin trading.");
         }
     }
 }
