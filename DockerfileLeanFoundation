@@ -1,7 +1,7 @@
 #
-#	LEAN Foundation Docker Container 20180205
-#	Cross platform deployment for multiple brokerages
-#	Intended to be used in conjunction with DockerfileLeanAlgorithm. This is just the foundation common OS+Dependencies required.
+#   LEAN Foundation Docker Container 20180607
+#   Cross platform deployment for multiple brokerages
+#   Intended to be used in conjunction with Dockerfile. This is just the foundation common OS+Dependencies required.
 #
 
 # Use base system for cleaning up wayward processes
@@ -15,7 +15,7 @@ CMD ["/sbin/my_init"]
 # Install OS Packages:
 # Misc tools for running Python.NET and IB inside a headless container.
 RUN apt-get update && apt-get install -y wget bzip2 python3-pip python-opengl && \
-    apt-get install -y xvfb unzip curl libxrender1 libxtst6 libxi6
+    apt-get install -y clang cmake curl git unzip xvfb libxrender1 libxtst6 libxi6 libglib2.0-dev
 
 # Install miniconda and supported third party python packages
 ENV PATH="/opt/miniconda3/bin:${PATH}"
@@ -26,10 +26,12 @@ RUN wget http://cdn.quantconnect.com.s3.amazonaws.com/miniconda/Miniconda3-4.3.3
     ln -s /opt/miniconda3/lib/libpython3.6m.so /usr/lib/libpython3.6m.so && \
     conda update -y python conda pip && \
     conda install -y cython pandas && \
+    conda install -y jsonschema lxml plotly quandl && \
     conda install -y blaze cvxopt keras nltk tensorflow theano && \
     conda install -y pytorch torchvision -c pytorch && \
     pip install arch copulalib cvxpy deap gym pykalman pyro-ppl  && \
     pip install sklearn statistics tensorforce xgboost && \
+    pip install QuantLib-Python && \
     conda clean -y --all
 
 # Java for running IB inside container:
@@ -47,10 +49,10 @@ RUN wget http://cdn.quantconnect.com/interactive/ibgateway-latest-standalone-lin
     rm ibgateway-latest-standalone-linux-x64-v968.2d.sh
 
 # Install IB Controller: Installs to ~/IBController
-RUN wget http://cdn.quantconnect.com/interactive/IBController-QuantConnect-3.2.0.2.zip && \
-    unzip IBController-QuantConnect-3.2.0.2.zip -d ~/IBController && \
+RUN wget http://cdn.quantconnect.com/interactive/IBController-QuantConnect-3.2.0.3.zip && \
+    unzip IBController-QuantConnect-3.2.0.3.zip -d ~/IBController && \
     chmod -R 777 ~/IBController && \
-    rm IBController-QuantConnect-3.2.0.2.zip
+    rm IBController-QuantConnect-3.2.0.3.zip
 
 # Mono C# for LEAN:
 # From https://github.com/mono/docker/blob/master/
@@ -70,6 +72,10 @@ RUN wget http://cdn.quantconnect.com/ta-lib/ta-lib-0.4.0-src.tar.gz && \
     tar -zxvf ta-lib-0.4.0-src.tar.gz && cd ta-lib && \
     ./configure --prefix=/usr && make && make install && \
     pip install TA-lib
+
+# Install DX Analytics
+RUN git clone https://github.com/yhilpisch/dx.git && cd dx && \
+    python setup.py install && cd .. && rm -irf dx
 
 # Install R
 RUN apt-get update && \

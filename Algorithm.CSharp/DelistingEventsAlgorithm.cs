@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -14,6 +14,8 @@
  *
 */
 
+using System;
+using System.Collections.Generic;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
@@ -27,7 +29,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="data event handlers" />
     /// <meta name="tag" content="delisting event" />
-    public class DelistingEventsAlgorithm : QCAlgorithm
+    public class DelistingEventsAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
@@ -58,10 +60,20 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 var symbol = kvp.Key;
                 var tradeBar = kvp.Value;
-                Debug(string.Format("OnData(Slice): {0}: {1}: {2}", Time, symbol, tradeBar.Close.ToString("0.00")));
+                Debug($"OnData(Slice): {Time}: {symbol}: {tradeBar.Close.ToString("0.00")}");
             }
 
             // the slice can also contain delisting data: data.Delistings in a dictionary string->Delisting
+
+            var aaa = Securities["AAA"];
+            if (aaa.IsDelisted && aaa.IsTradable)
+            {
+                throw new Exception("Delisted security must NOT be tradable");
+            }
+            if (!aaa.IsDelisted && !aaa.IsTradable)
+            {
+                throw new Exception("Securities must be marked as tradable until they're delisted or removed from the universe");
+            }
         }
 
         public void OnData(Delistings data)
@@ -72,18 +84,55 @@ namespace QuantConnect.Algorithm.CSharp
                 var delisting = kvp.Value;
                 if (delisting.Type == DelistingType.Warning)
                 {
-                    Debug(string.Format("OnData(Delistings): {0}: {1} will be delisted at end of day today.", Time, symbol));
+                    Debug($"OnData(Delistings): {Time}: {symbol} will be delisted at end of day today.");
+
+                    // liquidate on delisting warning
+                    SetHoldings(symbol, 0);
                 }
                 if (delisting.Type == DelistingType.Delisted)
                 {
-                    Debug(string.Format("OnData(Delistings): {0}: {1} has been delisted.", Time, symbol));
+                    Debug($"OnData(Delistings): {Time}: {symbol} has been delisted.");
+
+                    // fails because the security has already been delisted and is no longer tradable
+                    SetHoldings(symbol, 1);
                 }
             }
         }
 
         public override void OnOrderEvent(OrderEvent orderEvent)
         {
-            Debug(string.Format("OnOrderEvent(OrderEvent): {0}: {1}", Time, orderEvent));
+            Debug($"OnOrderEvent(OrderEvent): {Time}: {orderEvent}");
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "2"},
+            {"Average Win", "0%"},
+            {"Average Loss", "-5.59%"},
+            {"Compounding Annual Return", "-87.759%"},
+            {"Drawdown", "5.600%"},
+            {"Expectancy", "-1"},
+            {"Net Profit", "-5.592%"},
+            {"Sharpe Ratio", "-10.227"},
+            {"Loss Rate", "100%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "-1.958"},
+            {"Beta", "23.646"},
+            {"Annual Standard Deviation", "0.156"},
+            {"Annual Variance", "0.024"},
+            {"Information Ratio", "-10.33"},
+            {"Tracking Error", "0.156"},
+            {"Treynor Ratio", "-0.067"},
+            {"Total Fees", "$36.79"}
+        };
     }
 }

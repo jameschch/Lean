@@ -25,6 +25,7 @@ using QuantConnect.Orders;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Equity;
 using QuantConnect.Util;
+using QuantConnect.Data.Fundamental;
 
 namespace QuantConnect.Lean.Engine.DataFeeds
 {
@@ -57,7 +58,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <param name="universe">The universe to perform selection on</param>
         /// <param name="dateTimeUtc">The current date time in utc</param>
         /// <param name="universeData">The data provided to perform selection with</param>
-        public SecurityChanges ApplyUniverseSelection(Universe universe, DateTime dateTimeUtc, BaseDataCollection universeData)
+        public SecurityChanges  ApplyUniverseSelection(Universe universe, DateTime dateTimeUtc, BaseDataCollection universeData)
         {
             var algorithmEndDateUtc = _algorithm.EndDate.ConvertToUtc(_algorithm.TimeZone);
             if (dateTimeUtc > algorithmEndDateUtc)
@@ -82,7 +83,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                     foreach (var symbol in selectSymbolsResult)
                     {
-                        var factory = new FineFundamentalSubscriptionEnumeratorFactory(_algorithm.LiveMode, x => new[] { dateTimeUtc });
                         var config = FineFundamentalUniverse.CreateConfiguration(symbol);
 
                         var exchangeHours = _marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType).ExchangeHours;
@@ -91,7 +91,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                         var security = new Equity(symbol, exchangeHours, quoteCash, symbolProperties);
 
-                        var request = new SubscriptionRequest(true, universe, security, new SubscriptionDataConfig(config), dateTimeUtc, dateTimeUtc);
+                        var localStartTime = dateTimeUtc.ConvertFromUtc(exchangeHours.TimeZone).AddDays(-1);
+                        var factory = new FineFundamentalSubscriptionEnumeratorFactory(_algorithm.LiveMode, x => new[] { localStartTime });
+                        var request = new SubscriptionRequest(true, universe, security, new SubscriptionDataConfig(config), localStartTime, localStartTime);
                         using (var enumerator = factory.CreateEnumerator(request, dataProvider))
                         {
                             if (enumerator.MoveNext())
@@ -100,6 +102,58 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                             }
                         }
                     }
+
+                    // WARNING -- HACK ATTACK -- WARNING
+                    // Fine universes are considered special due to their chaining behavior.
+                    // As such, we need a means of piping the fine data read in here back to the data feed
+                    // so that it can be properly emitted via a TimeSlice.Create call. There isn't a mechanism
+                    // in place for this function to return such data. The following lines are tightly coupled
+                    // to the universeData dictionaries in SubscriptionSynchronizer and LiveTradingDataFeed and
+                    // rely on reference semantics to work.
+
+                    // Coarse raw data has SID collision on: CRHCY R735QTJ8XC9X
+                    var coarseData = universeData.Data.OfType<CoarseFundamental>()
+                        .DistinctBy(c => c.Symbol)
+                        .ToDictionary(c => c.Symbol);
+
+                    universeData.Data = new List<BaseData>();
+                    foreach (var fine in fineCollection.Data.OfType<FineFundamental>())
+                    {
+                        var fundamentals = new Fundamentals
+                        {
+                            Symbol = fine.Symbol,
+                            Time = fine.Time,
+                            EndTime = fine.EndTime,
+                            DataType = fine.DataType,
+                            CompanyReference = fine.CompanyReference,
+                            EarningReports = fine.EarningReports,
+                            EarningRatios = fine.EarningRatios,
+                            FinancialStatements = fine.FinancialStatements,
+                            OperationRatios = fine.OperationRatios,
+                            SecurityReference = fine.SecurityReference,
+                            ValuationRatios = fine.ValuationRatios
+                        };
+
+                        CoarseFundamental coarse;
+                        if (coarseData.TryGetValue(fine.Symbol, out coarse))
+                        {
+                            // the only time the coarse data won't exist is if the selection function
+                            // doesn't use the data provided, and instead returns a constant list of
+                            // symbols -- coupled with a potential hole in the data
+                            fundamentals.Value = coarse.Value;
+                            fundamentals.Market = coarse.Market;
+                            fundamentals.Volume = coarse.Volume;
+                            fundamentals.DollarVolume = coarse.DollarVolume;
+                            fundamentals.HasFundamentalData = coarse.HasFundamentalData;
+
+                            // set the fine fundamental price property to yesterday's closing price
+                            fine.Value = coarse.Value;
+                        }
+
+                        universeData.Data.Add(fundamentals);
+                    }
+
+                    // END -- HACK ATTACK -- END
 
                     // perform the fine fundamental universe selection
                     selectSymbolsResult = fineFiltered.FineFundamentalUniverse.PerformSelection(dateTimeUtc, fineCollection);
@@ -265,7 +319,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private bool IsSafeToRemove(Security member)
         {
             // but don't physically remove it from the algorithm if we hold stock or have open orders against it or an open target
-            var openOrders = _algorithm.Transactions.GetOrders(x => x.Status.IsOpen() && x.Symbol == member.Symbol);
+            var openOrders = _algorithm.Transactions.GetOpenOrders(x => x.Symbol == member.Symbol);
             if (!member.HoldStock && !openOrders.Any() && (member.Holdings.Target == null || member.Holdings.Target.Quantity == 0))
             {
                 return true;

@@ -291,6 +291,9 @@ namespace QuantConnect.Lean.Engine
                 //Set the algorithm and real time handler's time
                 algorithm.SetDateTime(time);
 
+                // Update the current slice before firing scheduled events or any other task
+                algorithm.SetCurrentSlice(timeSlice.Slice);
+
                 if (timeSlice.Slice.SymbolChangedEvents.Count != 0)
                 {
                     if (hasOnDataSymbolChangedEvents)
@@ -300,7 +303,7 @@ namespace QuantConnect.Lean.Engine
                     foreach (var symbol in timeSlice.Slice.SymbolChangedEvents.Keys)
                     {
                         // cancel all orders for the old symbol
-                        foreach (var ticket in transactions.GetOrderTickets(x => x.Status.IsOpen() && x.Symbol == symbol))
+                        foreach (var ticket in transactions.GetOpenOrderTickets(x => x.Symbol == symbol))
                         {
                             ticket.Cancel("Open order cancelled on symbol changed event");
                         }
@@ -311,10 +314,20 @@ namespace QuantConnect.Lean.Engine
                 {
                     foreach (var security in timeSlice.SecurityChanges.AddedSecurities)
                     {
+                        security.IsTradable = true;
                         if (!algorithm.Securities.ContainsKey(security.Symbol))
                         {
                             // add the new security
                             algorithm.Securities.Add(security);
+                        }
+                    }
+
+                    var activeSecurities = algorithm.UniverseManager.ActiveSecurities;
+                    foreach (var security in timeSlice.SecurityChanges.RemovedSecurities)
+                    {
+                        if (!activeSecurities.ContainsKey(security.Symbol))
+                        {
+                            security.IsTradable = false;
                         }
                     }
                 }
@@ -330,6 +343,22 @@ namespace QuantConnect.Lean.Engine
 
                     // Send market price updates to the TradeBuilder
                     algorithm.TradeBuilder.SetMarketPrice(security.Symbol, security.Price);
+                }
+
+                //Update the securities properties with any universe data
+                if (timeSlice.UniverseData.Count > 0)
+                {
+                    foreach (var kvp in timeSlice.UniverseData)
+                    {
+                        foreach (var data in kvp.Value.Data)
+                        {
+                            Security security;
+                            if (algorithm.Securities.TryGetValue(data.Symbol, out security))
+                            {
+                                security.Cache.StoreData(data);
+                            }
+                        }
+                    }
                 }
 
                 // poke each cash object to update from the recent security data
@@ -471,7 +500,7 @@ namespace QuantConnect.Lean.Engine
                         if (_liveMode || algorithm.Securities[split.Symbol].DataNormalizationMode == DataNormalizationMode.Raw)
                         {
                             // in live mode we always want to have our order match the order at the brokerage, so apply the split to the orders
-                            var openOrders = transactions.GetOrderTickets(ticket => ticket.Status.IsOpen() && ticket.Symbol == split.Symbol);
+                            var openOrders = transactions.GetOpenOrderTickets(ticket => ticket.Symbol == split.Symbol);
                             algorithm.BrokerageModel.ApplySplit(openOrders.ToList(), split);
                         }
                     }
@@ -605,8 +634,10 @@ namespace QuantConnect.Lean.Engine
                     {
                         // EVENT HANDLER v3.0 -- all data in a single event
                         algorithm.OnData(timeSlice.Slice);
-                        algorithm.OnFrameworkData(timeSlice.Slice);
                     }
+
+                    // always turn the crank on this method to ensure universe selection models function properly on day changes w/out data
+                    algorithm.OnFrameworkData(timeSlice.Slice);
                 }
                 catch (Exception err)
                 {
@@ -820,7 +851,7 @@ namespace QuantConnect.Lean.Engine
                             paired.Add(new DataFeedPacket(security, config, list));
                         }
 
-                        timeSlice = TimeSlice.Create(slice.Time.ConvertToUtc(timeZone), timeZone, algorithm.Portfolio.CashBook, paired, SecurityChanges.None);
+                        timeSlice = TimeSlice.Create(slice.Time.ConvertToUtc(timeZone), timeZone, algorithm.Portfolio.CashBook, paired, SecurityChanges.None, new Dictionary<Universe, BaseDataCollection>());
                     }
                     catch (Exception err)
                     {
@@ -982,6 +1013,21 @@ namespace QuantConnect.Lean.Engine
                 }
                 else
                 {
+                    // mark security as no longer tradable
+                    var security = algorithm.Securities[delisting.Symbol];
+                    security.IsTradable = false;
+                    security.IsDelisted = true;
+
+                    // remove security from all universes
+                    foreach (var ukvp in algorithm.UniverseManager)
+                    {
+                        var universe = ukvp.Value;
+                        if (universe.ContainsMember(security.Symbol))
+                        {
+                            universe.RemoveMember(algorithm.UtcTime, security);
+                        }
+                    }
+
                     Log.Trace("AlgorithmManager.Run(): Security delisted: " + delisting.Symbol.Value);
                     var cancelledOrders = algorithm.Transactions.CancelOpenOrders(delisting.Symbol);
                     foreach (var cancelledOrder in cancelledOrders)

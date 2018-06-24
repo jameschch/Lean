@@ -155,6 +155,7 @@
     <Compile Include="API\Backtest.cs" />
     <Compile Include="API\Compile.cs" />
     <Compile Include="API\CompileState.cs" />
+    <Compile Include="API\BacktestReport.cs" />
     <Compile Include="API\Link.cs" />
     <Compile Include="API\LiveAlgorithm.cs" />
     <Compile Include="API\LiveAlgorithmResults.cs" />
@@ -167,6 +168,7 @@
     <Compile Include="Benchmarks\FuncBenchmark.cs" />
     <Compile Include="Benchmarks\IBenchmark.cs" />
     <Compile Include="Benchmarks\SecurityBenchmark.cs" />
+    <Compile Include="Brokerages\BrokerageFactoryAttribute.cs" />
     <Compile Include="Brokerages\BrokerageName.cs" />
     <Compile Include="Brokerages\DefaultBrokerageMessageHandler.cs" />
     <Compile Include="Brokerages\DefaultBrokerageModel.cs" />
@@ -175,6 +177,7 @@
     <Compile Include="Data\Custom\Intrinio\IntrinioConfig.cs" />
     <Compile Include="Data\Custom\Intrinio\IntrinioEconomicData.cs" />
     <Compile Include="Data\Custom\Intrinio\EconomicDataSources.cs" />
+    <Compile Include="Data\Fundamental\Fundamentals.cs" />
     <Compile Include="Data\UniverseSelection\ITimeTriggeredUniverse.cs" />
     <Compile Include="Data\UniverseSelection\ScheduledUniverse.cs" />
     <Compile Include="Exceptions\DllNotFoundPythonExceptionInterpreter.cs" />
@@ -187,11 +190,18 @@
     <Compile Include="Exceptions\ScheduledEventExceptionInterpreter.cs" />
     <Compile Include="Exceptions\UnsupportedOperandPythonExceptionInterpreter.cs" />
     <Compile Include="Interfaces\IFutureChainProvider.cs" />
+    <Compile Include="Interfaces\ITimeInForceHandler.cs" />
     <Compile Include="Orders\Fills\LatestPriceFillModel.cs" />
     <Compile Include="Orders\GDAXOrderProperties.cs" />
+    <Compile Include="Orders\TimeInForceJsonConverter.cs" />
+    <Compile Include="Orders\TimeInForces\DayTimeInForce.cs" />
+    <Compile Include="Orders\TimeInForces\GoodTilCanceledTimeInForce.cs" />
+    <Compile Include="Orders\TimeInForces\GoodTilDateTimeInForce.cs" />
     <Compile Include="Orders\InteractiveBrokersOrderProperties.cs" />
     <Compile Include="Interfaces\IOrderProperties.cs" />
+    <Compile Include="Orders\OrderProperties.cs" />
     <Compile Include="Orders\OrderSubmissionData.cs" />
+    <Compile Include="Orders\TimeInForce.cs" />
     <Compile Include="Packets\AlphaNodePacket.cs" />
     <Compile Include="Packets\AlphaResultPacket.cs" />
     <Compile Include="Python\BrokerageModelPythonWrapper.cs" />
@@ -252,7 +262,6 @@
     <Compile Include="Data\Market\OptionContracts.cs" />
     <Compile Include="Data\Market\QuoteBars.cs" />
     <Compile Include="Data\Market\BarDirection.cs" />
-    <Compile Include="Data\Market\IntraDayDividendSplit.cs" />
     <Compile Include="Data\SubscriptionDataConfigList.cs" />
     <Compile Include="Data\UniverseSelection\CoarseFundamentalUniverse.cs" />
     <Compile Include="Data\UniverseSelection\FineFundamentalUniverse.cs" />

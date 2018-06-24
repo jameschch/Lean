@@ -21,7 +21,7 @@ from QuantConnect.Indicators import *
 from QuantConnect.Algorithm.Framework.Alphas import *
 
 
-class MacdAlphaModel:
+class MacdAlphaModel(AlphaModel):
     '''Defines a custom alpha model that uses MACD crossovers. The MACD signal line
     is used to generate up/down insights if it's stronger than the bounce threshold.
     If the MACD signal is within the bounce threshold then a flat price insight is returned.'''
@@ -59,13 +59,15 @@ class MacdAlphaModel:
             data: The new data available
         Returns:
             The new insights generated'''
+        insights = []
+
         for key, sd in self.symbolData.items():
             if sd.Security.Price == 0:
                 continue
 
             direction = InsightDirection.Flat
             normalized_signal = sd.MACD.Signal.Current.Value / sd.Security.Price
-            algorithm.Log(str(algorithm.Time) + ":" + str(normalized_signal) + ":" + str(sd.MACD.Signal.Current.Value))
+
             if normalized_signal > self.bounceThresholdPercent:
                 direction = InsightDirection.Up
             elif normalized_signal < -self.bounceThresholdPercent:
@@ -77,7 +79,9 @@ class MacdAlphaModel:
 
             insight = Insight.Price(sd.Security.Symbol, self.insightPeriod, direction)
             sd.PreviousDirection = insight.Direction
-            yield insight
+            insights.append(insight)
+
+        return insights
 
 
     def OnSecuritiesChanged(self, algorithm, changes):

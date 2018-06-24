@@ -27,7 +27,7 @@ namespace QuantConnect.Data.UniverseSelection
     /// <summary>
     /// Provides a base class for all universes to derive from.
     /// </summary>
-    public abstract class Universe
+    public abstract class Universe : IDisposable
     {
         /// <summary>
         /// Gets a value indicating that no change to the universe should be made
@@ -59,6 +59,15 @@ namespace QuantConnect.Data.UniverseSelection
         public string Market
         {
             get { return Configuration.Market; }
+        }
+
+        /// <summary>
+        /// Flag indicating if disposal of this universe has been requested
+        /// </summary>
+        public bool DisposeRequested
+        {
+            get;
+            private set;
         }
 
         /// <summary>
@@ -119,6 +128,18 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>True if we can remove the security, false otherwise</returns>
         public virtual bool CanRemoveMember(DateTime utcTime, Security security)
         {
+            // can always remove securities after dispose requested
+            if (DisposeRequested)
+            {
+                return true;
+            }
+
+            // can always remove delisted securities from the universe
+            if (security.IsDelisted)
+            {
+                return true;
+            }
+
             Member member;
             if (Securities.TryGetValue(security.Symbol, out member))
             {
@@ -139,6 +160,12 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>The data that passes the filter</returns>
         public IEnumerable<Symbol> PerformSelection(DateTime utcTime, BaseDataCollection data)
         {
+            // select empty set of symbols after dispose requested
+            if (DisposeRequested)
+            {
+                return Enumerable.Empty<Symbol>();
+            }
+
             var result = SelectSymbols(utcTime, data);
             if (ReferenceEquals(result, Unchanged))
             {
@@ -146,7 +173,7 @@ namespace QuantConnect.Data.UniverseSelection
             }
 
             var selections = result.ToHashSet();
-            var hasDiffs = _previousSelections.Except(selections).Union(selections.Except(_previousSelections)).Any();
+            var hasDiffs = _previousSelections.AreDifferent(selections);
             _previousSelections = selections;
             if (!hasDiffs)
             {
@@ -219,10 +246,17 @@ namespace QuantConnect.Data.UniverseSelection
         /// false if the security was already in the universe</returns>
         internal virtual bool AddMember(DateTime utcTime, Security security)
         {
-            if (Securities.ContainsKey(security.Symbol))
+            // never add members to disposed universes
+            if (DisposeRequested)
             {
                 return false;
             }
+
+            if (security.IsDelisted)
+            {
+                return false;
+            }
+
             return Securities.TryAdd(security.Symbol, new Member(utcTime, security));
         }
 
@@ -246,8 +280,25 @@ namespace QuantConnect.Data.UniverseSelection
         }
 
         /// <summary>
+        /// Sets the security initializer, used to initialize/configure securities after creation
+        /// </summary>
+        /// <param name="securityInitializer">The security initializer</param>
+        public virtual void SetSecurityInitializer(ISecurityInitializer securityInitializer)
+        {
+            SecurityInitializer = securityInitializer;
+        }
+
+        /// <summary>
+        /// Marks this universe as disposed and ready to remove all child subscriptions
+        /// </summary>
+        public void Dispose()
+        {
+            DisposeRequested = true;
+        }
+
+        /// <summary>
         /// Provides a value to indicate that no changes should be made to the universe.
-        /// This value is intended to be return reference via <see cref="Universe.SelectSymbols"/>
+        /// This value is intended to be returned by reference via <see cref="Universe.SelectSymbols"/>
         /// </summary>
         public sealed class UnchangedUniverse : IEnumerable<string>, IEnumerable<Symbol>
         {

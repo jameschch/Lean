@@ -27,10 +27,10 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
     /// insights of direction <see cref="InsightDirection.Up"/>, long targets are returned and for insights of direction
     /// <see cref="InsightDirection.Down"/>, short targets are returned.
     /// </summary>
-    public class EqualWeightingPortfolioConstructionModel : IPortfolioConstructionModel
+    public class EqualWeightingPortfolioConstructionModel : PortfolioConstructionModel
     {
         private List<Symbol> _removedSymbols;
-        private readonly HashSet<Security> _securities = new HashSet<Security>();
+        private readonly InsightCollection _insightCollection = new InsightCollection();
 
         /// <summary>
         /// Create portfolio targets from the specified insights
@@ -38,8 +38,10 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// <param name="algorithm">The algorithm instance</param>
         /// <param name="insights">The insights to create portoflio targets from</param>
         /// <returns>An enumerable of portoflio targets to be sent to the execution model</returns>
-        public IEnumerable<IPortfolioTarget> CreateTargets(QCAlgorithmFramework algorithm, Insight[] insights)
+        public override IEnumerable<IPortfolioTarget> CreateTargets(QCAlgorithmFramework algorithm, Insight[] insights)
         {
+            _insightCollection.AddRange(insights);
+
             var targets = new List<IPortfolioTarget>();
             if (_removedSymbols != null)
             {
@@ -48,16 +50,26 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
                 _removedSymbols = null;
             }
 
-            if (_securities.Count == 0)
+            if (insights.Length == 0)
             {
                 return Enumerable.Empty<IPortfolioTarget>();
             }
 
+            // Get symbols that have emit insights, are still in the universe, and insigths haven't expired
+            var symbols = _insightCollection
+                .Where(x => x.CloseTimeUtc > algorithm.UtcTime)
+                .Select(x => x.Symbol).Distinct().ToList();
+
             // give equal weighting to each security
-            var percent = 1m / _securities.Count;
-            foreach (var insight in insights)
+            var percent = 1m / symbols.Count;
+            foreach (var symbol in symbols)
             {
-                targets.Add(PortfolioTarget.Percent(algorithm, insight.Symbol, (int)insight.Direction * percent));
+                List<Insight> activeInsights;
+                if (_insightCollection.TryGetValue(symbol, out activeInsights))
+                {
+                    var direction = activeInsights.Last().Direction;
+                    targets.Add(PortfolioTarget.Percent(algorithm, symbol, (int)direction * percent));
+                }
             }
 
             return targets;
@@ -68,12 +80,23 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// </summary>
         /// <param name="algorithm">The algorithm instance that experienced the change in securities</param>
         /// <param name="changes">The security additions and removals from the algorithm</param>
-        public void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
+        public override void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
         {
             // save securities removed so we can zero out our holdings
             _removedSymbols = changes.RemovedSecurities.Select(x => x.Symbol).ToList();
 
-            NotifiedSecurityChanges.UpdateCollection(_securities, changes);
+            // remove the insights of the removed symbol from the collection 
+            foreach (var removedSymbol in _removedSymbols)
+            {
+                List<Insight> insights;
+                if (_insightCollection.TryGetValue(removedSymbol, out insights))
+                {
+                    foreach (var insight in insights.ToList())
+                    {
+                        _insightCollection.Remove(insight);
+                    }
+                }
+            }
         }
     }
 }

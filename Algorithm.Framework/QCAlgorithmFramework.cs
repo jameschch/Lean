@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Alphas.Analysis;
@@ -119,10 +120,50 @@ namespace QuantConnect.Algorithm.Framework
         /// <param name="slice">The current data slice</param>
         public sealed override void OnFrameworkData(Slice slice)
         {
-            // generate, timestamp and emit insights
-            var insights = Alpha.Update(this, slice)
-                .Select(SetGeneratedAndClosedTimes)
-                .ToArray();
+            if (UtcTime >= UniverseSelection.GetNextRefreshTimeUtc())
+            {
+                var universes = UniverseSelection.CreateUniverses(this).ToDictionary(u => u.Configuration.Symbol);
+
+                // remove deselected universes by symbol
+                foreach (var ukvp in UniverseManager)
+                {
+                    var universeSymbol = ukvp.Key;
+                    var qcUserDefined = UserDefinedUniverse.CreateSymbol(ukvp.Value.SecurityType, ukvp.Value.Market);
+                    if (universeSymbol.Equals(qcUserDefined))
+                    {
+                        // prevent removal of qc algorithm created user defined universes
+                        continue;
+                    }
+
+                    Universe universe;
+                    if (!universes.TryGetValue(universeSymbol, out universe))
+                    {
+                        if (ukvp.Value.DisposeRequested)
+                        {
+                            UniverseManager.Remove(universeSymbol);
+                        }
+
+                        // mark this universe as disposed to remove all child subscriptions
+                        ukvp.Value.Dispose();
+                    }
+                }
+
+                // add newly selected universes
+                foreach (var ukvp in universes)
+                {
+                    // note: UniverseManager.Add uses TryAdd, so don't need to worry about duplicates here
+                    UniverseManager.Add(ukvp);
+                }
+            }
+
+            // we only want to run universe selection if there's no data available in the slice
+            if (!slice.HasData)
+            {
+                return;
+            }
+
+            // insight timestamping handled via InsightsGenerated event handler
+            var insights = Alpha.Update(this, slice).ToArray();
 
             // only fire insights generated event if we actually have insights
             if (insights.Length != 0)
@@ -250,8 +291,29 @@ namespace QuantConnect.Algorithm.Framework
             RiskManagement = riskManagement;
         }
 
+        /// <summary>
+        /// Event invocator for the <see cref="QCAlgorithm.InsightsGenerated"/> event
+        /// </summary>
+        /// <remarks>
+        /// This method is sealed because the framework must be able to force setting of the
+        /// generated and close times before any event handlers are run. Bind directly to the
+        /// <see cref="QCAlgorithm.InsightsGenerated"/> event insead of overriding.
+        /// </remarks>
+        /// <param name="insights">The collection of insights generaed at the current time step</param>
+        protected sealed override void OnInsightsGenerated(IEnumerable<Insight> insights)
+        {
+            // set generated and close times on the insight object
+            base.OnInsightsGenerated(insights.Select(SetGeneratedAndClosedTimes));
+        }
+
         private Insight SetGeneratedAndClosedTimes(Insight insight)
         {
+            // function idempotency
+            if (insight.CloseTimeUtc != default(DateTime))
+            {
+                return insight;
+            }
+
             insight.GeneratedTimeUtc = UtcTime;
             insight.ReferenceValue = _securityValuesProvider.GetValues(insight.Symbol).Get(insight.Type);
             if (string.IsNullOrEmpty(insight.SourceModel))

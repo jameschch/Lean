@@ -91,9 +91,16 @@
     <Compile Include="..\Common\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="AddRemoveOptionUniverseRegressionAlgorithm.cs" />
     <Compile Include="AddRemoveSecurityRegressionAlgorithm.cs" />
+    <Compile Include="BasicTemplateOptionsFrameworkAlgorithm.cs" />
+    <Compile Include="OptionDataNullReferenceRegressionAlgorithm.cs" />
     <Compile Include="CancelOpenOrdersRegressionAlgorithm.cs" />
+    <Compile Include="ConvertToFrameworkAlgorithm.cs" />
+    <Compile Include="RawPricesCoarseUniverseAlgorithm.cs" />
     <Compile Include="CompositeAlphaModelFrameworkAlgorithm.cs" />
+    <Compile Include="IRegressionAlgorithmDefinition.cs" />
+    <Compile Include="SectorExposureRiskFrameworkAlgorithm.cs" />
     <Compile Include="DuplicateSecurityWithBenchmarkRegressionAlgorithm.cs" />
     <Compile Include="BasicTemplateCryptoAlgorithm.cs" />
     <Compile Include="BasicTemplateCryptoFrameworkAlgorithm.cs" />
@@ -104,12 +111,13 @@
     <Compile Include="Benchmarks\BasicTemplateBenchmark.cs" />
     <Compile Include="Benchmarks\EmptySingleSecuritySecondEquityBenchmark.cs" />
     <Compile Include="CustomFrameworkModelsAlgorithm.cs" />
+    <Compile Include="EmaCrossUniverseSelectionFrameworkAlgorithm.cs" />
     <Compile Include="FinancialAdvisorDemoAlgorithm.cs" />
     <Compile Include="ForexInternalFeedOnDataHigherResolutionRegressionAlgorithm.cs" />
     <Compile Include="ForexInternalFeedOnDataSameResolutionRegressionAlgorithm.cs" />
+    <Compile Include="PairsTradingAlphaModelFrameworkAlgorithm.cs" />
     <Compile Include="RollingWindowAlgorithm.cs" />
     <Compile Include="BasicTemplateDailyAlgorithm.cs" />
-    <Compile Include="BasicTemplateFxcmVolumeAlgorithm.cs" />
     <Compile Include="CallingRFromCSharp.cs" />
     <Compile Include="FuturesMomentumAlgorithm.cs" />
     <Compile Include="BasicTemplateFuturesConsolidationAlgorithm.cs" />
@@ -135,7 +143,7 @@
     <Compile Include="BasicTemplateForexAlgorithm.cs" />
     <Compile Include="BasicTemplateAlgorithm.cs" />
     <Compile Include="BasicTemplateOptionsAlgorithm.cs" />
-    <Compile Include="CoarseUniverseTop5DollarVolumeAlgorithm.cs" />
+    <Compile Include="CoarseFundamentalTop5Algorithm.cs" />
     <Compile Include="CustomBenchmarkAlgorithm.cs" />
     <Compile Include="CustomBrokerageMessageHandlerAlgorithm.cs" />
     <Compile Include="FractionalQuantityRegressionAlgorithm.cs" />
@@ -170,6 +178,7 @@
     <Compile Include="HourSplitRegressionAlgorithm.cs" />
     <Compile Include="ScheduledUniverseSelectionModelRegressionAlgorithm.cs" />
     <Compile Include="StandardDeviationExecutionModelRegressionAlgorithm.cs" />
+    <Compile Include="TimeInForceAlgorithm.cs" />
     <Compile Include="UniverseSelectionDefinitionsAlgorithm.cs" />
     <Compile Include="UserDefinedUniverseAlgorithm.cs" />
     <Compile Include="VolumeWeightedAveragePriceExecutionModelRegressionAlgorithm.cs" />
@@ -198,6 +207,10 @@
     <Compile Include="OptionChainProviderAlgorithm.cs" />
     <Compile Include="ConstituentsQC500GeneratorAlgorithm.cs" />
     <Compile Include="CustomDataIndicatorExtensionsAlgorithm.cs" />
+    <Compile Include="Benchmarks\ScheduleEventsBenchmark.cs" />
+    <Compile Include="Benchmarks\HistoryRequestBenchmark.cs" />
+    <Compile Include="Benchmarks\CoarseFineUniverseSelectionBenchmark.cs" />
+    <Compile Include="Benchmarks\IndicatorRibbonBenchmark.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Algorithm.Framework\QuantConnect.Algorithm.Framework.csproj">

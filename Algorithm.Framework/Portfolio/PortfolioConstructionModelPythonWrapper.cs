@@ -24,7 +24,7 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
     /// <summary>
     /// Provides an implementation of <see cref="IPortfolioConstructionModel"/> that wraps a <see cref="PyObject"/> object
     /// </summary>
-    public class PortfolioConstructionModelPythonWrapper : IPortfolioConstructionModel
+    public class PortfolioConstructionModelPythonWrapper : PortfolioConstructionModel
     {
         private readonly dynamic _model;
 
@@ -53,7 +53,7 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// <param name="algorithm">The algorithm instance</param>
         /// <param name="insights">The insights to create portoflio targets from</param>
         /// <returns>An enumerable of portfolio targets to be sent to the execution model</returns>
-        public IEnumerable<IPortfolioTarget> CreateTargets(QCAlgorithmFramework algorithm, Insight[] insights)
+        public override IEnumerable<IPortfolioTarget> CreateTargets(QCAlgorithmFramework algorithm, Insight[] insights)
         {
             using (Py.GIL())
             {
@@ -62,6 +62,7 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
                 {
                     yield return target.AsManagedObject(typeof(IPortfolioTarget)) as IPortfolioTarget;
                 }
+                targets.Destroy();
             }
         }
 
@@ -70,7 +71,7 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// </summary>
         /// <param name="algorithm">The algorithm instance that experienced the change in securities</param>
         /// <param name="changes">The security additions and removals from the algorithm</param>
-        public void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
+        public override void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
         {
             using (Py.GIL())
             {

@@ -105,6 +105,11 @@ namespace QuantConnect.Orders
             order.BrokerId = jObject["BrokerId"].Select(x => x.Value<string>()).ToList();
             order.ContingentId = jObject["ContingentId"].Value<int>();
 
+            var timeInForce = jObject["TimeInForce"] ?? jObject["Duration"];
+            order.Properties.TimeInForce = timeInForce != null
+                ? CreateTimeInForce(timeInForce, jObject)
+                : TimeInForce.GoodTilCanceled;
+
             string market = Market.USA;
 
             //does data have market?
@@ -136,6 +141,7 @@ namespace QuantConnect.Orders
                 var tickerstring = jObject["Symbol"].Value<string>();
                 order.Symbol = Symbol.Create(tickerstring, securityType, market);
             }
+
             return order;
         }
 
@@ -186,6 +192,37 @@ namespace QuantConnect.Orders
                     throw new ArgumentOutOfRangeException();
             }
             return order;
+        }
+
+        /// <summary>
+        /// Creates a Time In Force of the correct type
+        /// </summary>
+        private static TimeInForce CreateTimeInForce(JToken timeInForce, JObject jObject)
+        {
+            // for backward-compatibility support deserialization of old JSON format
+            if (timeInForce is JValue)
+            {
+                var value = timeInForce.Value<int>();
+
+                switch (value)
+                {
+                    case 0:
+                        return TimeInForce.GoodTilCanceled;
+
+                    case 1:
+                        return TimeInForce.Day;
+
+                    case 2:
+                        var expiry = jObject["DurationValue"].Value<DateTime>();
+                        return TimeInForce.GoodTilDate(expiry);
+
+                    default:
+                        throw new Exception($"Unknown time in force value: {value}");
+                }
+            }
+
+            // convert with TimeInForceJsonConverter
+            return timeInForce.ToObject<TimeInForce>();
         }
     }
 }

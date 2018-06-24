@@ -35,6 +35,7 @@ using Order = QuantConnect.Orders.Order;
 using IB = QuantConnect.Brokerages.InteractiveBrokers.Client;
 using IBApi;
 using NodaTime;
+using QuantConnect.Orders.TimeInForces;
 using Bar = QuantConnect.Data.Market.Bar;
 using HistoryRequest = QuantConnect.Data.HistoryRequest;
 
@@ -43,6 +44,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
     /// <summary>
     /// The Interactive Brokers brokerage
     /// </summary>
+    [BrokerageFactory(typeof(InteractiveBrokersBrokerageFactory))]
     public sealed class InteractiveBrokersBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider
     {
         // next valid order id for this client
@@ -1621,18 +1623,33 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 TotalQuantity = (int)Math.Abs(order.Quantity),
                 OrderType = ConvertOrderType(order.Type),
                 AllOrNone = false,
-                Tif = IB.TimeInForce.GoodTillCancel,
+                Tif = ConvertTimeInForce(order),
                 Transmit = true,
                 Rule80A = _agentDescription
             };
 
-            if (order.Type == OrderType.MarketOnOpen)
+            var gtdTimeInForce = order.TimeInForce as GoodTilDateTimeInForce;
+            if (gtdTimeInForce != null)
             {
-                ibOrder.Tif = IB.TimeInForce.MarketOnOpen;
-            }
-            else if (order.Type == OrderType.MarketOnClose)
-            {
-                ibOrder.Tif = IB.TimeInForce.Day;
+                DateTime expiryUtc;
+                if (order.SecurityType == SecurityType.Forex)
+                {
+                    expiryUtc = gtdTimeInForce.GetForexOrderExpiryDateTime(order);
+                }
+                else
+                {
+                    var exchangeHours = MarketHoursDatabase.FromDataFolder()
+                        .GetExchangeHours(order.Symbol.ID.Market, order.Symbol, order.SecurityType);
+
+                    var expiry = exchangeHours.GetNextMarketClose(gtdTimeInForce.Expiry.Date, false);
+                    expiryUtc = expiry.ConvertToUtc(exchangeHours.TimeZone);
+                }
+
+                // The IB format for the GoodTillDate order property is "yyyymmdd hh:mm:ss xxx" where yyyymmdd and xxx are optional.
+                // E.g.: 20031126 15:59:00 EST
+                // If no date is specified, current date is assumed. If no time-zone is specified, local time-zone is assumed.
+
+                ibOrder.GoodTillDate = expiryUtc.ToString("yyyyMMdd HH:mm:ss UTC", CultureInfo.InvariantCulture);
             }
 
             var limitOrder = order as LimitOrder;
@@ -1758,6 +1775,8 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             }
 
             order.BrokerId.Add(ibOrder.OrderId.ToString());
+
+            order.Properties.TimeInForce = ConvertTimeInForce(ibOrder.Tif, ibOrder.GoodTillDate);
 
             return order;
         }
@@ -1896,6 +1915,93 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 default:
                     throw new ArgumentException(order.OrderType, "order.OrderType");
             }
+        }
+
+        /// <summary>
+        /// Maps TimeInForce from IB to LEAN
+        /// </summary>
+        private static TimeInForce ConvertTimeInForce(string timeInForce, string expiryDateTime)
+        {
+            switch (timeInForce)
+            {
+                case IB.TimeInForce.Day:
+                    return TimeInForce.Day;
+
+                case IB.TimeInForce.GoodTillDate:
+                    return TimeInForce.GoodTilDate(ParseExpiryDateTime(expiryDateTime));
+
+                //case IB.TimeInForce.FillOrKill:
+                //    return TimeInForce.FillOrKill;
+
+                //case IB.TimeInForce.ImmediateOrCancel:
+                //    return TimeInForce.ImmediateOrCancel;
+
+                case IB.TimeInForce.MarketOnOpen:
+                case IB.TimeInForce.GoodTillCancel:
+                default:
+                    return TimeInForce.GoodTilCanceled;
+            }
+        }
+
+        private static DateTime ParseExpiryDateTime(string expiryDateTime)
+        {
+            // NOTE: we currently ignore the time zone in this method for a couple of reasons:
+            // - TZ abbreviations are ambiguous and unparsable to a unique time zone
+            //   see this article for more info:
+            //   https://codeblog.jonskeet.uk/2015/05/05/common-mistakes-in-datetime-formatting-and-parsing/
+            // - IB seems to also have issues with Daylight Saving Time zones
+            //   Example: an order submitted from Europe with GoodTillDate property set to "20180524 21:00:00 UTC"
+            //   when reading the open orders, the same property will have this value: "20180524 23:00:00 CET"
+            //   which is incorrect: should be CEST (UTC+2) instead of CET (UTC+1)
+
+            // We can ignore this issue, because the method is only called by GetOpenOrders,
+            // we only call GetOpenOrders during live trading, which means we won't be simulating time in force
+            // and instead will rely on brokerages to apply TIF properly.
+
+            var parts = expiryDateTime.Split(' ');
+            if (parts.Length == 3)
+            {
+                expiryDateTime = expiryDateTime.Substring(0, expiryDateTime.LastIndexOf(" ", StringComparison.Ordinal));
+            }
+
+            return DateTime.ParseExact(expiryDateTime, "yyyyMMdd HH:mm:ss", CultureInfo.InvariantCulture).Date;
+        }
+
+        /// <summary>
+        /// Maps TimeInForce from LEAN to IB
+        /// </summary>
+        private static string ConvertTimeInForce(Order order)
+        {
+            if (order.Type == OrderType.MarketOnOpen)
+            {
+                return IB.TimeInForce.MarketOnOpen;
+            }
+            if (order.Type == OrderType.MarketOnClose)
+            {
+                return IB.TimeInForce.Day;
+            }
+
+            if (order.TimeInForce is DayTimeInForce)
+            {
+                return IB.TimeInForce.Day;
+            }
+
+            if (order.TimeInForce is GoodTilDateTimeInForce)
+            {
+                return IB.TimeInForce.GoodTillDate;
+            }
+
+            //if (order.TimeInForce is FillOrKillTimeInForce)
+            //{
+            //    return IB.TimeInForce.FillOrKill;
+            //}
+
+            //if (order.TimeInForce is ImmediateOrCancelTimeInForce)
+            //{
+            //    return IB.TimeInForce.ImmediateOrCancel;
+            //}
+
+            return IB.TimeInForce.GoodTillCancel;
         }
 
         /// <summary>

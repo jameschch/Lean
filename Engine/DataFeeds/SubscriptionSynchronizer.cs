@@ -17,7 +17,6 @@
 using System;
 using System.Collections.Generic;
 using NodaTime;
-using QuantConnect.Data;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Securities;
 
@@ -67,13 +66,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             long earlyBirdTicks;
             var changes = SecurityChanges.None;
             var data = new List<DataFeedPacket>();
+            // NOTE: Tight coupling in UniverseSelection.ApplyUniverseSelection
             var universeData = new Dictionary<Universe, BaseDataCollection>();
+            var universeDataForTimeSliceCreate = new Dictionary<Universe, BaseDataCollection>();
 
             SecurityChanges newChanges;
             do
             {
                 earlyBirdTicks = MaxDateTimeTicks;
-                universeData.Clear();
                 newChanges = SecurityChanges.None;
                 foreach (var subscription in subscriptions)
                 {
@@ -91,9 +91,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                             OnSubscriptionFinished(subscription);
                             continue;
                         }
+
+                        if (subscription.Current == null)
+                        {
+                            throw new Exception($"SubscriptionSynchronizer.Sync(): subscription.Current is null, configuration: {subscription}");
+                        }
                     }
 
-                    var packet = new DataFeedPacket(subscription.Security, subscription.Configuration);
+                    var packet = new DataFeedPacket(subscription.Security, subscription.Configuration, subscription.RemovedFromUniverse);
 
                     while (subscription.Current.EmitTimeUtc <= _frontier)
                     {
@@ -145,6 +150,13 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                                 universeData[subscription.Universe] = collection;
                             }
+
+                            // remove subscription for universe data if disposal requested AFTER time sync
+                            // this ensures we get any security changes from removing the universe and its children
+                            if (subscription.Universe.DisposeRequested)
+                            {
+                                OnSubscriptionFinished(subscription);
+                            }
                         }
                     }
 
@@ -166,14 +178,16 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 {
                     var universe = kvp.Key;
                     var baseDataCollection = kvp.Value;
+                    universeDataForTimeSliceCreate[universe] = baseDataCollection;
                     newChanges += _universeSelection.ApplyUniverseSelection(universe, _frontier, baseDataCollection);
                 }
+                universeData.Clear();
 
                 changes += newChanges;
             }
             while (newChanges != SecurityChanges.None);
 
-            var timeSlice = TimeSlice.Create(_frontier, _sliceTimeZone, _cashBook, data, changes);
+            var timeSlice = TimeSlice.Create(_frontier, _sliceTimeZone, _cashBook, data, changes, universeDataForTimeSliceCreate);
 
             // next frontier time
             _frontier = new DateTime(Math.Max(earlyBirdTicks, _frontier.Ticks), DateTimeKind.Utc);

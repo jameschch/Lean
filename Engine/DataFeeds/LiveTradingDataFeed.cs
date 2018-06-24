@@ -219,9 +219,23 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         {
             // remove the subscription from our collection
             Subscription subscription;
+            if (!_subscriptions.TryGetValue(configuration, out subscription))
+            {
+                Log.Error($"LiveTradingDataFeed.RemoveSubscription(): Unable to locate: {configuration}");
+            }
+
+            // don't remove universe subscriptions immediately, instead mark them as disposed
+            // so we can turn the crank one more time to ensure we emit security changes properly
+            if (subscription.IsUniverseSelectionSubscription && subscription.Universe.DisposeRequested)
+            {
+                // subscription syncer will dispose the universe AFTER we've run selection a final time
+                // and then will invoke SubscriptionFinished which will remove the universe subscription
+                return false;
+            }
+
             if (!_subscriptions.TryRemove(configuration, out subscription))
             {
-                Log.Error("LiveTradingDataFeed.RemoveSubscription(): Unable to remove: " + configuration.ToString());
+                Log.Error($"LiveTradingDataFeed.RemoveSubscription(): Unable to remove: {configuration}");
                 return false;
             }
 
@@ -239,6 +253,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 _exchange.RemoveDataHandler(security.Symbol);
             }
 
+            // if the security is no longer a member of the universe, then mark the subscription properly
+            if (subscription.Universe != null && !subscription.Universe.Members.ContainsKey(configuration.Symbol))
+            {
+                subscription.MarkAsRemovedFromUniverse();
+            }
             subscription.Dispose();
 
             // keep track of security changes, we emit these to the algorithm
@@ -275,10 +294,13 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     _frontierTimeProvider.SetCurrentTime(_frontierUtc);
 
                     var data = new List<DataFeedPacket>();
+
+                    // NOTE: Tight coupling in UniverseSelection.ApplyUniverseSelection
+                    var universeData = new Dictionary<Universe, BaseDataCollection>();
                     foreach (var subscription in Subscriptions)
                     {
                         var config = subscription.Configuration;
-                        var packet = new DataFeedPacket(subscription.Security, config);
+                        var packet = new DataFeedPacket(subscription.Security, config, subscription.RemovedFromUniverse);
 
                         // dequeue data that is time stamped at or before this frontier
                         while (subscription.MoveNext() && subscription.Current != null)
@@ -290,21 +312,41 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         if (packet.Count > 0) data.Add(packet);
 
                         // we have new universe data to select based on
-                        if (subscription.IsUniverseSelectionSubscription && packet.Count > 0)
+                        if (subscription.IsUniverseSelectionSubscription)
                         {
-                            var universe = subscription.Universe;
-
-                            // always wait for other thread to sync up
-                            if (!_bridge.WaitHandle.WaitOne(Timeout.Infinite, _cancellationTokenSource.Token))
+                            if (packet.Count > 0)
                             {
-                                break;
+                                var universe = subscription.Universe;
+
+                                // always wait for other thread to sync up
+                                if (!_bridge.WaitHandle.WaitOne(Timeout.Infinite, _cancellationTokenSource.Token))
+                                {
+                                    break;
+                                }
+
+                                // assume that if the first item is a base data collection then the enumerator handled the aggregation,
+                                // otherwise, load all the the data into a new collection instance
+                                var collection = packet.Data[0] as BaseDataCollection ?? new BaseDataCollection(_frontierUtc, config.Symbol, packet.Data);
+
+                                BaseDataCollection existingCollection;
+                                if (universeData.TryGetValue(universe, out existingCollection))
+                                {
+                                    existingCollection.Data.AddRange(collection.Data);
+                                }
+                                else
+                                {
+                                    universeData[universe] = collection;
+                                }
+
+                                _changes += _universeSelection.ApplyUniverseSelection(universe, _frontierUtc, collection);
                             }
 
-                            // assume that if the first item is a base data collection then the enumerator handled the aggregation,
-                            // otherwise, load all the the data into a new collection instance
-                            var collection = packet.Data[0] as BaseDataCollection ?? new BaseDataCollection(_frontierUtc, config.Symbol, packet.Data);
-
-                            _changes += _universeSelection.ApplyUniverseSelection(universe, _frontierUtc, collection);
+                            // remove subscription for universe data if disposal requested AFTER time sync
+                            // this ensures we get any security changes from removing the universe and its children
+                            if (subscription.Universe.DisposeRequested)
+                            {
+                                RemoveSubscription(subscription.Configuration);
+                            }
                         }
                     }
 
@@ -314,7 +356,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     // emit on data or if we've elapsed a full second since last emit
                     if (data.Count != 0 || _frontierUtc >= nextEmit)
                     {
-                        _bridge.Add(TimeSlice.Create(_frontierUtc, _algorithm.TimeZone, _algorithm.Portfolio.CashBook, data, _changes), _cancellationTokenSource.Token);
+                        _bridge.Add(TimeSlice.Create(_frontierUtc, _algorithm.TimeZone, _algorithm.Portfolio.CashBook, data, _changes, universeData), _cancellationTokenSource.Token);
 
                         // force emitting every second
                         nextEmit = _frontierUtc.RoundDown(Time.OneSecond).Add(Time.OneSecond);
@@ -341,7 +383,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 if (!_cancellationTokenSource.IsCancellationRequested)
                 {
                     _bridge.Add(
-                        TimeSlice.Create(nextEmit, _algorithm.TimeZone, _algorithm.Portfolio.CashBook, new List<DataFeedPacket>(), SecurityChanges.None),
+                        TimeSlice.Create(nextEmit, _algorithm.TimeZone, _algorithm.Portfolio.CashBook, new List<DataFeedPacket>(), SecurityChanges.None, new Dictionary<Universe, BaseDataCollection>()),
                         _cancellationTokenSource.Token);
                 }
             }
@@ -456,21 +498,34 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                             });
                             enumerator = quoteBarAggregator;
                             break;
+
                         case TickType.Trade:
                         default:
                             var tradeBarAggregator = new TradeBarBuilderEnumerator(request.Configuration.Increment, request.Security.Exchange.TimeZone, _timeProvider);
+                            var auxDataEnumerator = new EnqueueableEnumerator<BaseData>();
+
                             _exchange.AddDataHandler(request.Configuration.Symbol, data =>
                             {
-                                var tick = data as Tick;
-
-                                if (tick.TickType == TickType.Trade)
+                                if (data.DataType == MarketDataType.Auxiliary)
                                 {
-                                    tradeBarAggregator.ProcessData(tick);
-                                    if (SubscriptionShouldUpdateRealTimePrice(subscription, timeZoneOffsetProvider)) subscription.RealtimePrice = data.Value;
+                                    auxDataEnumerator.Enqueue(data);
+                                }
+                                else
+                                {
+                                    var tick = data as Tick;
+                                    if (tick.TickType == TickType.Trade)
+                                    {
+                                        tradeBarAggregator.ProcessData(tick);
+                                        if (SubscriptionShouldUpdateRealTimePrice(subscription, timeZoneOffsetProvider)) subscription.RealtimePrice = data.Value;
+                                    }
                                 }
                             });
-                            enumerator = tradeBarAggregator;
+
+                            enumerator = request.Configuration.SecurityType == SecurityType.Equity
+                                ? (IEnumerator<BaseData>) new LiveBaseDataSynchronizingEnumerator(_frontierTimeProvider, request.Security.Exchange.TimeZone, auxDataEnumerator, tradeBarAggregator)
+                                : tradeBarAggregator;
                             break;
+
                         case TickType.OpenInterest:
                             var oiAggregator = new OpenInterestEnumerator(request.Configuration.Increment, request.Security.Exchange.TimeZone, _timeProvider);
                             _exchange.AddDataHandler(request.Configuration.Symbol, data =>
@@ -493,7 +548,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     _exchange.SetDataHandler(request.Configuration.Symbol, data =>
                     {
                         tickEnumerator.Enqueue(data);
-                        if (SubscriptionShouldUpdateRealTimePrice(subscription, timeZoneOffsetProvider)) subscription.RealtimePrice = data.Value;
+
+                        if (data.DataType != MarketDataType.Auxiliary &&
+                            SubscriptionShouldUpdateRealTimePrice(subscription, timeZoneOffsetProvider))
+                        {
+                            subscription.RealtimePrice = data.Value;
+                        }
                     });
                     enumerator = tickEnumerator;
                 }
@@ -663,7 +723,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             return subscription;
         }
 
-                /// <summary>
+        /// <summary>
         /// Checks if the subscription should update the RealTimePrice
         /// </summary>
         /// <param name="subscription">The <see cref="Subscription"/></param>

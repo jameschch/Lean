@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 using QuantConnect.Algorithm.Framework.Alphas.Serialization;
 
@@ -32,6 +33,11 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// Gets the unique identifier for this insight
         /// </summary>
         public Guid Id { get; private set; }
+
+        /// <summary>
+        /// Gets the group id this insight belongs to, null if not in a group
+        /// </summary>
+        public Guid? GroupId { get; private set; }
 
         /// <summary>
         /// Gets an identifier for the source model that generated this insight.
@@ -172,7 +178,8 @@ namespace QuantConnect.Algorithm.Framework.Alphas
                 Id = Id,
                 EstimatedValue = EstimatedValue,
                 ReferenceValue = ReferenceValue,
-                SourceModel = SourceModel
+                SourceModel = SourceModel,
+                GroupId = GroupId
             };
         }
 
@@ -190,6 +197,36 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         {
             return new Insight(symbol, period, InsightType.Price, direction, magnitude, confidence, sourceModel);
         }
+
+        /// <summary>
+        /// Creates a new, unique group id and sets it on each insight
+        /// </summary>
+        /// <param name="insights">The insights to be grouped</param>
+        public static IEnumerable<Insight> Group(params Insight[] insights)
+        {
+            if (insights == null)
+            {
+                throw new ArgumentNullException(nameof(insights));
+            }
+
+            var groupId = Guid.NewGuid();
+            foreach (var insight in insights)
+            {
+                if (insight.GroupId.HasValue)
+                {
+                    throw new InvalidOperationException($"Unable to set group id on insight {insight} because it has already been assigned to a group.");
+                }
+
+                insight.GroupId = groupId;
+            }
+            return insights;
+        }
+
+        /// <summary>
+        /// Creates a new, unique group id and sets it on each insight
+        /// </summary>
+        /// <param name="insight">The insight to be grouped</param>
+        public static IEnumerable<Insight> Group(Insight insight) => Group(new[] { insight });
 
         /// <summary>
         /// Creates a new <see cref="Insight"/> object from the specified serialized form
@@ -212,7 +249,8 @@ namespace QuantConnect.Algorithm.Framework.Alphas
                 Id = Guid.Parse(serializedInsight.Id),
                 CloseTimeUtc = Time.UnixTimeStampToDateTime(serializedInsight.CloseTime),
                 EstimatedValue = serializedInsight.EstimatedValue,
-                ReferenceValue = serializedInsight.ReferenceValue
+                ReferenceValue = serializedInsight.ReferenceValue,
+                GroupId = string.IsNullOrEmpty(serializedInsight.GroupId) ? (Guid?) null : Guid.Parse(serializedInsight.GroupId)
             };
 
             // only set score values if non-zero or if they're the final scores

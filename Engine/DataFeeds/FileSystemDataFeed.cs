@@ -250,12 +250,28 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
             if (_subscriptions.TryGetValue(configuration, out subscription))
             {
+                // don't remove universe subscriptions immediately, instead mark them as disposed
+                // so we can turn the crank one more time to ensure we emit security changes properly
+                if (subscription.IsUniverseSelectionSubscription && subscription.Universe.DisposeRequested)
+                {
+                    // subscription syncer will dispose the universe AFTER we've run selection a final time
+                    // and then will invoke SubscriptionFinished which will remove the universe subscription
+                    return false;
+                }
+
                 if (!_subscriptions.TryRemove(configuration, out subscription))
                 {
                     Log.Error("FileSystemDataFeed.RemoveSubscription(): Unable to remove: " + configuration);
                     return false;
                 }
 
+                // if the security is no longer a member of the universe, then mark the subscription properly
+                // universe may be null for internal currency conversion feeds
+                // TODO : Put currency feeds in their own internal universe
+                if (subscription.Universe != null && !subscription.Universe.Members.ContainsKey(configuration.Symbol))
+                {
+                    subscription.MarkAsRemovedFromUniverse();
+                }
                 subscription.Dispose();
                 Log.Debug("FileSystemDataFeed.RemoveSubscription(): Removed " + configuration);
 
@@ -464,7 +480,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             syncer.SubscriptionFinished += (sender, subscription) =>
             {
                 RemoveSubscription(subscription.Configuration);
-                Log.Debug(string.Format("FileSystemDataFeed.GetEnumerator(): Finished subscription: {0} at {1} UTC", subscription.Configuration, _algorithm.UtcTime));
+                Log.Debug($"FileSystemDataFeed.GetEnumerator(): Finished subscription: {subscription.Configuration} at {_algorithm.UtcTime} UTC");
             };
 
             while (!_cancellationTokenSource.IsCancellationRequested)

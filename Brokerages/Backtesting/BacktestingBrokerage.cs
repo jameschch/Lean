@@ -79,6 +79,7 @@ namespace QuantConnect.Brokerages.Backtesting
             MarketSimulation = marketSimulation;
             _pending = new ConcurrentDictionary<int, Order>();
         }
+
         /// <summary>
         /// Gets the connection status
         /// </summary>
@@ -93,7 +94,7 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>The open orders returned from IB</returns>
         public override List<Order> GetOpenOrders()
         {
-            return Algorithm.Transactions.GetOpenOrders();
+            return Algorithm.Transactions.GetOpenOrders().ToList();
         }
 
         /// <summary>
@@ -276,6 +277,18 @@ namespace QuantConnect.Brokerages.Backtesting
                         continue;
                     }
 
+                    // check if the time in force handler allows fills
+                    if (order.TimeInForce.IsOrderExpired(security, order))
+                    {
+                        OnOrderEvent(new OrderEvent(order, Algorithm.UtcTime, 0m)
+                        {
+                            Status = OrderStatus.Canceled,
+                            Message = "The order has expired."
+                        });
+                        _pending.TryRemove(order.Id, out order);
+                        continue;
+                    }
+
                     // check if we would actually be able to fill this
                     if (!Algorithm.BrokerageModel.CanExecuteOrder(security, order))
                     {
@@ -361,6 +374,12 @@ namespace QuantConnect.Brokerages.Backtesting
 
                     foreach (var fill in fills)
                     {
+                        // check if the fill should be emitted
+                        if (!order.TimeInForce.IsFillValid(security, order, fill))
+                        {
+                            break;
+                        }
+
                         // change in status or a new fill
                         if (order.Status != fill.Status || fill.FillQuantity != 0)
                         {

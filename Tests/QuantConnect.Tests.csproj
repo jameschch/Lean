@@ -120,10 +120,13 @@
     <Compile Include="Algorithm\Framework\Alphas\ConstantAlphaModelTests.cs" />
     <Compile Include="Algorithm\Framework\Alphas\EmaCrossAlphaModelTests.cs" />
     <Compile Include="Algorithm\Framework\Alphas\MacdAlphaModelTests.cs" />
+    <Compile Include="Algorithm\Framework\Alphas\PairsTradingAlphaModelTests.cs" />
     <Compile Include="Algorithm\Framework\Alphas\RsiAlphaModelTests.cs" />
     <Compile Include="Algorithm\Framework\Alphas\Serialization\InsightJsonConverterTests.cs" />
     <Compile Include="Algorithm\Framework\InsightTests.cs" />
     <Compile Include="Algorithm\Framework\Portfolio\PortfolioTargetTests.cs" />
+    <Compile Include="Algorithm\Framework\QCAlgorithmFrameworkTests.cs" />
+    <Compile Include="Algorithm\Framework\Selection\ManualUniverseSelectionModelTests.cs" />
     <Compile Include="API\ApiTests.cs" />
     <Compile Include="Brokerages\BrokerageTests.cs" />
     <Compile Include="Brokerages\Fxcm\FxcmBrokerageHistoryProviderTests.cs" />
@@ -157,8 +160,10 @@
     <Compile Include="Brokerages\Tradier\TradierBrokerageTests.cs" />
     <Compile Include="Common\BrokerageNameTests.cs" />
     <Compile Include="Common\CurrenciesTests.cs" />
+    <Compile Include="Common\Data\Auxiliary\AuxiliaryDataSerializationTests.cs" />
     <Compile Include="Common\Data\Market\QuoteBarTests.cs" />
     <Compile Include="Common\Data\SubscriptionManagerTests.cs" />
+    <Compile Include="Common\Data\UniverseSelection\CoarseFundamentalTests.cs" />
     <Compile Include="Common\Exceptions\DllNotFoundPythonExceptionInterpreterTests.cs" />
     <Compile Include="Common\Exceptions\InvalidTokenPythonExceptionInterpreterTests.cs" />
     <Compile Include="Common\Exceptions\FakeExceptionInterpreter.cs" />
@@ -170,9 +175,11 @@
     <Compile Include="Common\Exceptions\ScheduledEventExceptionInterpreterTests.cs" />
     <Compile Include="Common\Orders\Fills\LatestPriceFillModelTests.cs" />
     <Compile Include="Common\Orders\Slippage\SlippageModelsTests.cs" />
+    <Compile Include="Common\Orders\TimeInForces\TimeInForceTests.cs" />
     <Compile Include="Common\Scheduling\ScheduleManagerTests.cs" />
     <Compile Include="Common\Securities\BrokerageModelSecurityInitializerTests.cs" />
     <Compile Include="Common\Securities\CashBuyingPowerModelTests.cs" />
+    <Compile Include="Common\Securities\FakeOrderProcessor.cs" />
     <Compile Include="Common\Securities\Forex\ForexHoldingTest.cs" />
     <Compile Include="Common\Securities\FutureFilterTests.cs" />
     <Compile Include="Common\Securities\Futures\FuturesExpiryFunctionsTests.cs" />
@@ -262,6 +269,7 @@
     <Compile Include="Engine\DataFeeds\AlgorithmStub.cs" />
     <Compile Include="Engine\DataFeeds\Auxiliary\MapFileResolverTests.cs" />
     <Compile Include="Engine\DataFeeds\BaseDataExchangeTests.cs" />
+    <Compile Include="Engine\DataFeeds\CustomLiveDataFeedTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\BaseDataCollectionAggregatorEnumeratorTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\EnqueableEnumeratorTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\Factories\BaseDataCollectionSubscriptionEnumeratorFactoryTests.cs" />
@@ -270,6 +278,7 @@
     <Compile Include="Engine\DataFeeds\Enumerators\Factories\LiveCustomDataSubscriptionEnumeratorFactoryTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\FastForwardEnumeratorTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\FrontierAwareEnumeratorTests.cs" />
+    <Compile Include="Engine\DataFeeds\Enumerators\LiveBaseDataSynchronizingEnumeratorTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\LiveFillForwardEnumeratorTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\OptionChainUniverseDataCollectionAggregatorEnumeratorTests.cs" />
     <Compile Include="Engine\DataFeeds\Enumerators\QuoteBarFillForwardEnumeratorTests.cs" />
@@ -417,6 +426,9 @@
     <None Include="TestData\20151224_quote_american.zip">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="TestData\aapl_fine_fundamental.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="TestData\CashTestingStrategy.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -510,6 +522,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="TestData\spy_coppock_curve.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\quandl_future_chris_cme_es1.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="TestData\quandl_future_chris_cme_es2.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <None Include="TestData\spy_dpo.csv">

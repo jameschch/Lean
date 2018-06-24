@@ -174,10 +174,19 @@ namespace QuantConnect.Securities
                     if (quoteBar.LastAskSize != 0) AskSize = quoteBar.LastAskSize;
                 }
             }
-            else
+            else if (data.DataType != MarketDataType.Auxiliary)
             {
                 Price = data.Price;
             }
+        }
+
+        /// <summary>
+        /// Stores the specified data instance in the cache WITHOUT updating any of the cache properties, such as Price
+        /// </summary>
+        /// <param name="data"></param>
+        public void StoreData(BaseData data)
+        {
+            _dataByType[data.GetType()] = data;
         }
 
         /// <summary>

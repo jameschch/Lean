@@ -16,13 +16,13 @@ AddReference("QuantConnect.Algorithm.Framework")
 AddReference("QuantConnect.Common")
 
 from QuantConnect import *
-from QuantConnect.Algorithm.Framework.Alphas import Insight, InsightType, InsightDirection
+from QuantConnect.Algorithm.Framework.Alphas import AlphaModel, Insight, InsightType, InsightDirection
 
 
-class ConstantAlphaModel:
+class ConstantAlphaModel(AlphaModel):
     ''' Provides an implementation of IAlphaModel that always returns the same insight for each security'''
 
-    def __init__(self, type, direction, period, magnitude, confidence):
+    def __init__(self, type, direction, period, magnitude = None, confidence = None):
         '''Initializes a new instance of the ConstantAlphaModel class
         Args:
             type: The type of insight
@@ -57,9 +57,13 @@ class ConstantAlphaModel:
             data: The new data available
         Returns:
             The new insights generated'''
+        insights = []
+
         for security in self.securities:
             if self.ShouldEmitInsight(algorithm.UtcTime, security.Symbol):
-                yield Insight(security.Symbol, self.period, self.type, self.direction, self.magnitude, self.confidence)
+                insights.append(Insight(security.Symbol, self.period, self.type, self.direction, self.magnitude, self.confidence))
+
+        return insights
 
 
     def OnSecuritiesChanged(self, algorithm, changes):

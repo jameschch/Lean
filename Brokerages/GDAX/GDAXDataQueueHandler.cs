@@ -25,6 +25,7 @@ namespace QuantConnect.Brokerages.GDAX
     /// <summary>
     /// An implementation of <see cref="IDataQueueHandler"/> for GDAX
     /// </summary>
+    [BrokerageFactory(typeof(GDAXBrokerageFactory))]
     public class GDAXDataQueueHandler : GDAXBrokerage, IDataQueueHandler
     {
         /// <summary>
@@ -46,7 +47,7 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns></returns>
         public IEnumerable<BaseData> GetNextTicks()
         {
-            lock (Ticks)
+            lock (TickLocker)
             {
                 //workaround for mono bug on ToArray.
                 var copy = new List<Data.Market.Tick>();

@@ -19,6 +19,7 @@
  * limitations under the License.
 */
 
+using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Securities.Option;
@@ -37,19 +38,25 @@ namespace QuantConnect.Algorithm.CSharp
     public class OptionChainProviderAlgorithm : QCAlgorithm
     {
         private Symbol _equitySymbol;
-     
+        private Symbol _optionContract = string.Empty;
+
         public override void Initialize()
         {
-            SetStartDate(2017, 06, 01);
-            SetEndDate(2017, 07, 01);
+            SetStartDate(2015, 12, 24);
+            SetEndDate(2015, 12, 24);
             SetCash(100000);
-            var equity = AddEquity("AMZN", Resolution.Minute);
+            var equity = AddEquity("GOOG", Resolution.Minute);
             _equitySymbol = equity.Symbol;
         }
 
         public override void OnData(Slice data)
         {
-            if (!Portfolio.Invested)
+            if (!Portfolio[_equitySymbol].Invested)
+            {
+                MarketOrder(_equitySymbol, 100);
+            }
+
+            if (!(Securities.ContainsKey(_optionContract) && Portfolio[_optionContract].Invested))
             {
                 var contracts = OptionChainProvider.GetOptionContractList(_equitySymbol, data.Time);
                 var underlyingPrice = Securities[_equitySymbol].Price;
@@ -62,15 +69,49 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (otmCalls.Count() != 0)
                 {
-                    var contract = otmCalls.OrderBy(x => x.ID.Date)
-                                           .ThenBy(x => (x.ID.StrikePrice - underlyingPrice))
-                                           .FirstOrDefault();
-                    // Before placing the order, use AddOptionContract() to subscribe the requested contract symbol
-                    AddOptionContract(contract, Resolution.Minute);
-                    MarketOrder(contract, -1);
-                    MarketOrder(_equitySymbol, 100);
+                    _optionContract = otmCalls.OrderBy(x => x.ID.Date)
+                                          .ThenBy(x => (x.ID.StrikePrice - underlyingPrice))
+                                          .FirstOrDefault();
+                    // use AddOptionContract() to subscribe the data for specified contract
+                    AddOptionContract(_optionContract, Resolution.Minute);
                 }
+                else _optionContract = string.Empty;
+            }
+            if (Securities.ContainsKey(_optionContract) && !Portfolio[_optionContract].Invested)
+            {
+                MarketOrder(_optionContract, -1);
             }
         }
-	}
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "2"},
+            {"Average Win", "0%"},
+            {"Average Loss", "0%"},
+            {"Compounding Annual Return", "3.198%"},
+            {"Drawdown", "0.200%"},
+            {"Expectancy", "0"},
+            {"Net Profit", "0.006%"},
+            {"Sharpe Ratio", "0"},
+            {"Loss Rate", "0%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "0"},
+            {"Beta", "0"},
+            {"Annual Standard Deviation", "0"},
+            {"Annual Variance", "0"},
+            {"Information Ratio", "0"},
+            {"Tracking Error", "0"},
+            {"Treynor Ratio", "0"},
+            {"Total Fees", "$1.25"},
+        };
+    }
 }

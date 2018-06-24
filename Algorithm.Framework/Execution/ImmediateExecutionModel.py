@@ -14,30 +14,34 @@
 from clr import AddReference
 AddReference("System")
 AddReference("QuantConnect.Common")
+AddReference("QuantConnect.Algorithm.Framework")
 
 from System import *
 from QuantConnect import *
 from QuantConnect.Orders import *
+from QuantConnect.Algorithm.Framework.Execution import ExecutionModel
+from QuantConnect.Algorithm.Framework.Portfolio import PortfolioTargetCollection
 
-
-class ImmediateExecutionModel:
+class ImmediateExecutionModel(ExecutionModel):
     '''Provides an implementation of IExecutionModel that immediately submits market orders to achieve the desired portfolio targets'''
+
+    def __init__(self):
+        '''Initializes a new instance of the ImmediateExecutionModel class'''
+        self.targetsCollection = PortfolioTargetCollection()
 
     def Execute(self, algorithm, targets):
         '''Immediately submits orders for the specified portfolio targets.
         Args:
             algorithm: The algorithm instance
             targets: The portfolio targets to be ordered'''
-        for target in targets:
+
+        self.targetsCollection.AddRange(targets)
+
+        for target in self.targetsCollection.OrderByMarginImpact(algorithm):
             open_quantity = sum([x.Quantity for x in algorithm.Transactions.GetOpenOrders(target.Symbol)])
             existing = algorithm.Securities[target.Symbol].Holdings.Quantity + open_quantity
             quantity = target.Quantity - existing
             if quantity != 0:
                 algorithm.MarketOrder(target.Symbol, quantity)
 
-    def OnSecuritiesChanged(self, algorithm, changes):
-        '''Event fired each time the we add/remove securities from the data feed
-        Args:
-            algorithm: The algorithm instance that experienced the change in securities
-            changes: The security additions and removals from the algorithm'''
-        pass
+        self.targetsCollection.Clear()

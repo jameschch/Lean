@@ -23,9 +23,26 @@ namespace QuantConnect.Algorithm.Framework.Selection
     /// <summary>
     /// Provides an implementation of <see cref="IUniverseSelectionModel"/> that wraps a <see cref="PyObject"/> object
     /// </summary>
-    public class UniverseSelectionModelPythonWrapper : IUniverseSelectionModel
+    public class UniverseSelectionModelPythonWrapper : UniverseSelectionModel
     {
         private readonly dynamic _model;
+        private readonly bool _modelHasGetNextRefreshTime;
+
+        /// <summary>
+        /// Gets the next time the framework should invoke the `CreateUniverses` method to refresh the set of universes.
+        /// </summary>
+        public override DateTime GetNextRefreshTimeUtc()
+        {
+            if (!_modelHasGetNextRefreshTime)
+            {
+                return DateTime.MaxValue;
+            }
+
+            using (Py.GIL())
+            {
+                return _model.GetNextRefreshTime();
+            }
+        }
 
         /// <summary>
         /// Constructor for initialising the <see cref="IUniverseSelectionModel"/> class with wrapped <see cref="PyObject"/> object
@@ -35,6 +52,11 @@ namespace QuantConnect.Algorithm.Framework.Selection
         {
             using (Py.GIL())
             {
+                if (!model.HasAttr(nameof(IUniverseSelectionModel.GetNextRefreshTimeUtc)))
+                {
+                    _modelHasGetNextRefreshTime = false;
+                }
+
                 foreach (var attributeName in new[] { "CreateUniverses" })
                 {
                     if (!model.HasAttr(attributeName))
@@ -51,15 +73,16 @@ namespace QuantConnect.Algorithm.Framework.Selection
         /// </summary>
         /// <param name="algorithm">The algorithm instance to create universes for</param>
         /// <returns>The universes to be used by the algorithm</returns>
-        public IEnumerable<Universe> CreateUniverses(QCAlgorithmFramework algorithm)
+        public override IEnumerable<Universe> CreateUniverses(QCAlgorithmFramework algorithm)
         {
             using (Py.GIL())
             {
-                var universers = _model.CreateUniverses(algorithm) as PyObject;
-                foreach (PyObject universe in universers)
+                var universes = _model.CreateUniverses(algorithm) as PyObject;
+                foreach (PyObject universe in universes)
                 {
                     yield return universe.AsManagedObject(typeof(Universe)) as Universe;
                 }
+                universes.Destroy();
             }
         }
     }

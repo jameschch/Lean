@@ -20,7 +20,7 @@ namespace QuantConnect.Orders
     /// <summary>
     /// Contains additional properties and settings for an order submitted to GDAX brokerage
     /// </summary>
-    public class GDAXOrderProperties : IOrderProperties
+    public class GDAXOrderProperties : OrderProperties
     {
         /// <summary>
         /// This flag will ensure the order executes only as a maker (no fee) order.
@@ -33,7 +33,7 @@ namespace QuantConnect.Orders
         /// <summary>
         /// Returns a new instance clone of this object
         /// </summary>
-        public IOrderProperties Clone()
+        public override IOrderProperties Clone()
         {
             return (GDAXOrderProperties)MemberwiseClone();
         }

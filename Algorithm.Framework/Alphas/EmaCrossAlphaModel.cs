@@ -24,18 +24,13 @@ namespace QuantConnect.Algorithm.Framework.Alphas
     /// <summary>
     /// Alpha model that uses an EMA cross to create insights
     /// </summary>
-    public class EmaCrossAlphaModel : IAlphaModel, INamedModel
+    public class EmaCrossAlphaModel : AlphaModel
     {
         private readonly int _fastPeriod;
         private readonly int _slowPeriod;
         private readonly Resolution _resolution;
         private readonly int _predictionInterval;
         private readonly Dictionary<Symbol, SymbolData> _symbolDataBySymbol;
-
-        /// <summary>
-        /// Defines a name for a framework model
-        /// </summary>
-        public string Name { get; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EmaCrossAlphaModel"/> class
@@ -64,7 +59,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// <param name="algorithm">The algorithm instance</param>
         /// <param name="data">The new data available</param>
         /// <returns>The new insights generated</returns>
-        public IEnumerable<Insight> Update(QCAlgorithmFramework algorithm, Slice data)
+        public override IEnumerable<Insight> Update(QCAlgorithmFramework algorithm, Slice data)
         {
             var insights = new List<Insight>();
             foreach (var symbolData in _symbolDataBySymbol.Values)
@@ -99,7 +94,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// </summary>
         /// <param name="algorithm">The algorithm instance that experienced the change in securities</param>
         /// <param name="changes">The security additions and removals from the algorithm</param>
-        public void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
+        public override void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
         {
             foreach (var added in changes.AddedSecurities)
             {
@@ -107,8 +102,8 @@ namespace QuantConnect.Algorithm.Framework.Alphas
                 if (!_symbolDataBySymbol.TryGetValue(added.Symbol, out symbolData))
                 {
                     // create fast/slow EMAs
-                    var fast = algorithm.EMA(added.Symbol, _fastPeriod);
-                    var slow = algorithm.EMA(added.Symbol, _slowPeriod);
+                    var fast = algorithm.EMA(added.Symbol, _fastPeriod, _resolution);
+                    var slow = algorithm.EMA(added.Symbol, _slowPeriod, _resolution);
                     _symbolDataBySymbol[added.Symbol] = new SymbolData
                     {
                         Security = added,

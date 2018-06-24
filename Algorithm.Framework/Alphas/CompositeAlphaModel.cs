@@ -26,7 +26,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
     /// Provides an implementation of <see cref="IAlphaModel"/> that combines multiple alpha
     /// models into a single alpha model and properly sets each insights 'SourceModel' property.
     /// </summary>
-    public class CompositeAlphaModel : IAlphaModel
+    public class CompositeAlphaModel : AlphaModel
     {
         private readonly IAlphaModel[] _alphaModels;
 
@@ -44,7 +44,11 @@ namespace QuantConnect.Algorithm.Framework.Alphas
             _alphaModels = alphaModels;
         }
 
-        public CompositeAlphaModel(PyObject[] alphaModels)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CompositeAlphaModel"/> class
+        /// </summary>
+        /// <param name="alphaModels">The individual alpha models defining this composite model</param>
+        public CompositeAlphaModel(params PyObject[] alphaModels)
         {
             if (alphaModels.IsNullOrEmpty())
             {
@@ -63,6 +67,16 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="CompositeAlphaModel"/> class
+        /// </summary>
+        /// <param name="alphaModel">The individual alpha model defining this composite model</param>
+        public CompositeAlphaModel(PyObject alphaModel)
+            : this(new[] { alphaModel} )
+        {
+
+        }
+
+        /// <summary>
         /// Updates this alpha model with the latest data from the algorithm.
         /// This is called each time the algorithm receives data for subscribed securities.
         /// This method patches this call through the each of the wrapped models.
@@ -70,7 +84,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// <param name="algorithm">The algorithm instance</param>
         /// <param name="data">The new data available</param>
         /// <returns>The new insights generated</returns>
-        public IEnumerable<Insight> Update(QCAlgorithmFramework algorithm, Slice data)
+        public override IEnumerable<Insight> Update(QCAlgorithmFramework algorithm, Slice data)
         {
             foreach (var model in _alphaModels)
             {
@@ -94,7 +108,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// </summary>
         /// <param name="algorithm">The algorithm instance that experienced the change in securities</param>
         /// <param name="changes">The security additions and removals from the algorithm</param>
-        public void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
+        public override void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
         {
             foreach (var model in _alphaModels)
             {

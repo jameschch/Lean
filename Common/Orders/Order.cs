@@ -16,7 +16,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 
@@ -27,6 +26,9 @@ namespace QuantConnect.Orders
     /// </summary>
     public abstract class Order
     {
+        private decimal _quantity;
+        private decimal _price;
+
         /// <summary>
         /// Order ID.
         /// </summary>
@@ -52,8 +54,8 @@ namespace QuantConnect.Orders
         /// </summary>
         public decimal Price
         {
-            get { return price; }
-            internal set { price = value.Normalize(); }
+            get { return _price; }
+            internal set { _price = value.Normalize(); }
         }
 
         /// <summary>
@@ -67,12 +69,32 @@ namespace QuantConnect.Orders
         public DateTime Time { get; internal set; }
 
         /// <summary>
+        /// Gets the utc time this order was created. Alias for <see cref="Time"/>
+        /// </summary>
+        public DateTime CreatedTime => Time;
+
+        /// <summary>
+        /// Gets the utc time the last fill was received, or null if no fills have been received
+        /// </summary>
+        public DateTime? LastFillTime { get; internal set; }
+
+        /// <summary>
+        /// Gets the utc time this order was last updated, or null if the order has not been updated.
+        /// </summary>
+        public DateTime? LastUpdateTime { get; internal set; }
+
+        /// <summary>
+        /// Gets the utc time this order was canceled, or null if the order was not canceled.
+        /// </summary>
+        public DateTime? CanceledTime { get; internal set; }
+
+        /// <summary>
         /// Number of shares to execute.
         /// </summary>
         public decimal Quantity
         {
-            get { return quantity; }
-            internal set { quantity = value.Normalize(); }
+            get { return _quantity; }
+            internal set { _quantity = value.Normalize(); }
         }
 
         /// <summary>
@@ -86,9 +108,9 @@ namespace QuantConnect.Orders
         public OrderStatus Status { get; internal set; }
 
         /// <summary>
-        /// Order duration - GTC or Day. Day not supported in backtests.
+        /// Order Time In Force
         /// </summary>
-        public OrderDuration Duration { get; internal set; }
+        public TimeInForce TimeInForce => Properties.TimeInForce;
 
         /// <summary>
         /// Tag the order with some custom data
@@ -172,11 +194,9 @@ namespace QuantConnect.Orders
             Symbol = Symbol.Empty;
             Status = OrderStatus.None;
             Tag = "";
-            Duration = OrderDuration.GTC;
             BrokerId = new List<string>();
             ContingentId = 0;
-            DurationValue = DateTime.MaxValue;
-            Properties = null;
+            Properties = new OrderProperties();
         }
 
         /// <summary>
@@ -196,11 +216,9 @@ namespace QuantConnect.Orders
             Symbol = symbol;
             Status = OrderStatus.None;
             Tag = tag;
-            Duration = OrderDuration.GTC;
             BrokerId = new List<string>();
             ContingentId = 0;
-            DurationValue = DateTime.MaxValue;
-            Properties = properties;
+            Properties = properties ?? new OrderProperties();
         }
 
         /// <summary>
@@ -252,7 +270,7 @@ namespace QuantConnect.Orders
         /// <filterpriority>2</filterpriority>
         public override string ToString()
         {
-            return string.Format("OrderId: {0} {1} {2} order for {3} unit{4} of {5}", Id, Status, Type, Quantity, Quantity == 1 ? "" : "s", Symbol);
+            return $"OrderId: {Id} {Status} {Type} order for {Quantity} unit{(Quantity == 1 ? "" : "s")} of {Symbol}";
         }
 
         /// <summary>
@@ -269,16 +287,18 @@ namespace QuantConnect.Orders
         {
             order.Id = Id;
             order.Time = Time;
+            order.LastFillTime = LastFillTime;
+            order.LastUpdateTime = LastUpdateTime;
+            order.CanceledTime = CanceledTime;
             order.BrokerId = BrokerId.ToList();
             order.ContingentId = ContingentId;
-            order.Duration = Duration;
             order.Price = Price;
             order.PriceCurrency = PriceCurrency;
             order.Quantity = Quantity;
             order.Status = Status;
             order.Symbol = Symbol;
             order.Tag = Tag;
-            order.Properties = Properties?.Clone();
+            order.Properties = Properties.Clone();
             order.OrderSubmissionData = OrderSubmissionData?.Clone();
         }
 
@@ -295,24 +315,31 @@ namespace QuantConnect.Orders
                 case OrderType.Market:
                     order = new MarketOrder(request.Symbol, request.Quantity, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 case OrderType.Limit:
                     order = new LimitOrder(request.Symbol, request.Quantity, request.LimitPrice, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 case OrderType.StopMarket:
                     order = new StopMarketOrder(request.Symbol, request.Quantity, request.StopPrice, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 case OrderType.StopLimit:
                     order = new StopLimitOrder(request.Symbol, request.Quantity, request.StopPrice, request.LimitPrice, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 case OrderType.MarketOnOpen:
                     order = new MarketOnOpenOrder(request.Symbol, request.Quantity, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 case OrderType.MarketOnClose:
                     order = new MarketOnCloseOrder(request.Symbol, request.Quantity, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 case OrderType.OptionExercise:
                     order = new OptionExerciseOrder(request.Symbol, request.Quantity, request.Time, request.Tag, request.OrderProperties);
                     break;
+
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -324,13 +351,5 @@ namespace QuantConnect.Orders
             }
             return order;
         }
-
-        /// <summary>
-        /// Order Expiry on a specific UTC time.
-        /// </summary>
-        public DateTime DurationValue;
-
-        private decimal quantity;
-        private decimal price;
     }
 }

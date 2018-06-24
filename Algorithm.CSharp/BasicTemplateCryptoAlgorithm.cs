@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Brokerages;
@@ -28,7 +29,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="using quantconnect" />
     /// <meta name="tag" content="trading and orders" />
-    public class BasicTemplateCryptoAlgorithm : QCAlgorithm
+    public class BasicTemplateCryptoAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         private ExponentialMovingAverage _fast;
         private ExponentialMovingAverage _slow;
@@ -83,10 +84,6 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            // Note: all limit orders in this algorithm will be paying taker fees,
-            // they shouldn't, but they do (for now) because of this issue:
-            // https://github.com/QuantConnect/Lean/issues/1852
-
             if (Time.Hour == 1 && Time.Minute == 0)
             {
                 // Sell all ETH holdings with a limit order at 1% above the current price
@@ -118,8 +115,7 @@ namespace QuantConnect.Algorithm.CSharp
                 // use all of our available USD
                 var quantity = usdAvailable / limitPrice;
 
-                // this order will be rejected (for now) because of this issue:
-                // https://github.com/QuantConnect/Lean/issues/1852
+                // this order will be rejected for insufficient funds
                 LimitOrder("ETHUSD", quantity, limitPrice);
 
                 // use only half of our available USD
@@ -181,5 +177,36 @@ namespace QuantConnect.Algorithm.CSharp
             Log($"{Time} - TotalPortfolioValue: {Portfolio.TotalPortfolioValue}");
             Log($"{Time} - CashBook: {Portfolio.CashBook}");
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "10"},
+            {"Average Win", "0%"},
+            {"Average Loss", "-0.18%"},
+            {"Compounding Annual Return", "-99.992%"},
+            {"Drawdown", "3.800%"},
+            {"Expectancy", "-1"},
+            {"Net Profit", "-2.542%"},
+            {"Sharpe Ratio", "-15.98"},
+            {"Loss Rate", "100%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "-5.47"},
+            {"Beta", "327.12"},
+            {"Annual Standard Deviation", "0.201"},
+            {"Annual Variance", "0.04"},
+            {"Information Ratio", "-16.063"},
+            {"Tracking Error", "0.2"},
+            {"Treynor Ratio", "-0.01"},
+            {"Total Fees", "$85.27"}
+        };
     }
 }

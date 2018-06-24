@@ -33,6 +33,8 @@ namespace QuantConnect.Data.UniverseSelection
         private readonly Option _option;
         private readonly UniverseSettings _universeSettings;
         private readonly bool _liveMode;
+        // as an array to make it easy to prepend to selected symbols
+        private readonly Symbol[] _underlyingSymbol;
 
         private DateTime _cacheDate;
 
@@ -54,6 +56,7 @@ namespace QuantConnect.Data.UniverseSelection
             : base(option.SubscriptionDataConfig, securityInitializer)
         {
             _option = option;
+            _underlyingSymbol = new[] { _option.Symbol.Underlying };
             _universeSettings = universeSettings;
             _liveMode = liveMode;
         }
@@ -102,7 +105,8 @@ namespace QuantConnect.Data.UniverseSelection
                 _cacheDate = data.Time.Date;
             }
 
-            var resultingSymbols = results.ToHashSet();
+            // always prepend the underlying symbol
+            var resultingSymbols = _underlyingSymbol.Concat(results).ToHashSet();
 
             // we save off the filtered results to the universe data collection for later
             // population into the OptionChain. This is non-ideal and could be remedied by
@@ -122,6 +126,12 @@ namespace QuantConnect.Data.UniverseSelection
         /// false if the security was already in the universe</returns>
         internal override bool AddMember(DateTime utcTime, Security security)
         {
+            // never add members to disposed universes
+            if (DisposeRequested)
+            {
+                return false;
+            }
+
             if (Securities.ContainsKey(security.Symbol))
             {
                 return false;
@@ -155,8 +165,17 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>The newly initialized security object</returns>
         public override Security CreateSecurity(Symbol symbol, IAlgorithm algorithm, MarketHoursDatabase marketHoursDatabase, SymbolPropertiesDatabase symbolPropertiesDatabase)
         {
+            // create the underlying w/ raw mode
+            if (!symbol.HasUnderlying)
+            {
+                var underlying = base.CreateSecurity(symbol, algorithm, marketHoursDatabase, symbolPropertiesDatabase);
+                underlying.SetDataNormalizationMode(DataNormalizationMode.Raw);
+                _option.Underlying = underlying;
+                return underlying;
+            }
+
             // set the underlying security and pricing model from the canonical security
-            var option = (Option)base.CreateSecurity(symbol, algorithm, marketHoursDatabase, symbolPropertiesDatabase);
+            var option = (Option) base.CreateSecurity(symbol, algorithm, marketHoursDatabase, symbolPropertiesDatabase);
             option.Underlying = _option.Underlying;
             option.PriceModel = _option.PriceModel;
             return option;
@@ -173,6 +192,12 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>True if we can remove the security, false otherwise</returns>
         public override bool CanRemoveMember(DateTime utcTime, Security security)
         {
+            // can always remove securities after dispose requested
+            if (DisposeRequested)
+            {
+                return true;
+            }
+
             // if we haven't begun receiving data for this security then it's safe to remove
             var lastData = security.Cache.GetData();
             if (lastData == null)

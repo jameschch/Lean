@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using System.Collections.Generic;
 using QuantConnect.Algorithm.Framework;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Execution;
@@ -25,7 +26,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// <summary>
     /// Show cases how to use the <see cref="CompositeAlphaModel"/> to define
     /// </summary>
-    public class CompositeAlphaModelFrameworkAlgorithm : QCAlgorithmFramework
+    public class CompositeAlphaModelFrameworkAlgorithm : QCAlgorithmFramework, IRegressionAlgorithmDefinition
     {
         public override void Initialize()
         {
@@ -41,18 +42,62 @@ namespace QuantConnect.Algorithm.CSharp
             AddEquity("AIG");
 
             // define a manual universe of all the securities we manually registered
-            UniverseSelection = new ManualUniverseSelectionModel(Securities.Keys);
+            SetUniverseSelection(new ManualUniverseSelectionModel(Securities.Keys));
 
             // define alpha model as a composite of the rsi and ema cross models
-            Alpha = new CompositeAlphaModel(
+            SetAlpha(new CompositeAlphaModel(
                 new RsiAlphaModel(),
                 new EmaCrossAlphaModel()
-            );
+            ));
 
             // default models for the rest
-            PortfolioConstruction = new EqualWeightingPortfolioConstructionModel();
-            Execution = new ImmediateExecutionModel();
-            RiskManagement = new NullRiskManagementModel();
+            SetPortfolioConstruction(new EqualWeightingPortfolioConstructionModel());
+            SetExecution(new ImmediateExecutionModel());
+            SetRiskManagement(new NullRiskManagementModel());
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = {Language.CSharp, Language.Python};
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "3"},
+            {"Average Win", "0%"},
+            {"Average Loss", "-0.38%"},
+            {"Compounding Annual Return", "1205.791%"},
+            {"Drawdown", "1.700%"},
+            {"Expectancy", "-1"},
+            {"Net Profit", "3.340%"},
+            {"Sharpe Ratio", "6.642"},
+            {"Loss Rate", "100%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "0"},
+            {"Beta", "152.779"},
+            {"Annual Standard Deviation", "0.254"},
+            {"Annual Variance", "0.064"},
+            {"Information Ratio", "6.6"},
+            {"Tracking Error", "0.254"},
+            {"Treynor Ratio", "0.011"},
+            {"Total Fees", "$63.14"},
+            {"Total Insights Generated", "2"},
+            {"Total Insights Closed", "0"},
+            {"Total Insights Analysis Completed", "0"},
+            {"Long Insight Count", "2"},
+            {"Short Insight Count", "0"},
+            {"Long/Short Ratio", "100%"},
+            {"Estimated Monthly Alpha Value", "$0"},
+            {"Total Accumulated Estimated Alpha Value", "$0"},
+            {"Mean Population Estimated Insight Value", "$0"},
+            {"Mean Population Direction", "0%"},
+            {"Mean Population Magnitude", "0%"},
+            {"Rolling Averaged Population Direction", "0%"},
+            {"Rolling Averaged Population Magnitude", "0%"}
+        };
     }
 }
