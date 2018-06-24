@@ -174,7 +174,7 @@ namespace QuantConnect.Lean.Engine.Setup
                 //Execute the initialize code:
                 var controls = job.Controls;
                 var isolator = new Isolator();
-                var initializeComplete = isolator.ExecuteWithTimeLimit(TimeSpan.FromSeconds(300), () =>
+                var initializeComplete = isolator.ExecuteWithTimeLimit(TimeSpan.FromSeconds(1200), () =>
                 {
                     try
                     {
