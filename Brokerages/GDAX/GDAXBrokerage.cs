@@ -14,7 +14,6 @@
 */
 
 using Newtonsoft.Json;
-using QuantConnect.Interfaces;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
 using RestSharp;
@@ -22,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
+using System.Net;
 
 namespace QuantConnect.Brokerages.GDAX
 {
@@ -75,7 +75,17 @@ namespace QuantConnect.Brokerages.GDAX
             {
                 var raw = JsonConvert.DeserializeObject<Messages.Order>(response.Content);
 
-                if (raw == null || raw.Id == null)
+                if (raw?.Id == null)
+                {
+                    var errorMessage = $"Error parsing response from place order: {response.Content}";
+                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "GDAX Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
+                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, (int)response.StatusCode, errorMessage));
+
+                    UnlockStream();
+                    return true;
+                }
+
+                if (raw.Status == "rejected")
                 {
                     var errorMessage = "Reject reason: " + raw.RejectReason;
                     OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "GDAX Order Event") { Status = OrderStatus.Invalid, Message = errorMessage });
@@ -103,20 +113,7 @@ namespace QuantConnect.Brokerages.GDAX
                 OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, 0, "GDAX Order Event") { Status = OrderStatus.Submitted });
                 OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1, "Order completed successfully orderid:" + order.Id));
 
-                if (order.Type == OrderType.Market)
-                {
-                    Logging.Log.Trace("GDAXBrokerage.PlaceOrder(Market): Response: " + response.Content);
-                    OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, (decimal) raw.FillFees, "GDAX Order Event")
-                    {
-                        Status = OrderStatus.Filled,
-                        FillPrice = raw.FilledSize,
-                        FillQuantity = raw.ExecutedValue / raw.FilledSize
-                    });
-                    Orders.Order outOrder = null;
-                    CachedOrderIDs.TryRemove(order.Id, out outOrder);
-                }
-
-                OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1, "GDAXBrokerage.PlaceOrder: Order completed successfully orderid:" + order.Id.ToString()));
+                UnlockStream();
                 return true;
             }
 
@@ -186,7 +183,7 @@ namespace QuantConnect.Brokerages.GDAX
 
             if (response.StatusCode != HttpStatusCode.OK)
             {
-                throw new Exception($"GDAXBrokerage.GetOpenOrders: request failed: [{(int) response.StatusCode}] {response.StatusDescription}, Content: {response.Content}, ErrorMessage: {response.ErrorMessage}");
+                throw new Exception($"GDAXBrokerage.GetOpenOrders: request failed: [{(int)response.StatusCode}] {response.StatusDescription}, Content: {response.Content}, ErrorMessage: {response.ErrorMessage}");
             }
 
             var orders = JsonConvert.DeserializeObject<Messages.Order[]>(response.Content);
@@ -195,37 +192,7 @@ namespace QuantConnect.Brokerages.GDAX
                 Order order;
                 if (item.Type == "market")
                 {
-                    var orders = JsonConvert.DeserializeObject<Messages.Order[]>(response.Content);
-                    foreach (var item in orders)
-                    {
-                        Order order = null;
-                        if (item.Type == "market")
-                        {
-                            order = new MarketOrder { Price = item.Price };
-                        }
-                        else if (item.Type == "limit")
-                        {
-                            order = new LimitOrder { LimitPrice = item.Price };
-                        }
-                        else if (item.Type == "stop")
-                        {
-                            order = new StopMarketOrder { StopPrice = item.Price };
-                        }
-                        else
-                        {
-                            OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, (int)response.StatusCode,
-                                "GDAXBrokerage.GetOpenOrders: Unsupported order type returned from brokerage: " + item.Type));
-                            continue;
-                        }
-
-                        order.Quantity = item.Side == "sell" ? -item.Size : item.Size;
-                        order.BrokerId = new List<string> { item.Id.ToString() };
-                        order.Symbol = ConvertProductId(item.ProductId);
-                        order.Time = DateTime.UtcNow;
-                        order.Status = ConvertOrderStatus(item);
-                        order.Price = item.Price;
-                        list.Add(order);
-                    }
+                    order = new MarketOrder { Price = item.Price };
                 }
                 else if (item.Type == "limit")
                 {
@@ -272,49 +239,12 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns></returns>
         public override List<Holding> GetAccountHoldings()
         {
-            var list = new List<Holding>();
-
-            var req = new RestRequest("/orders?status=active", Method.GET);
-            GetAuthenticationToken(req);
-            var response = RestClient.Execute(req);
-            if (response != null)
-            {
-                foreach (var item in JsonConvert.DeserializeObject<Messages.Order[]>(response.Content))
-                {
-
-                    decimal conversionRate;
-                    if (!item.ProductId.EndsWith("USD", StringComparison.InvariantCultureIgnoreCase))
-                    {
-
-                        var baseSymbol = (item.ProductId.Substring(0, 3) + "USD").ToLower();
-                        var tick = this.GetTick(Symbol.Create(baseSymbol, SecurityType.Crypto, Market.GDAX));
-                        conversionRate = tick.Price;
-                    }
-                    else
-                    {
-                        var tick = this.GetTick(ConvertProductId(item.ProductId));
-                        conversionRate = tick.Price;
-                    }
-
-                    list.Add(new Holding
-                    {
-                        Symbol = ConvertProductId(item.ProductId),
-                        Quantity = item.Side == "sell" ? -item.FilledSize : item.FilledSize,
-                        Type = SecurityType.Crypto,
-                        CurrencySymbol = item.ProductId.Substring(0, 3).ToUpper(),
-                        ConversionRate = conversionRate,
-                        MarketPrice = item.Price,
-                        //todo: check this
-                        AveragePrice = item.FilledSize > 0 ? item.ExecutedValue / item.FilledSize : 0
-                    });
-                }
-
-            }
-            else
-            {
-                Logging.Log.Error("GDAXBrokerage.GetAccountHoldings(): Null response.");
-            }
-            return list;
+            /*
+             * On launching the algorithm the cash balances are pulled and stored in the cashbook.
+             * There are no pre-existing currency swaps as we don't know the entire historical breakdown that brought us here.
+             * Attempting to figure this out would be growing problem; every new trade would need to be processed.
+             */
+            return new List<Holding>();
         }
 
         /// <summary>
@@ -342,7 +272,7 @@ namespace QuantConnect.Brokerages.GDAX
                     {
                         list.Add(new Cash(item.Currency, item.Balance, 1));
                     }
-                    else if (new[] {"GBP", "EUR"}.Contains(item.Currency))
+                    else if (new[] { "GBP", "EUR" }.Contains(item.Currency))
                     {
                         var rate = GetConversionRate(item.Currency);
                         list.Add(new Cash(item.Currency.ToUpper(), item.Balance, rate));

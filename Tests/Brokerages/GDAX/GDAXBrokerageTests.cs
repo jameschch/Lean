@@ -167,7 +167,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
 
             // not our order, market order is completed even if not totally filled
             json = json.Replace(id, Guid.NewGuid().ToString());
-            _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
+            _unit.OnMessage(_unit, new WebSocketMessage(json));
 
             //if not our order should get no event
             Assert.AreEqual(raised.WaitOne(1000), expectedQuantity != 99);
@@ -398,7 +398,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
             BrokerageMessageType messageType = 0;
             _unit.Message += (sender, e) => { messageType = e.Type; };
             const string json = "{\"type\":\"error\",\"message\":\"Failed to subscribe\",\"reason\":\"Invalid product ID provided\"}";
-            _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
+            _unit.OnMessage(_unit, new WebSocketMessage(json));
 
             Assert.AreEqual(BrokerageMessageType.Warning, messageType);
         }

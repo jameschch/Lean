@@ -903,5 +903,9 @@ namespace QuantConnect.Lean.Engine.Results
                 RuntimeStatistic(pair.Key, pair.Value);
             }
         }
+
+        public void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
+        {
+        }
     }
 }

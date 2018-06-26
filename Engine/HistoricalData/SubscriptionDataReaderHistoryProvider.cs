@@ -203,6 +203,11 @@ namespace QuantConnect.Lean.Engine.HistoricalData
             public void PurgeQueue() { }
             public void ProcessSynchronousEvents(bool forceProcess = false) { }
 
+            public void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
+            {
+                throw new NotImplementedException();
+            }
+
             #endregion
         }
 

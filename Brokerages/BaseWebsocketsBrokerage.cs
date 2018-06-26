@@ -303,7 +303,7 @@ namespace QuantConnect.Brokerages
             finally
             {
                 WebSocket.Error += this.OnError;
-                this.Subscribe(null, subscribed);
+                this.Subscribe(subscribed);
             }
         }
 

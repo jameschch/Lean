@@ -230,5 +230,10 @@ namespace QuantConnect.Tests.Engine
         public void ProcessSynchronousEvents(bool forceProcess = false)
         {
         }
+
+        public void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
+        {
+            
+        }
     }
 }

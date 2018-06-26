@@ -510,6 +510,9 @@ namespace QuantConnect.Lean.Engine.Results
             }
         }
 
+        public void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
+        {
+        }
     } // End Result Handler Thread:
 
 } // End Namespace

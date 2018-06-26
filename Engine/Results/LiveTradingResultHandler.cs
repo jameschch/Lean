@@ -1181,5 +1181,9 @@ namespace QuantConnect.Lean.Engine.Results
 
             Log.Debug("LiveTradingResultHandler.ProcessSynchronousEvents(): Exit");
         }
+
+        public void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
+        {      
+        }
     }
 }

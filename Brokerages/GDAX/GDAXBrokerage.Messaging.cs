@@ -21,13 +21,15 @@ using QuantConnect.Orders;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using QuantConnect.Packets;
 using System.Threading;
 using RestSharp;
 using System.Text.RegularExpressions;
 using QuantConnect.Logging;
+using QuantConnect.Orders.Fees;
+using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages.GDAX
 {
@@ -82,7 +84,6 @@ namespace QuantConnect.Brokerages.GDAX
         public GDAXBrokerage(string wssUrl, IWebSocket websocket, IRestClient restClient, string apiKey, string apiSecret, string passPhrase, IAlgorithm algorithm)
             : base(wssUrl, websocket, restClient, apiKey, apiSecret, Market.GDAX, "GDAX")
         {
-            throw new Exception("GDAX currently under maintenance and will be back online Monday 23rd October 2017");
             FillSplit = new ConcurrentDictionary<long, GDAXFill>();
             _passPhrase = passPhrase;
             _algorithm = algorithm;
@@ -104,6 +105,57 @@ namespace QuantConnect.Brokerages.GDAX
         }
 
         /// <summary>
+        /// Lock the streaming processing while we're sending orders as sometimes they fill before the REST call returns.
+        /// </summary>
+        public void LockStream()
+        {
+            Log.Trace("GDAXBrokerage.Messaging.LockStream(): Locking Stream");
+            _streamLocked = true;
+        }
+
+        /// <summary>
+        /// Unlock stream and process all backed up messages.
+        /// </summary>
+        public void UnlockStream()
+        {
+            Log.Trace("GDAXBrokerage.Messaging.UnlockStream(): Processing Backlog...");
+            while (_messageBuffer.Any())
+            {
+                WebSocketMessage e;
+                _messageBuffer.TryDequeue(out e);
+                OnMessageImpl(this, e);
+            }
+            Log.Trace("GDAXBrokerage.Messaging.UnlockStream(): Stream Unlocked.");
+            // Once dequeued in order; unlock stream.
+            _streamLocked = false;
+        }
+
+        /// <summary>
+        /// Wss message handler
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        public override void OnMessage(object sender, WebSocketMessage e)
+        {
+            // Verify if we're allowed to handle the streaming packet yet; while we're placing an order we delay the
+            // stream processing a touch.
+            try
+            {
+                if (_streamLocked)
+                {
+                    _messageBuffer.Enqueue(e);
+                    return;
+                }
+            }
+            catch (Exception err)
+            {
+                Log.Error(err);
+            }
+
+            OnMessageImpl(sender, e);
+        }
+
+        /// <summary>
         /// Implementation of the OnMessage event
         /// </summary>
         /// <param name="sender"></param>
@@ -118,20 +170,17 @@ namespace QuantConnect.Brokerages.GDAX
 
                 if (raw.Type == "heartbeat")
                 {
-                    Log.Trace("GDAXBrokerage.OnMessage.heartbeat()");
                     return;
                 }
                 else if (raw.Type == "snapshot")
                 {
-                    //Log.Trace($"GDAXBrokerage.OnMessage.ticker(): Data: {Environment.NewLine}{e.Message}");
-                    EmitTick(e.Message);
+                    OnSnapshot(e.Message);
                     return;
                 }
                 else if (raw.Type == "l2update")
                 {
-                    Log.Error($"GDAXBrokerage.OnMessage.error(): Data: {Environment.NewLine}{e.Message}");
-                    var error = JsonConvert.DeserializeObject<Messages.Error>(e.Message, JsonSettings);
-                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Error, -1, $"GDAXBrokerage.OnMessage: {error.Message} {error.Reason}"));
+                    OnL2Update(e.Message);
+                    return;
                 }
                 else if (raw.Type == "error")
                 {
@@ -166,8 +215,7 @@ namespace QuantConnect.Brokerages.GDAX
             {
                 var message = JsonConvert.DeserializeObject<Messages.Snapshot>(data);
 
-            var symbol = ConvertProductId(message.ProductId);
-            Log.Trace($"GDAXBrokerage.OrderMatch(): Match event for {message.ProductId} Data:{Environment.NewLine}{data}");
+                var symbol = ConvertProductId(message.ProductId);
 
                 OrderBook orderBook;
                 if (!_orderBooks.TryGetValue(symbol, out orderBook))
@@ -203,8 +251,8 @@ namespace QuantConnect.Brokerages.GDAX
             }
             catch (Exception e)
             {
-                Log.Trace("GDAXBrokerage.Messaging.OrderMatch(): No match found");
-                return;
+                Log.Error(e);
+                throw;
             }
         }
 
@@ -265,13 +313,12 @@ namespace QuantConnect.Brokerages.GDAX
 
         private void OrderMatch(string data)
         {
-            Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order completed with data {data}");
-            var message = JsonConvert.DeserializeObject<Messages.Done>(data, JsonSettings);
+            // deserialize the current match (trade) message
+            var message = JsonConvert.DeserializeObject<Messages.Matched>(data, JsonSettings);
 
             if (_isDataQueueHandler)
             {
-                Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order cancelled. Remaining {message.RemainingSize}");
-                return;
+                EmitTradeTick(message);
             }
 
             // check the list of currently active orders, if the current trade is ours we are either a maker or a taker
@@ -284,12 +331,50 @@ namespace QuantConnect.Brokerages.GDAX
                 // order fill for other order of ours (less likely but may happen)
                 currentOrder.Value.BrokerId[0] != _pendingGdaxMarketOrderId))
             {
-                Log.Trace($"GDAXBrokerage.Messaging.OrderDone(): Order could not locate order in cache with order id {message.OrderId}");
+                // process all fills for our pending market order
+                var fills = FillSplit[_pendingLeanMarketOrderId];
+                var fillMessages = fills.Messages;
+
+                for (var i = 0; i < fillMessages.Count; i++)
+                {
+                    var fillMessage = fillMessages[i];
+                    var isFinalFill = i == fillMessages.Count - 1;
+
+                    // emit all order events with OrderStatus.PartiallyFilled except for the last one which has OrderStatus.Filled
+                    EmitFillOrderEvent(fillMessage, fills.Order.Symbol, fills, isFinalFill);
+                }
+
+                // clear the pending market order
+                _pendingGdaxMarketOrderId = null;
+                _pendingLeanMarketOrderId = 0;
+            }
+
+            if (currentOrder.Value == null)
+            {
+                // not our order, nothing else to do here
                 return;
             }
 
-            OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Information, -1,
-                $"GDAXWebsocketsBrokerage.OrderDone: Encountered done message prior to match filling order brokerId: {message.OrderId} orderId: {cached.FirstOrDefault().Key}"));
+            Log.Trace($"GDAXBrokerage.OrderMatch(): Match: {message.ProductId} {data}");
+
+            var order = currentOrder.Value;
+
+            if (order.Type == OrderType.Market)
+            {
+                // Fill events for this order will be delayed until we receive messages for a different order,
+                // so we can know which is the last fill.
+                // The market order total filled quantity can be less than the total order quantity,
+                // details here: https://github.com/QuantConnect/Lean/issues/1751
+
+                // do not process market order fills immediately, save off the order ids
+                _pendingGdaxMarketOrderId = order.BrokerId[0];
+                _pendingLeanMarketOrderId = order.Id;
+            }
+
+            if (!FillSplit.ContainsKey(order.Id))
+            {
+                FillSplit[order.Id] = new GDAXFill(order);
+            }
 
             var split = FillSplit[order.Id];
             split.Add(message);
@@ -382,8 +467,11 @@ namespace QuantConnect.Brokerages.GDAX
                     Time = DateTime.UtcNow,
                     Symbol = symbol,
                     TickType = TickType.Quote,
-                    //todo: tick volume
-                };
+                    AskSize = askSize,
+                    BidSize = bidSize
+                });
+            }
+        }
 
         /// <summary>
         /// Emits a new trade tick from a match message
@@ -427,25 +515,6 @@ namespace QuantConnect.Brokerages.GDAX
                 else
                 {
                     this.ChannelList[item.Value] = new Channel { Name = item.Value, Symbol = item.Value };
-
-                    //emit baseline tick
-                    var message = GetTick(item);
-
-                    lock (_tickLocker)
-                    {
-                        Tick updating = new Tick
-                        {
-                            AskPrice = message.AskPrice,
-                            BidPrice = message.BidPrice,
-                            Value = (message.AskPrice + message.BidPrice) / 2m,
-                            Time = DateTime.UtcNow,
-                            Symbol = item,
-                            TickType = TickType.Quote
-                            //todo: tick volume
-                        };
-
-                        this.Ticks.Add(updating);
-                    }
                 }
             }
 
@@ -546,7 +615,7 @@ namespace QuantConnect.Brokerages.GDAX
         {
             if (WebSocket.IsOpen)
             {
-                WebSocket.Send(JsonConvert.SerializeObject(new {type = "unsubscribe", channels = ChannelNames}));
+                WebSocket.Send(JsonConvert.SerializeObject(new { type = "unsubscribe", channels = ChannelNames }));
             }
         }
 

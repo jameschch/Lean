@@ -51,7 +51,7 @@ namespace QuantConnect.Brokerages
         /// <param name="data"></param>
         public void Send(string data)
         {
-            _wrapped.Send(data);
+            wrapped.Send(data);
         }
 
         /// <summary>
@@ -70,7 +70,7 @@ namespace QuantConnect.Brokerages
         /// </summary>
         public void Close()
         {
-            _wrapped.Close();
+            wrapped.Close();
         }
 
         /// <summary>
