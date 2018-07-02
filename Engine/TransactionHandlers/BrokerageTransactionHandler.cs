@@ -34,7 +34,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
     /// </summary>
     public class BrokerageTransactionHandler : ITransactionHandler
     {
-        private IAlgorithm _algorithm;
+        public IAlgorithm _algorithm;
         private IBrokerage _brokerage;
         private bool _syncedLiveBrokerageCashToday;
 

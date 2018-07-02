@@ -154,6 +154,7 @@ namespace QuantConnect.Lean.Engine
                     algorithm.BrokerageMessageHandler = factory.CreateBrokerageMessageHandler(algorithm, job, _systemHandlers.Api);
 
                     //Initialize the internal state of algorithm and job: executes the algorithm.Initialize() method.
+                    ((TransactionHandlers.BrokerageTransactionHandler)_algorithmHandlers.Transactions)._algorithm = algorithm;
                     initializeComplete = _algorithmHandlers.Setup.Setup(algorithm, brokerage, job, _algorithmHandlers.Results, _algorithmHandlers.Transactions, _algorithmHandlers.RealTime);
 
                     // set this again now that we've actually added securities
