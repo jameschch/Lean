@@ -33,7 +33,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
     {
         const int MaxDatapointsPerRequest = 200;
         const int MaxRequestsPerSecond = 2;
-        const string HistoricCandlesUrl = "http://api.gdax.com/products/{0}/candles?start={1}&end={2}&granularity={3}";
+        const string HistoricCandlesUrl = "https://api.pro.coinbase.com/products/{0}/candles?start={1}&end={2}&granularity={3}";
 
         /// <summary>
         /// Get historical data enumerable for a single symbol, type and resolution given this start and end times(in UTC).
