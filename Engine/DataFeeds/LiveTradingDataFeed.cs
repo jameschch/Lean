@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Data.Custom;
+using QuantConnect.Data.Custom.Tiingo;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
@@ -55,7 +56,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private IDataProvider _dataProvider;
         private SingleEntryDataCacheProvider _dataCacheProvider;
 
-        private Ref<TimeSpan> _fillForwardResolution;
         private IResultHandler _resultHandler;
         private IDataQueueHandler _dataQueueHandler;
         private BaseDataExchange _exchange;
@@ -117,10 +117,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             Task.Run(() => _exchange.Start(_cancellationTokenSource.Token));
             Task.Run(() => _customExchange.Start(_cancellationTokenSource.Token));
 
-            // this value will be modified via calls to AddSubscription/RemoveSubscription
-            var ffres = Time.OneMinute;
-            _fillForwardResolution = Ref.Create(() => ffres, v => ffres = v);
-
             // wire ourselves up to receive notifications when universes are added/removed
             var start = _timeProvider.GetUtcNow();
             algorithm.UniverseManager.CollectionChanged += (sender, args) =>
@@ -142,10 +138,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                             }
 
                             AddSubscription(new SubscriptionRequest(true, universe, security, config, start, Time.EndOfTime));
-
-                            // Not sure if this is needed but left here because of this:
-                            // https://github.com/QuantConnect/Lean/commit/029d70bde6ca83a1eb0c667bb5cc4444bea05678
-                            UpdateFillForwardResolution();
                         }
                         break;
 
@@ -190,7 +182,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             Log.Trace("LiveTradingDataFeed.AddSubscription(): Added " + request.Configuration);
 
             _subscriptions.TryAdd(subscription);
-
             // send the subscription for the new symbol through to the data queuehandler
             // unless it is custom data, custom data is retrieved using the same as backtest
             if (!subscription.Configuration.IsCustomData)
@@ -204,8 +195,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             {
                 _changes += SecurityChanges.Added(request.Security);
             }
-
-            UpdateFillForwardResolution();
 
             return true;
         }
@@ -268,7 +257,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
 
             Log.Trace("LiveTradingDataFeed.RemoveSubscription(): Removed " + configuration);
-            UpdateFillForwardResolution();
 
             return true;
         }
@@ -465,6 +453,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         Quandl.SetAuthCode(Config.Get("quandl-auth-token"));
                     }
 
+                    if (!Tiingo.IsAuthCodeSet)
+                    {
+                        // we're not using the SubscriptionDataReader, so be sure to set the auth token here
+                        Tiingo.SetAuthCode(Config.Get("tiingo-auth-token"));
+                    }
+
                     var factory = new LiveCustomDataSubscriptionEnumeratorFactory(_timeProvider);
                     var enumeratorStack = factory.CreateEnumerator(request, _dataProvider);
 
@@ -560,11 +554,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                 if (request.Configuration.FillDataForward)
                 {
-                    var subscriptionConfigs = _subscriptions.Select(x => x.Configuration).Concat(new[] { request.Configuration });
+                    var fillForwardResolution = _subscriptions.UpdateAndGetFillForwardResolution(request.Configuration);
 
-                    UpdateFillForwardResolution(subscriptionConfigs);
-
-                    enumerator = new LiveFillForwardEnumerator(_frontierTimeProvider, enumerator, request.Security.Exchange, _fillForwardResolution, request.Configuration.ExtendedMarketHours, localEndTime, request.Configuration.Increment, request.Configuration.DataTimeZone);
+                    enumerator = new LiveFillForwardEnumerator(_frontierTimeProvider, enumerator, request.Security.Exchange, fillForwardResolution, request.Configuration.ExtendedMarketHours, localEndTime, request.Configuration.Increment, request.Configuration.DataTimeZone);
                 }
 
                 // define market hours and user filters to incoming data
@@ -670,11 +662,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         });
                     }
 
-                    var subscriptionConfigs = _subscriptions.Select(x => x.Configuration).Concat(new[] { request.Configuration });
+                    var fillForwardResolution = _subscriptions.UpdateAndGetFillForwardResolution(request.Configuration);
 
-                    UpdateFillForwardResolution(subscriptionConfigs);
-
-                    return new LiveFillForwardEnumerator(_frontierTimeProvider, input, request.Security.Exchange, _fillForwardResolution, request.Configuration.ExtendedMarketHours, localEndTime, request.Configuration.Increment, request.Configuration.DataTimeZone);
+                    return new LiveFillForwardEnumerator(_frontierTimeProvider, input, request.Security.Exchange, fillForwardResolution, request.Configuration.ExtendedMarketHours, localEndTime, request.Configuration.Increment, request.Configuration.DataTimeZone);
                 };
 
                 var symbolUniverse = _dataQueueHandler as IDataQueueUniverseProvider;
@@ -756,40 +746,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
 
             Log.Trace("LiveTradingDataFeed.GetNextTicksEnumerator(): Exiting enumerator thread...");
-        }
-
-        /// <summary>
-        /// Updates the fill forward resolution by checking all existing subscriptions and
-        /// selecting the smallest resoluton not equal to tick
-        /// </summary>
-        private void UpdateFillForwardResolution()
-        {
-            UpdateFillForwardResolution(_subscriptions.Select(x => x.Configuration));
-        }
-
-        /// <summary>
-        /// Updates the fill forward resolution by checking specified subscription configurations and
-        /// selecting the smallest resoluton not equal to tick
-        /// </summary>
-        /// <param name="subscriptionConfigs">Subscription configurations list</param>
-        private void UpdateFillForwardResolution(IEnumerable<SubscriptionDataConfig> subscriptionConfigs)
-        {
-            _fillForwardResolution.Value = GetFillForwardResolution(subscriptionConfigs);
-        }
-
-        /// <summary>
-        /// Returns the fill forward resolution by checking specified subscription configurations and
-        /// selecting the smallest resoluton not equal to tick
-        /// </summary>
-        /// <param name="subscriptionConfigs">Subscription configurations list</param>
-        private TimeSpan GetFillForwardResolution(IEnumerable<SubscriptionDataConfig> subscriptionConfigs)
-        {
-            return subscriptionConfigs
-                .Where(x => !x.IsInternalFeed)
-                .Select(x => x.Resolution)
-                .Where(x => x != Resolution.Tick)
-                .DefaultIfEmpty(Resolution.Minute)
-                .Min().ToTimeSpan();
         }
 
         /// <summary>

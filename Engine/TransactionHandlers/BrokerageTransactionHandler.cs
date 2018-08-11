@@ -85,7 +85,14 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// </summary>
         private readonly ConcurrentDictionary<int, OrderTicket> _completeOrderTickets = new ConcurrentDictionary<int, OrderTicket>();
 
+        /// <summary>
+        /// The _cancelPendingOrders instance will help to keep track of CancelPending orders and their Status
+        /// </summary>
+        protected readonly CancelPendingOrders _cancelPendingOrders = new CancelPendingOrders();
+
         private IResultHandler _resultHandler;
+
+        private readonly object _lockHandleOrderEvent = new object();
 
         /// <summary>
         /// Gets the permanent storage for all orders
@@ -184,13 +191,13 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             switch (request.OrderRequestType)
             {
                 case OrderRequestType.Submit:
-                    return AddOrder((SubmitOrderRequest) request);
+                    return AddOrder((SubmitOrderRequest)request);
 
                 case OrderRequestType.Update:
-                    return UpdateOrder((UpdateOrderRequest) request);
+                    return UpdateOrder((UpdateOrderRequest)request);
 
                 case OrderRequestType.Cancel:
-                    return CancelOrder((CancelOrderRequest) request);
+                    return CancelOrder((CancelOrderRequest)request);
 
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -335,6 +342,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 }
                 else
                 {
+                    _cancelPendingOrders.Set(order.Id, order.Status);
                     // update the order status
                     order.Status = OrderStatus.CancelPending;
 
@@ -402,9 +410,6 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
         private Order GetOrderByIdInternal(int orderId)
         {
-            // this function can be invoked by brokerages when getting open orders, guard against null ref
-            if (_completeOrders == null) return null;
-
             Order order;
             return _completeOrders.TryGetValue(orderId, out order) ? order : null;
         }
@@ -416,9 +421,6 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// <returns>The first order matching the brokerage id, or null if no match is found</returns>
         public Order GetOrderByBrokerageId(string brokerageId)
         {
-            // this function can be invoked by brokerages when getting open orders, guard against null ref
-            if (_completeOrders == null || _openOrders == null) return null;
-
             var order = _openOrders.FirstOrDefault(x => x.Value.BrokerId.Contains(brokerageId)).Value
                         ?? _completeOrders.FirstOrDefault(x => x.Value.BrokerId.Contains(brokerageId)).Value;
             return order?.Clone();
@@ -432,12 +434,6 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// <returns>All orders this order provider currently holds by the specified filter</returns>
         public IEnumerable<Order> GetOrders(Func<Order, bool> filter = null)
         {
-            if (_completeOrders == null)
-            {
-                // this is the case when we haven't initialize yet, backtesting brokerage
-                // will end up calling this through the transaction manager
-                return Enumerable.Empty<Order>();
-            }
             if (filter != null)
             {
                 // return a clone to prevent object reference shenanigans, you must submit a request to change the order
@@ -453,13 +449,6 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// <returns>All open orders this order provider currently holds</returns>
         public List<Order> GetOpenOrders(Func<Order, bool> filter = null)
         {
-            if (_openOrders == null)
-            {
-                // this is the case when we haven't initialize yet, backtesting brokerage
-                // will end up calling this through the transaction manager
-                return new List<Order>();
-            }
-
             if (filter != null)
             {
                 // return a clone to prevent object reference shenanigans, you must submit a request to change the order
@@ -475,7 +464,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         {
             try
             {
-                foreach(var request in _orderRequestQueue.GetConsumingEnumerable(_cancellationTokenSource.Token))
+                foreach (var request in _orderRequestQueue.GetConsumingEnumerable(_cancellationTokenSource.Token))
                 {
                     HandleOrderRequest(request);
                     ProcessAsynchronousEvents();
@@ -568,13 +557,12 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// <summary>
         /// Register an already open Order
         /// </summary>
-        public void AddOpenOrder(Order order)
+        public void AddOpenOrder(Order order, OrderTicket orderTicket)
         {
             _openOrders.AddOrUpdate(order.Id, order, (i, o) => order);
             _completeOrders.AddOrUpdate(order.Id, order, (i, o) => order);
-            var ticket = order.ToOrderTicket(_algorithm.Transactions);
-            _openOrderTickets.AddOrUpdate(order.Id, ticket);
-            _completeOrderTickets.AddOrUpdate(order.Id, ticket);
+            _openOrderTickets.AddOrUpdate(order.Id, orderTicket);
+            _completeOrderTickets.AddOrUpdate(order.Id, orderTicket);
         }
 
         /// <summary>
@@ -843,9 +831,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             BrokerageMessageEvent message;
             if (!_algorithm.LiveMode && !_algorithm.BrokerageModel.CanUpdateOrder(_algorithm.Securities[order.Symbol], order, request, out message))
             {
-                // if we couldn't actually process the order, mark it as invalid and bail
-                order.Status = OrderStatus.Invalid;
-                if (message == null) message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "InvalidOrder", "BrokerageModel declared unable to update order: " + order.Id);
+                if (message == null) message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "InvalidRequest", "BrokerageModel declared unable to update order: " + order.Id);
                 var response = OrderResponse.Error(request, OrderResponseErrorCode.BrokerageModelRefusedToUpdateOrder, "OrderID: " + order.Id + " " + message);
                 _algorithm.Error(response.ErrorMessage);
                 HandleOrderEvent(new OrderEvent(order, _algorithm.UtcTime, 0m, "BrokerageModel declared unable to update order"));
@@ -906,11 +892,13 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
             if (!_completeOrders.TryGetValue(request.OrderId, out order) || !_completeOrderTickets.TryGetValue(request.OrderId, out ticket))
             {
                 Log.Error("BrokerageTransactionHandler.HandleCancelOrderRequest(): Unable to cancel order with ID " + request.OrderId + ".");
+                _cancelPendingOrders.RemoveAndFallback(order);
                 return OrderResponse.UnableToFindOrder(request);
             }
 
             if (order.Status.IsClosed())
             {
+                _cancelPendingOrders.RemoveAndFallback(order);
                 return OrderResponse.InvalidStatus(request, order);
             }
 
@@ -932,12 +920,9 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
                 // failed to cancel the order
                 var message = "Brokerage failed to cancel order with id " + order.Id;
                 _algorithm.Error(message);
-                HandleOrderEvent(new OrderEvent(order, _algorithm.UtcTime, 0m, "Brokerage failed to cancel order"));
+                _cancelPendingOrders.RemoveAndFallback(order);
                 return OrderResponse.Error(request, OrderResponseErrorCode.BrokerageFailedToCancelOrder, message);
             }
-
-            // we succeeded to cancel the order
-            order.Status = OrderStatus.Canceled;
 
             if (request.Tag != null)
             {
@@ -950,94 +935,97 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
         private void HandleOrderEvent(OrderEvent fill)
         {
-            Order order;
-            OrderTicket ticket;
-            if(fill.Status.IsClosed() && _openOrders.TryRemove(fill.OrderId, out order))
+            lock (_lockHandleOrderEvent)
             {
-                _completeOrders[fill.OrderId] = order;
-            }
-            else if(!_completeOrders.TryGetValue(fill.OrderId, out order))
-            {
-                Log.Error("BrokerageTransactionHandler.HandleOrderEvent(): Unable to locate open Order with id " + fill.OrderId);
-                return;
-            }
+                Order order;
+                OrderTicket ticket;
+                if (fill.Status.IsClosed() && _openOrders.TryRemove(fill.OrderId, out order))
+                {
+                    _completeOrders[fill.OrderId] = order;
+                }
+                else if (!_completeOrders.TryGetValue(fill.OrderId, out order))
+                {
+                    Log.Error("BrokerageTransactionHandler.HandleOrderEvent(): Unable to locate open Order with id " + fill.OrderId);
+                    return;
+                }
 
-            if (fill.Status.IsClosed() && _openOrderTickets.TryRemove(fill.OrderId, out ticket))
-            {
-                _completeOrderTickets[fill.OrderId] = ticket;
-            }
-            else if (!_completeOrderTickets.TryGetValue(fill.OrderId, out ticket))
-            {
-                Log.Error("BrokerageTransactionHandler.HandleOrderEvent(): Unable to resolve open ticket: " + fill.OrderId);
-                return;
-            }
-            // set the status of our order object based on the fill event
-            order.Status = fill.Status;
+                if (fill.Status.IsClosed() && _openOrderTickets.TryRemove(fill.OrderId, out ticket))
+                {
+                    _completeOrderTickets[fill.OrderId] = ticket;
+                }
+                else if (!_completeOrderTickets.TryGetValue(fill.OrderId, out ticket))
+                {
+                    Log.Error("BrokerageTransactionHandler.HandleOrderEvent(): Unable to resolve open ticket: " + fill.OrderId);
+                    return;
+                }
+                _cancelPendingOrders.UpdateOrRemove(order.Id, fill.Status);
+                // set the status of our order object based on the fill event
+                order.Status = fill.Status;
 
 
-            // set the modified time of the order to the fill's timestamp
-            switch (fill.Status)
-            {
-                case OrderStatus.Canceled:
-                    order.CanceledTime = fill.UtcTime;
-                    break;
+                // set the modified time of the order to the fill's timestamp
+                switch (fill.Status)
+                {
+                    case OrderStatus.Canceled:
+                        order.CanceledTime = fill.UtcTime;
+                        break;
 
-                case OrderStatus.PartiallyFilled:
-                case OrderStatus.Filled:
-                    order.LastFillTime = fill.UtcTime;
-                    break;
+                    case OrderStatus.PartiallyFilled:
+                    case OrderStatus.Filled:
+                        order.LastFillTime = fill.UtcTime;
+                        break;
 
-                case OrderStatus.Submitted:
-                    // submit events after the initial submission are all order updates
-                    if (ticket.UpdateRequests.Count > 0)
+                    case OrderStatus.Submitted:
+                        // submit events after the initial submission are all order updates
+                        if (ticket.UpdateRequests.Count > 0)
+                        {
+                            order.LastUpdateTime = fill.UtcTime;
+                        }
+                        break;
+                }
+
+                // save that the order event took place, we're initializing the list with a capacity of 2 to reduce number of mallocs
+                //these hog memory
+                //List<OrderEvent> orderEvents = _orderEvents.GetOrAdd(orderEvent.OrderId, i => new List<OrderEvent>(2));
+                //orderEvents.Add(orderEvent);
+
+                //Apply the filled order to our portfolio:
+                if (fill.Status == OrderStatus.Filled || fill.Status == OrderStatus.PartiallyFilled)
+                {
+                    Interlocked.Exchange(ref _lastFillTimeTicks, DateTime.UtcNow.Ticks);
+
+                    // check if the fill currency and the order currency match the symbol currency
+                    var security = _algorithm.Securities[fill.Symbol];
+                    // Bug in FXCM API flipping the currencies -- disabling for now. 5/17/16 RFB
+                    //if (fill.FillPriceCurrency != security.SymbolProperties.QuoteCurrency)
+                    //{
+                    //    Log.Error(string.Format("Currency mismatch: Fill currency: {0}, Symbol currency: {1}", fill.FillPriceCurrency, security.SymbolProperties.QuoteCurrency));
+                    //}
+                    //if (order.PriceCurrency != security.SymbolProperties.QuoteCurrency)
+                    //{
+                    //    Log.Error(string.Format("Currency mismatch: Order currency: {0}, Symbol currency: {1}", order.PriceCurrency, security.SymbolProperties.QuoteCurrency));
+                    //}
+
+                    try
                     {
-                        order.LastUpdateTime = fill.UtcTime;
+                        _algorithm.Portfolio.ProcessFill(fill);
+
+                        var conversionRate = security.QuoteCurrency.ConversionRate;
+                        var multiplier = security.SymbolProperties.ContractMultiplier;
+
+                        _algorithm.TradeBuilder.ProcessFill(fill, conversionRate, multiplier);
                     }
-                    break;
-            }
-
-            // save that the order event took place, we're initializing the list with a capacity of 2 to reduce number of mallocs
-            //these hog memory
-            //List<OrderEvent> orderEvents = _orderEvents.GetOrAdd(orderEvent.OrderId, i => new List<OrderEvent>(2));
-            //orderEvents.Add(orderEvent);
-
-            //Apply the filled order to our portfolio:
-            if (fill.Status == OrderStatus.Filled || fill.Status == OrderStatus.PartiallyFilled)
-            {
-                Interlocked.Exchange(ref _lastFillTimeTicks, DateTime.UtcNow.Ticks);
-
-                // check if the fill currency and the order currency match the symbol currency
-                var security = _algorithm.Securities[fill.Symbol];
-                // Bug in FXCM API flipping the currencies -- disabling for now. 5/17/16 RFB
-                //if (fill.FillPriceCurrency != security.SymbolProperties.QuoteCurrency)
-                //{
-                //    Log.Error(string.Format("Currency mismatch: Fill currency: {0}, Symbol currency: {1}", fill.FillPriceCurrency, security.SymbolProperties.QuoteCurrency));
-                //}
-                //if (order.PriceCurrency != security.SymbolProperties.QuoteCurrency)
-                //{
-                //    Log.Error(string.Format("Currency mismatch: Order currency: {0}, Symbol currency: {1}", order.PriceCurrency, security.SymbolProperties.QuoteCurrency));
-                //}
-
-                try
-                {
-                    _algorithm.Portfolio.ProcessFill(fill);
-
-                    var conversionRate = security.QuoteCurrency.ConversionRate;
-                    var multiplier = security.SymbolProperties.ContractMultiplier;
-
-                    _algorithm.TradeBuilder.ProcessFill(fill, conversionRate, multiplier);
+                    catch (Exception err)
+                    {
+                        Log.Error(err);
+                        _algorithm.Error(string.Format("Order Error: id: {0}, Error in Portfolio.ProcessFill: {1}", order.Id, err.Message));
+                    }
                 }
-                catch (Exception err)
-                {
-                    Log.Error(err);
-                    _algorithm.Error(string.Format("Order Error: id: {0}, Error in Portfolio.ProcessFill: {1}", order.Id, err.Message));
-                }
+
+                // update the ticket and order after we've processed the fill, but before the event, this way everything is ready for user code
+                ticket.AddOrderEvent(fill);
+                order.Price = ticket.AverageFillPrice;
             }
-
-            // update the ticket and order after we've processed the fill, but before the event, this way everything is ready for user code
-            ticket.AddOrderEvent(fill);
-            order.Price = ticket.AverageFillPrice;
-
             //We have an event! :) Order filled, send it in to be handled by algorithm portfolio.
             if (fill.Status != OrderStatus.None) //order.Status != OrderStatus.Submitted
             {

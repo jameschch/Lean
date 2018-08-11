@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,7 +28,7 @@ using QuantConnect.Logging;
 namespace QuantConnect.ToolBox.GDAXDownloader
 {
     /// <summary>
-    /// GDAX Data Downloader class 
+    /// GDAX Data Downloader class
     /// </summary>
     public class GDAXDownloader : IDataDownloader
     {
@@ -111,7 +112,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
         /// <summary>
         /// Parse string response from web response
         /// </summary>
-        /// <param name="Symbol">Crypto security symbol.</param>
+        /// <param name="symbol">Crypto security symbol.</param>
         /// <param name="granularity">Resolution in seconds.</param>
         /// <param name="data">Web response as string.</param>
         /// <returns>web response as string</returns>

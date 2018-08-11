@@ -20,6 +20,7 @@ using System.Linq;
 using Newtonsoft.Json;
 using QuantConnect.Algorithm.CSharp;
 using QuantConnect.Configuration;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Tests
 {
@@ -62,21 +63,16 @@ namespace QuantConnect.Tests
         private static TestCaseData[] GetRegressionTestParameters()
         {
             // find all regression algorithms in Algorithm.CSharp
-            var regressionAlgorithms =
+            return (
                 from type in typeof(BasicTemplateAlgorithm).Assembly.GetTypes()
                 where typeof(IRegressionAlgorithmDefinition).IsAssignableFrom(type)
                 where !type.IsAbstract                          // non-abstract
                 where type.GetConstructor(new Type[0]) != null  // has default ctor
-                select type;
-
-            return regressionAlgorithms.SelectMany(ra =>
-            {
-                // create instance to fetch statistics and other regression languages
-                var instance = (IRegressionAlgorithmDefinition)Activator.CreateInstance(ra);
-
-                // generate test parameters
-                return instance.Languages.Select(lang => new AlgorithmStatisticsTestParameters(ra.Name, instance.ExpectedStatistics, lang));
-            })
+                let instance = (IRegressionAlgorithmDefinition) Activator.CreateInstance(type)
+                where instance.CanRunLocally                   // open source has data to run this algorithm
+                from language in instance.Languages
+                select new AlgorithmStatisticsTestParameters(type.Name, instance.ExpectedStatistics, language)
+            )
             .OrderBy(x => x.Language).ThenBy(x => x.Algorithm)
             // generate test cases from test parameters
             .Select(x => new TestCaseData(x).SetName(x.Language + "/" + x.Algorithm))

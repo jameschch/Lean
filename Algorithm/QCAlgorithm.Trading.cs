@@ -771,6 +771,12 @@ namespace QuantConnect.Algorithm
         public List<int> Liquidate(Symbol symbolToLiquidate = null, string tag = "Liquidated")
         {
             var orderIdList = new List<int>();
+            if (!Settings.LiquidateEnabled)
+            {
+                Debug("Liquidate() is currently disabled by settings. To re-enable please set 'Settings.LiquidateEnabled' to true");
+                return orderIdList;
+            }
+
 
             foreach (var symbol in Securities.Keys.OrderBy(x => x.Value))
             {
@@ -874,9 +880,10 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Automatically place an order which will set the holdings to between 100% or -100% of *PORTFOLIO VALUE*.
+        /// Automatically place a market order which will set the holdings to between 100% or -100% of *PORTFOLIO VALUE*.
         /// E.g. SetHoldings("AAPL", 0.1); SetHoldings("IBM", -0.2); -> Sets portfolio as long 10% APPL and short 20% IBM
         /// E.g. SetHoldings("AAPL", 2); -> Sets apple to 2x leveraged with all our cash.
+        /// If the market is closed, place a market on open order.
         /// </summary>
         /// <param name="symbol">Symbol indexer</param>
         /// <param name="percentage">decimal fraction of portfolio to set stock</param>
@@ -889,7 +896,7 @@ namespace QuantConnect.Algorithm
             Security security;
             if (!Securities.TryGetValue(symbol, out security))
             {
-                Error(symbol.ToString() + " not found in portfolio. Request this data when initializing the algorithm.");
+                Error($"{symbol} not found in portfolio. Request this data when initializing the algorithm.");
                 return;
             }
 
@@ -909,11 +916,28 @@ namespace QuantConnect.Algorithm
                 }
             }
 
+            //Calculate total unfilled quantity for open market orders
+            var marketOrdersQuantity =
+                (from order in Transactions.GetOpenOrders(symbol)
+                 where order.Type == OrderType.Market
+                 select Transactions.GetOrderTicket(order.Id)
+                 into ticket
+                 where ticket != null
+                 select ticket.Quantity - ticket.QuantityFilled).Sum();
+
             //Only place trade if we've got > 1 share to order.
-            var quantity = CalculateOrderQuantity(symbol, percentage);
+            var quantity = CalculateOrderQuantity(symbol, percentage) - marketOrdersQuantity;
             if (Math.Abs(quantity) > 0)
             {
-                MarketOrder(symbol, quantity, false, tag);
+                //Check whether the exchange is open to send a market order. If not, send a market on open order instead
+                if (security.Exchange.ExchangeOpen)
+                {
+                    MarketOrder(symbol, quantity, false, tag);
+                }
+                else
+                {
+                    MarketOnOpenOrder(symbol, quantity, tag);
+                }
             }
         }
 
@@ -947,10 +971,10 @@ namespace QuantConnect.Algorithm
                 return 0;
             }
 
-            // this is the value in account currency that we want our holdings to have
-            var targetPortfolioValue = target * Portfolio.TotalPortfolioValue;
+            // Factoring in SetHoldingsBuffer.
+            var adjustedTarget = target * (1 - Settings.SetHoldingsBuffer);
 
-            var result = security.BuyingPowerModel.GetMaximumOrderQuantityForTargetValue(Portfolio, security, targetPortfolioValue);
+            var result = security.BuyingPowerModel.GetMaximumOrderQuantityForTargetValue(Portfolio, security, adjustedTarget);
             if (result.Quantity == 0 && result.IsError)
             {
                 Error($"The order quantity for {symbol.Value} cannot be calculated: Reason: {result.Reason}.");

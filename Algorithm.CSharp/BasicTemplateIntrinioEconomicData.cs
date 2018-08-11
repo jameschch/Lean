@@ -19,6 +19,7 @@ using QuantConnect.Data;
 using QuantConnect.Data.Custom.Intrinio;
 using QuantConnect.Indicators;
 using QuantConnect.Parameters;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -45,6 +46,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         private CompositeIndicator<IndicatorDataPoint> _spread;
 
+        private ExponentialMovingAverage _emaWti;
+
         /// <summary>
         ///     Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All
         ///     algorithms must initialized.
@@ -68,6 +71,8 @@ namespace QuantConnect.Algorithm.CSharp
             AddData<IntrinioEconomicData>(IntrinioEconomicDataSources.Commodities.CrudeOilWTI, Resolution.Daily);
             AddData<IntrinioEconomicData>(IntrinioEconomicDataSources.Commodities.CrudeOilBrent, Resolution.Daily);
             _spread = _brent.Minus(_wti);
+
+            _emaWti = EMA(Securities[IntrinioEconomicDataSources.Commodities.CrudeOilWTI].Symbol, 10);
         }
 
         /// <summary>
@@ -98,11 +103,16 @@ namespace QuantConnect.Algorithm.CSharp
                     new[] {"higher", "long", "short"} :
                     new[] {"lower", "short", "long"};
 
-                Log($"Brent Price is {logText[0]} than West Texas. Go {logText[1]} BNO and {logText[2]} USO.");
+                Log($"Brent Price is {logText[0]} than West Texas. Go {logText[1]} BNO and {logText[2]} USO. West Texas EMA: {_emaWti}");
                 SetHoldings(_bno, 0.25 * Math.Sign(_spread));
                 SetHoldings(_uso, -0.25 * Math.Sign(_spread));
             }
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
 
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
@@ -114,25 +124,25 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "89"},
+            {"Total Trades", "91"},
             {"Average Win", "0.09%"},
             {"Average Loss", "-0.01%"},
-            {"Compounding Annual Return", "5.704%"},
-            {"Drawdown", "4.800%"},
-            {"Expectancy", "1.469"},
-            {"Net Profit", "24.865%"},
-            {"Sharpe Ratio", "1.143"},
-            {"Loss Rate", "70%"},
-            {"Win Rate", "30%"},
-            {"Profit-Loss Ratio", "7.23"},
-            {"Alpha", "0.065"},
-            {"Beta", "-0.522"},
-            {"Annual Standard Deviation", "0.048"},
-            {"Annual Variance", "0.002"},
-            {"Information Ratio", "0.74"},
-            {"Tracking Error", "0.048"},
-            {"Treynor Ratio", "-0.105"},
-            {"Total Fees", "$100.58"}
+            {"Compounding Annual Return", "5.732%"},
+            {"Drawdown", "21.500%"},
+            {"Expectancy", "1.846"},
+            {"Net Profit", "24.996%"},
+            {"Sharpe Ratio", "0.416"},
+            {"Loss Rate", "68%"},
+            {"Win Rate", "32%"},
+            {"Profit-Loss Ratio", "7.97"},
+            {"Alpha", "0.097"},
+            {"Beta", "-1.612"},
+            {"Annual Standard Deviation", "0.16"},
+            {"Annual Variance", "0.025"},
+            {"Information Ratio", "0.295"},
+            {"Tracking Error", "0.16"},
+            {"Treynor Ratio", "-0.041"},
+            {"Total Fees", "$102.64"}
         };
     }
 }

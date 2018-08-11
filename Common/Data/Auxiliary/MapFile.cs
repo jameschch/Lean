@@ -16,9 +16,11 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using QuantConnect.Configuration;
 using QuantConnect.Logging;
 
@@ -65,10 +67,11 @@ namespace QuantConnect.Data.Auxiliary
         /// Memory overload search method for finding the mapped symbol for this date.
         /// </summary>
         /// <param name="searchDate">date for symbol we need to find.</param>
+        /// <param name="defaultReturnValue">Default return value if search was got no result.</param>
         /// <returns>Symbol on this date.</returns>
-        public string GetMappedSymbol(DateTime searchDate)
+        public string GetMappedSymbol(DateTime searchDate, string defaultReturnValue = "")
         {
-            var mappedSymbol = "";
+            var mappedSymbol = defaultReturnValue;
             //Iterate backwards to find the most recent factor:
             foreach (var splitDate in _data.Keys)
             {
@@ -152,11 +155,17 @@ namespace QuantConnect.Data.Auxiliary
         /// <returns>An enumerable of all map files</returns>
         public static IEnumerable<MapFile> GetMapFiles(string mapFileDirectory)
         {
-            return from file in Directory.EnumerateFiles(mapFileDirectory)
-                   where file.EndsWith(".csv")
-                   let permtick = Path.GetFileNameWithoutExtension(file)
-                   let fileRead = SafeMapFileRowRead(file)
-                   select new MapFile(permtick, fileRead);
+            var mapFiles = new ConcurrentBag<MapFile>();
+            Parallel.ForEach(Directory.EnumerateFiles(mapFileDirectory), file =>
+            {
+                if (file.EndsWith(".csv"))
+                {
+                    var permtick = Path.GetFileNameWithoutExtension(file);
+                    var fileRead = SafeMapFileRowRead(file);
+                    mapFiles.Add(new MapFile(permtick, fileRead));
+                }
+            });
+            return mapFiles;
         }
 
         /// <summary>

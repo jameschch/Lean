@@ -20,6 +20,7 @@ using QuantConnect.Data;
 using QuantConnect.Brokerages;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -179,6 +180,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -194,16 +200,16 @@ namespace QuantConnect.Algorithm.CSharp
             {"Compounding Annual Return", "-99.992%"},
             {"Drawdown", "3.800%"},
             {"Expectancy", "-1"},
-            {"Net Profit", "-2.542%"},
-            {"Sharpe Ratio", "-15.98"},
+            {"Net Profit", "-2.545%"},
+            {"Sharpe Ratio", "-16.028"},
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "-5.47"},
-            {"Beta", "327.12"},
+            {"Beta", "326.539"},
             {"Annual Standard Deviation", "0.201"},
             {"Annual Variance", "0.04"},
-            {"Information Ratio", "-16.063"},
+            {"Information Ratio", "-16.112"},
             {"Tracking Error", "0.2"},
             {"Treynor Ratio", "-0.01"},
             {"Total Fees", "$85.27"}

@@ -192,6 +192,9 @@ namespace QuantConnect.Lean.Engine.Results
             //Set the start time for the algorithm
             _startTime = DateTime.Now;
 
+            // Delay uploading first packet
+            _nextS3Update = _startTime.AddSeconds(30);
+
             //Default charts:
             Charts.AddOrUpdate("Strategy Equity", new Chart("Strategy Equity"));
             Charts["Strategy Equity"].Series.Add("Equity", new Series("Equity", SeriesType.Candle, 0, "$"));
@@ -642,6 +645,12 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="value">Value for the chart sample.</param>
         public void Sample(string chartName, string seriesName, int seriesIndex, SeriesType seriesType, DateTime time, decimal value, string unit = "$")
         {
+            // Sampling during warming up period skews statistics
+            if (_algorithm.IsWarmingUp)
+            {
+                return;
+            }
+
             lock (_chartLock)
             {
                 //Add a copy locally:

@@ -22,6 +22,7 @@ using QuantConnect.Algorithm.Framework.Portfolio;
 using QuantConnect.Algorithm.Framework.Risk;
 using QuantConnect.Algorithm.Framework.Selection;
 using QuantConnect.Orders;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -67,6 +68,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -97,17 +103,17 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Fees", "$9.80"},
             {"Total Insights Generated", "100"},
             {"Total Insights Closed", "99"},
-            {"Total Insights Analysis Completed", "86"},
+            {"Total Insights Analysis Completed", "99"},
             {"Long Insight Count", "100"},
             {"Short Insight Count", "0"},
             {"Long/Short Ratio", "100%"},
             {"Estimated Monthly Alpha Value", "$158418.3850"},
             {"Total Accumulated Estimated Alpha Value", "$25522.9620"},
             {"Mean Population Estimated Insight Value", "$257.8077"},
-            {"Mean Population Direction", "48.8372%"},
-            {"Mean Population Magnitude", "48.8372%"},
-            {"Rolling Averaged Population Direction", "68.2411%"},
-            {"Rolling Averaged Population Magnitude", "68.2411%"}
+            {"Mean Population Direction", "54.5455%"},
+            {"Mean Population Magnitude", "54.5455%"},
+            {"Rolling Averaged Population Direction", "59.8056%"},
+            {"Rolling Averaged Population Magnitude", "59.8056%"}
         };
     }
 }

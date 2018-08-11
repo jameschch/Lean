@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>QuantConnect.Algorithm.Python</RootNamespace>
     <AssemblyName>QuantConnect.Algorithm.Python</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <LangVersion>6</LangVersion>
     <TargetFrameworkProfile />
@@ -36,7 +36,13 @@
     <LangVersion>6</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="BasicTemplateFuturesFrameworkAlgorithm.py" />
+    <Content Include="BasicTemplateOptionsFrameworkAlgorithm.py" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <None Include="BlackLittermanPortfolioOptimizationFrameworkAlgorithm.py" />
+    <None Include="TiingoDailyDataAlgorithm.py" />
+    <None Include="packages.config" />
+    <None Include="PearsonCorrelationPairsTradingAlphaModelFrameworkAlgorithm.py" />
   </ItemGroup>
   <ItemGroup>
     <None Include="AddRemoveSecurityRegressionAlgorithm.py" />
@@ -65,7 +71,7 @@
     <None Include="build.bat" />
     <None Include="CoarseFineFundamentalComboAlgorithm.py" />
     <None Include="CoarseFineFundamentalRegressionAlgorithm.py" />
-    <None Include="CoarseFundamentalTop5Algorithm.py" />
+    <None Include="CoarseFundamentalTop3Algorithm.py" />
     <None Include="CompositeAlphaModelFrameworkAlgorithm.py" />
     <None Include="ConstituentsQC500GeneratorAlgorithm.py" />
     <None Include="CustomBenchmarkAlgorithm.py" />
@@ -95,7 +101,7 @@
     <None Include="FractionalQuantityRegressionAlgorithm.py" />
     <None Include="FuturesMomentumAlgorithm.py" />
     <None Include="HistoryAlgorithm.py" />
-    <None Include="HistoryAndWarmupRegressionAlgorithm.py" />
+    <None Include="IndicatorWarmupAlgorithm.py" />
     <None Include="HourReverseSplitRegressionAlgorithm.py" />
     <None Include="HourSplitRegressionAlgorithm.py" />
     <None Include="IndicatorSuiteAlgorithm.py" />
@@ -104,7 +110,7 @@
     <None Include="main.py" />
     <None Include="MarginCallEventsAlgorithm.py" />
     <None Include="MarketOnOpenOnCloseAlgorithm.py" />
-    <None Include="MeanVarianceOptimizationAlgorithm.py" />
+    <None Include="MeanVarianceOptimizationFrameworkAlgorithm.py" />
     <None Include="MovingAverageCrossAlgorithm.py" />
     <None Include="MultipleSymbolConsolidationAlgorithm.py" />
     <None Include="OptionChainConsistencyRegressionAlgorithm.py" />
@@ -114,8 +120,6 @@
     <None Include="OptionRenameRegressionAlgorithm.py" />
     <None Include="OptionSplitRegressionAlgorithm.py" />
     <None Include="OrderTicketDemoAlgorithm.py" />
-    <None Include="packages.config" />
-    <None Include="PairsTradingAlphaModelFrameworkAlgorithm.py" />
     <None Include="ParameterizedAlgorithm.py" />
     <None Include="PythonPackageTestAlgorithm.py" />
     <None Include="QCUWeatherBasedRebalancing.py" />
@@ -163,15 +167,12 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="Python.Runtime, Version=2.4.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.7\lib\Python.Runtime.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="ConvertToFrameworkAlgorithm.py" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Benchmarks\" />
+    <Reference Include="Python.Runtime, Version=2.4.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.8\lib\Python.Runtime.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <None Include="OptionDataNullReferenceRegressionAlgorithm.py" />
@@ -185,12 +186,12 @@
       ./build.sh
     </PostBuildEvent>
   </PropertyGroup>
-  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.7\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.7\build\QuantConnect.pythonnet.targets')" />
+  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.8\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.8\build\QuantConnect.pythonnet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.7\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.7\build\QuantConnect.pythonnet.targets'))" />
+    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.8\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.8\build\QuantConnect.pythonnet.targets'))" />
   </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

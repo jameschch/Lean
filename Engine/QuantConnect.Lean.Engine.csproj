@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>QuantConnect.Lean.Engine</RootNamespace>
     <AssemblyName>QuantConnect.Lean.Engine</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
@@ -241,6 +241,7 @@
     <Compile Include="Alphas\IAlphaHandler.cs" />
     <Compile Include="TransactionHandlers\BacktestingTransactionHandler.cs" />
     <Compile Include="TransactionHandlers\BrokerageTransactionHandler.cs" />
+    <Compile Include="TransactionHandlers\CancelPendingOrders.cs" />
     <Compile Include="TransactionHandlers\ITransactionHandler.cs" />
     <Compile Include="DataFeeds\IDataFeed.cs" />
     <Compile Include="Results\LiveTradingResultHandler.cs" />

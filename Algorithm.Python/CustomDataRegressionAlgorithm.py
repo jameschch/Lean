@@ -56,11 +56,11 @@ class Bitcoin(PythonData):
 
     def GetSource(self, config, date, isLiveMode):
         if isLiveMode:
-            return SubscriptionDataSource("https://www.bitstamp.net/api/ticker/", SubscriptionTransportMedium.Rest);
+            return SubscriptionDataSource("https://www.bitstamp.net/api/ticker/", SubscriptionTransportMedium.Rest)
 
-        #return "http://my-ftp-server.com/futures-data-" + date.ToString("Ymd") + ".zip";
+        #return "http://my-ftp-server.com/futures-data-" + date.ToString("Ymd") + ".zip"
         # OR simply return a fixed small data file. Large files will slow down your backtest
-        return SubscriptionDataSource("https://www.quandl.com/api/v3/datasets/BCHARTS/BITSTAMPUSD.csv?order=asc", SubscriptionTransportMedium.RemoteFile);
+        return SubscriptionDataSource("https://www.quandl.com/api/v3/datasets/BCHARTS/BITSTAMPUSD.csv?order=asc&api_key=WyAazVXnq7ATy_fefTqm", SubscriptionTransportMedium.RemoteFile)
 
 
     def Reader(self, config, line, date, isLiveMode):
@@ -99,13 +99,8 @@ class Bitcoin(PythonData):
 
         try:
             data = line.split(',')
-
-            # If value is zero, return None
-            value = decimal.Decimal(data[4])
-            if value == 0: return None
-
             coin.Time = datetime.strptime(data[0], "%Y-%m-%d")
-            coin.Value = value
+            coin.Value = float(data[4])
             coin["Open"] = float(data[1])
             coin["High"] = float(data[2])
             coin["Low"] = float(data[3])
@@ -113,7 +108,7 @@ class Bitcoin(PythonData):
             coin["VolumeBTC"] = float(data[5])
             coin["VolumeUSD"] = float(data[6])
             coin["WeightedPrice"] = float(data[7])
-            return coin;
+            return coin
 
         except ValueError:
             # Do nothing, possible error in json decoding

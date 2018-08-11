@@ -41,7 +41,7 @@ class TimeInForceAlgorithm(QCAlgorithm):
         # The default time in force setting for all orders is GoodTilCancelled (GTC),
         # uncomment this line to set a different time in force.
         # We currently only support GTC and DAY.
-        # self.DefaultOrderProperties.TimeInForce = TimeInForce.Day;
+        # self.DefaultOrderProperties.TimeInForce = TimeInForce.Day
 
         self.symbol = self.AddEquity("SPY", Resolution.Minute).Symbol
 
@@ -78,7 +78,7 @@ class TimeInForceAlgorithm(QCAlgorithm):
             self.DefaultOrderProperties.TimeInForce = TimeInForce.Day
 
             # this order will not be filled before market close and will be canceled
-            self.dayOrderTicket1 = self.LimitOrder(self.symbol, 10, 160)
+            self.dayOrderTicket1 = self.LimitOrder(self.symbol, 10, 150)
             self.expectedOrderStatuses[self.dayOrderTicket1.OrderId] = OrderStatus.Canceled
 
             # this order will be filled before market close

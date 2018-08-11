@@ -21,6 +21,7 @@ using QuantConnect.Algorithm.Framework.Selection;
 using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Orders;
+using QuantConnect.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
     /// This example algorithm defines its own custom coarse/fine fundamental selection model
-    /// with equally weighted portfolio and a maximum sector exposure 
+    /// with equally weighted portfolio and a maximum sector exposure
     /// </summary>
     public class SectorExposureRiskFrameworkAlgorithm : QCAlgorithmFramework, IRegressionAlgorithmDefinition
     {
@@ -68,6 +69,11 @@ namespace QuantConnect.Algorithm.CSharp
         private IEnumerable<Symbol> SelectFine(IEnumerable<FineFundamental> fine) => fine.Select(f => f.Symbol);
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -80,34 +86,34 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "19"},
             {"Average Win", "0.12%"},
             {"Average Loss", "-0.02%"},
-            {"Compounding Annual Return", "-47.616%"},
+            {"Compounding Annual Return", "-47.685%"},
             {"Drawdown", "3.000%"},
             {"Expectancy", "2.082"},
-            {"Net Profit", "-2.622%"},
-            {"Sharpe Ratio", "-6.132"},
+            {"Net Profit", "-2.627%"},
+            {"Sharpe Ratio", "-6.156"},
             {"Loss Rate", "50%"},
             {"Win Rate", "50%"},
             {"Profit-Loss Ratio", "5.16"},
-            {"Alpha", "-0.207"},
-            {"Beta", "-20.07"},
+            {"Alpha", "-0.206"},
+            {"Beta", "-20.207"},
             {"Annual Standard Deviation", "0.09"},
             {"Annual Variance", "0.008"},
-            {"Information Ratio", "-6.314"},
+            {"Information Ratio", "-6.338"},
             {"Tracking Error", "0.09"},
-            {"Treynor Ratio", "0.028"},
+            {"Treynor Ratio", "0.027"},
             {"Total Fees", "$26.42"},
             {"Total Insights Generated", "33"},
             {"Total Insights Closed", "30"},
-            {"Total Insights Analysis Completed", "27"},
+            {"Total Insights Analysis Completed", "30"},
             {"Long Insight Count", "33"},
             {"Short Insight Count", "0"},
             {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$-8434779"},
-            {"Total Accumulated Estimated Alpha Value", "$-4264249"},
-            {"Mean Population Estimated Insight Value", "$-142141.6"},
-            {"Mean Population Direction", "51.8519%"},
+            {"Estimated Monthly Alpha Value", "$-10605760"},
+            {"Total Accumulated Estimated Alpha Value", "$-5361800"},
+            {"Mean Population Estimated Insight Value", "$-178726.7"},
+            {"Mean Population Direction", "36.6667%"},
             {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "78.9332%"},
+            {"Rolling Averaged Population Direction", "56.6585%"},
             {"Rolling Averaged Population Magnitude", "0%"}
         };
     }

@@ -22,10 +22,12 @@ using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
 using QuantConnect.Data.Custom;
+using QuantConnect.Data.Custom.Tiingo;
 using QuantConnect.Data.Market;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Logging;
+using QuantConnect.Securities;
 using QuantConnect.Util;
 using QuantConnect.Securities.Option;
 
@@ -49,9 +51,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
         /// true if we can find a scale factor file for the security of the form: ..\Lean\Data\equity\market\factor_files\{SYMBOL}.csv
         private readonly bool _hasScaleFactors;
-
-        // Symbol Mapping:
-        private string _mappedSymbol = "";
 
         // Location of the datafeed - the type of this data.
 
@@ -93,6 +92,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private BaseData _lastInstanceBeforeAuxilliaryData;
         private readonly IDataProvider _dataProvider;
         private readonly IDataCacheProvider _dataCacheProvider;
+        private DateTime _delistingDate;
 
         /// <summary>
         /// Last read BaseData object from this type and source
@@ -181,6 +181,16 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
             }
 
+            // If Tiingo data, set the access token in data factory
+            var tiingo = _dataFactory as TiingoDailyData;
+            if (tiingo != null)
+            {
+                if (!Tiingo.IsAuthCodeSet)
+                {
+                    Tiingo.SetAuthCode(Config.Get("tiingo-auth-token"));
+                }
+            }
+
             _factorFile = new FactorFile(config.Symbol.Value, new List<FactorFileRow>());
             _mapFile = new MapFile(config.Symbol.Value, new List<MapFileRow>());
 
@@ -237,6 +247,19 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
             }
 
+            // Estimate delisting date.
+            switch (_config.Symbol.ID.SecurityType)
+            {
+                case SecurityType.Future:
+                    _delistingDate = _config.Symbol.ID.Date;
+                    break;
+                case SecurityType.Option:
+                    _delistingDate = OptionSymbol.GetLastDayOfTrading(_config.Symbol);
+                    break;
+                default:
+                    _delistingDate = _mapFile.DelistingDate;
+                    break;
+            }
             _subscriptionFactoryEnumerator = ResolveDataEnumerator(true);
         }
 
@@ -291,6 +314,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     Current = _lastInstanceBeforeAuxilliaryData;
                     _lastInstanceBeforeAuxilliaryData = null;
                     return true;
+                }
+
+                if (_delisted)
+                {
+                    break;
                 }
 
                 // keep enumerating until we find something that is within our time frame
@@ -434,10 +462,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 if (sourceChanged || liveRemoteFile)
                 {
                     // dispose of the current enumerator before creating a new one
-                    if (_subscriptionFactoryEnumerator != null)
-                    {
-                        _subscriptionFactoryEnumerator.Dispose();
-                    }
+                    Dispose();
 
                     // save off for comparison next time
                     _source = newSource;
@@ -558,15 +583,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
 
                 // check to see if the symbol was remapped
-                var newSymbol = _mapFile.GetMappedSymbol(date);
-                if (newSymbol != _mappedSymbol)
+                var newSymbol = _mapFile.GetMappedSymbol(date, _config.MappedSymbol);
+                if (newSymbol != _config.MappedSymbol)
                 {
-                    if (_mappedSymbol != "")
-                    {
-                        var changed = new SymbolChangedEvent(_config.Symbol, date, _mappedSymbol, newSymbol);
-                        _auxiliaryData.Enqueue(changed);
-                    }
-                    _config.MappedSymbol = _mappedSymbol = newSymbol;
+                    var changed = new SymbolChangedEvent(_config.Symbol, date, _config.MappedSymbol, newSymbol);
+                    _auxiliaryData.Enqueue(changed);
+                    _config.MappedSymbol = newSymbol;
                 }
 
                 // we've passed initial checks,now go get data for this date!
@@ -664,33 +686,20 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// </summary>
         private void CheckForDelisting(DateTime date)
         {
-            DateTime delistingDate;
+            
 
-            switch (_config.Symbol.ID.SecurityType)
-            {
-                case SecurityType.Future:
-                    delistingDate = _config.Symbol.ID.Date;
-                    break;
-                case SecurityType.Option:
-                    delistingDate = OptionSymbol.GetLastDayOfTrading(_config.Symbol);
-                    break;
-                default:
-                    delistingDate = _mapFile.DelistingDate;
-                    break;
-            }
-
-            if (!_delistedWarning && date >= delistingDate)
+            if (!_delistedWarning && date >= _delistingDate)
             {
                 _delistedWarning = true;
                 var price = _previous != null ? _previous.Price : 0;
                 _auxiliaryData.Enqueue(new Delisting(_config.Symbol, date, price, DelistingType.Warning));
             }
-            else if (!_delisted && date > delistingDate)
+            else if (!_delisted && date > _delistingDate)
             {
                 _delisted = true;
                 var price = _previous != null ? _previous.Price : 0;
                 // delisted at EOD
-                _auxiliaryData.Enqueue(new Delisting(_config.Symbol, delistingDate.AddDays(1), price, DelistingType.Delisted));
+                _auxiliaryData.Enqueue(new Delisting(_config.Symbol, _delistingDate.AddDays(1), price, DelistingType.Delisted));
             }
         }
 

@@ -110,13 +110,13 @@ namespace QuantConnect.Algorithm
             Func<IEnumerable<CoarseFundamental>, object[]> coarse;
             Universe universe;
 
-            if (pyObject.TryConvertToDelegate(out coarse))
-            {
-                AddUniverse(c => coarse(c.ToList()).Select(x => (Symbol)x));
-            }
-            else if (pyObject.TryConvert(out universe))
+            if (pyObject.TryConvert(out universe))
             {
                 AddUniverse(universe);
+            }
+            else if (pyObject.TryConvertToDelegate(out coarse))
+            {
+                AddUniverse(c => coarse(c.ToList()).Select(x => (Symbol)x));
             }
             else
             {
@@ -753,10 +753,19 @@ namespace QuantConnect.Algorithm
         /// </summary>
         /// <param name="address">A string containing the URI to download</param>
         /// <param name="headers">Defines header values to add to the request</param>
+        /// <returns>The requested resource as a <see cref="string"/></returns>
+        public string Download(string address, PyObject headers) => Download(address, headers, null, null);
+
+        /// <summary>
+        /// Downloads the requested resource as a <see cref="string"/>.
+        /// The resource to download is specified as a <see cref="string"/> containing the URI.
+        /// </summary>
+        /// <param name="address">A string containing the URI to download</param>
+        /// <param name="headers">Defines header values to add to the request</param>
         /// <param name="userName">The user name associated with the credentials</param>
         /// <param name="password">The password for the user name associated with the credentials</param>
         /// <returns>The requested resource as a <see cref="string"/></returns>
-        public string Download(string address, PyObject headers = null, string userName = null, string password = null)
+        public string Download(string address, PyObject headers, string userName, string password)
         {
             var dict = new Dictionary<string, string>();
 
@@ -964,31 +973,39 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Creates a type with a given name
+        /// Creates a type with a given name, if PyObject is not a CLR type. Otherwise, convert it.
         /// </summary>
-        /// <param name="type">Python object</param>
+        /// <param name="pyObject">Python object representing a type.</param>
         /// <returns>Type object</returns>
-        private Type CreateType(PyObject type)
+        private Type CreateType(PyObject pyObject)
         {
+            Type type;
+            if (pyObject.TryConvert(out type) &&
+                type != typeof(PythonQuandl) &&
+                type != typeof(PythonData))
+            {
+                return type;
+            }
+
             PythonActivator pythonType;
-            if (!_pythonActivators.TryGetValue(type.Handle, out pythonType))
+            if (!_pythonActivators.TryGetValue(pyObject.Handle, out pythonType))
             {
                 AssemblyName an;
                 using (Py.GIL())
                 {
-                    an = new AssemblyName(type.Repr().Split('\'')[1]);
+                    an = new AssemblyName(pyObject.Repr().Split('\'')[1]);
                 }
                 var typeBuilder = AppDomain.CurrentDomain
                     .DefineDynamicAssembly(an, AssemblyBuilderAccess.Run)
                     .DefineDynamicModule("MainModule")
                     .DefineType(an.Name, TypeAttributes.Class, typeof(DynamicData));
 
-                pythonType = new PythonActivator(typeBuilder.CreateType(), type);
+                pythonType = new PythonActivator(typeBuilder.CreateType(), pyObject);
 
                 ObjectActivator.AddActivator(pythonType.Type, pythonType.Factory);
 
                 // Save to prevent future additions
-                _pythonActivators.Add(type.Handle, pythonType);
+                _pythonActivators.Add(pyObject.Handle, pythonType);
             }
             return pythonType.Type;
         }

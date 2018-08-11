@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data.Market;
 using QuantConnect.Indicators;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -151,6 +152,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -161,24 +167,24 @@ namespace QuantConnect.Algorithm.CSharp
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "7"},
-            {"Average Win", "19.19%"},
+            {"Average Win", "19.15%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "16.752%"},
-            {"Drawdown", "12.600%"},
+            {"Compounding Annual Return", "16.720%"},
+            {"Drawdown", "12.500%"},
             {"Expectancy", "0"},
-            {"Net Profit", "153.380%"},
-            {"Sharpe Ratio", "1.269"},
+            {"Net Profit", "152.966%"},
+            {"Sharpe Ratio", "1.275"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.073"},
-            {"Beta", "4.494"},
-            {"Annual Standard Deviation", "0.129"},
-            {"Annual Variance", "0.017"},
-            {"Information Ratio", "1.114"},
-            {"Tracking Error", "0.129"},
-            {"Treynor Ratio", "0.036"},
-            {"Total Fees", "$46.86"}
+            {"Alpha", "0.079"},
+            {"Beta", "4.194"},
+            {"Annual Standard Deviation", "0.128"},
+            {"Annual Variance", "0.016"},
+            {"Information Ratio", "1.119"},
+            {"Tracking Error", "0.128"},
+            {"Treynor Ratio", "0.039"},
+            {"Total Fees", "$46.73"}
         };
     }
 }

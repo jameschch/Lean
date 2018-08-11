@@ -223,6 +223,14 @@ namespace QuantConnect.Tests.Engine
             public void Update()
             {
             }
+
+            public void OnAlgorithmStart()
+            {
+            }
+
+            public void OnAlgorithmEnd()
+            {
+            }
         }
 
         class NullResultHandler : IResultHandler
@@ -448,7 +456,7 @@ namespace QuantConnect.Tests.Engine
             {
             }
 
-            public void AddOpenOrder(Order order)
+            public void AddOpenOrder(Order order, OrderTicket orderTicket)
             {
                 throw new NotImplementedException();
             }

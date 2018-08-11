@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 using System;
 using Newtonsoft.Json;
 using QuantConnect.API;
+using QuantConnect.Configuration;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 using RestSharp;
@@ -46,7 +47,8 @@ namespace QuantConnect.Api
         {
             _token = token;
             _userId = userId.ToString();
-            Client = new RestClient("https://www.quantconnect.com/api/v2/");
+            var apiUrl = Config.Get("cloud-api-url", "https://www.quantconnect.com/api/v2/");
+            Client = new RestClient(apiUrl);
         }
 
         /// <summary>
@@ -87,7 +89,7 @@ namespace QuantConnect.Api
                 var hash = Api.CreateSecureHash(timestamp, _token);
                 request.AddHeader("Timestamp", timestamp.ToString());
                 Client.Authenticator = new HttpBasicAuthenticator(_userId, hash);
-                
+
                 // Execute the authenticated REST API Call
                 var restsharpResponse = Client.Execute(request);
 
@@ -115,7 +117,7 @@ namespace QuantConnect.Api
             }
             catch (Exception err)
             {
-                Log.Error("Api.ApiConnection.TryRequest(): Failed to make REST request. Response content: " + responseContent + ", Error: " + err);
+                Log.Error($"Api.ApiConnection.TryRequest({request.Resource}): Failed to make REST request. Response content: {responseContent}, Error: {err}");
                 result = null;
                 return false;
             }
