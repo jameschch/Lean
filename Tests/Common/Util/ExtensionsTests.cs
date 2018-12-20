@@ -16,8 +16,14 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using Python.Runtime;
+using QuantConnect.Data.Market;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Indicators;
+using QuantConnect.Orders;
 using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Common.Util
@@ -83,6 +89,31 @@ namespace QuantConnect.Tests.Common.Util
         }
 
         [Test]
+        public void ConvertToSkipsDiscontinuitiesBecauseOfDaylightSavingsStart_AddingOneHour()
+        {
+            var expected = new DateTime(2014, 3, 9, 3, 0, 0);
+            var time = new DateTime(2014, 3, 9, 2, 0, 0).ConvertTo(TimeZones.NewYork, TimeZones.NewYork);
+            var time2 = new DateTime(2014, 3, 9, 2, 0, 1).ConvertTo(TimeZones.NewYork, TimeZones.NewYork);
+            Assert.AreEqual(expected, time);
+            Assert.AreEqual(expected, time2);
+        }
+
+        [Test]
+        public void ConvertToIgnoreDaylightSavingsEnd_SubtractingOneHour()
+        {
+            var time1Expected = new DateTime(2014, 11, 2, 1, 59, 59);
+            var time2Expected = new DateTime(2014, 11, 2, 2, 0, 0);
+            var time3Expected = new DateTime(2014, 11, 2, 2, 0, 1);
+            var time1 = time1Expected.ConvertTo(TimeZones.NewYork, TimeZones.NewYork);
+            var time2 = time2Expected.ConvertTo(TimeZones.NewYork, TimeZones.NewYork);
+            var time3 = time3Expected.ConvertTo(TimeZones.NewYork, TimeZones.NewYork);
+
+            Assert.AreEqual(time1Expected, time1);
+            Assert.AreEqual(time2Expected, time2);
+            Assert.AreEqual(time3Expected, time3);
+        }
+
+        [Test]
         public void ExchangeRoundDownInTimeZoneSkipsWeekends()
         {
             // moment before EST market open in UTC (time + one day)
@@ -91,6 +122,174 @@ namespace QuantConnect.Tests.Common.Util
             var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.USA, null, SecurityType.Equity);
             var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneDay, hours, TimeZones.Utc, false);
             Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        // This unit test reproduces a fixed infinite loop situation, due to a daylight saving time change, in ExchangeRoundDownInTimeZone, GH issue 2368.
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_AddingOneHour_UTC()
+        {
+            var time = new DateTime(2014, 3, 9, 16, 0, 1);
+            var expected = new DateTime(2014, 3, 7, 16, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.Utc, false);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        // This unit test reproduces a fixed infinite loop situation, due to a daylight saving time change, in ExchangeRoundDownInTimeZone, GH issue 2368.
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_SubtractingOneHour_UTC()
+        {
+            var time = new DateTime(2014, 11, 2, 2, 0, 1);
+            var expected = new DateTime(2014, 10, 31, 16, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.Utc, false);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_AddingOneHour_ExtendedHours_UTC()
+        {
+            var time = new DateTime(2014, 3, 9, 2, 0, 1);
+            var expected = new DateTime(2014, 3, 9, 2, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.Utc, true);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_SubtractingOneHour_ExtendedHours_UTC()
+        {
+            var time = new DateTime(2014, 11, 2, 2, 0, 1);
+            var expected = new DateTime(2014, 11, 2, 2, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.Utc, true);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void RoundDownInTimeZoneReturnsCorrectValuesAroundDaylightTimeChanges_AddingOneHour_UTC()
+        {
+            var timeAt = new DateTime(2014, 3, 9, 2, 0, 0);
+            var timeAfter = new DateTime(2014, 3, 9, 2, 0, 1);
+            var timeBefore = new DateTime(2014, 3, 9, 1, 59, 59);
+            var timeAfterDaylightTimeChanges = new DateTime(2014, 3, 9, 3, 0, 0);
+
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+
+            var exchangeRoundedAt = timeAt.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+            var exchangeRoundedAfter = timeAfter.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+            var exchangeRoundedBefore = timeBefore.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+            var exchangeRoundedAfterDaylightTimeChanges = timeAfterDaylightTimeChanges.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+
+            var expected = new DateTime(2014, 3, 9, 3, 0, 0);
+            Assert.AreEqual(expected, exchangeRoundedAt);
+            Assert.AreEqual(expected, exchangeRoundedAfter);
+            Assert.AreEqual(timeBefore, exchangeRoundedBefore);
+            Assert.AreEqual(expected, exchangeRoundedAfterDaylightTimeChanges);
+        }
+
+        [Test]
+        public void RoundDownInTimeZoneReturnsCorrectValuesAroundDaylightTimeChanges_SubtractingOneHour_UTC()
+        {
+            var timeAt = new DateTime(2014, 11, 2, 2, 0, 0);
+            var timeAfter = new DateTime(2014, 11, 2, 2, 0, 1);
+            var timeBefore = new DateTime(2014, 11, 2, 1, 59, 59);
+            var timeAfterDaylightTimeChanges = new DateTime(2014, 11, 2, 3, 0, 0);
+
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+
+            var exchangeRoundedAt = timeAt.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+            var exchangeRoundedAfter = timeAfter.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+            var exchangeRoundedBefore = timeBefore.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+            var exchangeRoundedAfterDaylightTimeChanges = timeAfterDaylightTimeChanges.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.Utc);
+
+            Assert.AreEqual(timeAt, exchangeRoundedAt);
+            Assert.AreEqual(timeAfter, exchangeRoundedAfter);
+            Assert.AreEqual(timeBefore, exchangeRoundedBefore);
+            Assert.AreEqual(timeAfterDaylightTimeChanges, exchangeRoundedAfterDaylightTimeChanges);
+        }
+
+        [Test]
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_AddingOneHour_NewYork()
+        {
+            var time = new DateTime(2014, 3, 9, 16, 0, 1);
+            var expected = new DateTime(2014, 3, 7, 16, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.NewYork, false);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_SubtractingOneHour_NewYork()
+        {
+            var time = new DateTime(2014, 11, 2, 2, 0, 1);
+            var expected = new DateTime(2014, 10, 31, 16, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.NewYork, false);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_AddingOneHour_ExtendedHours_NewYork()
+        {
+            var time = new DateTime(2014, 3, 9, 2, 0, 1);
+            var expected = new DateTime(2014, 3, 9, 2, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.NewYork, true);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void ExchangeRoundDownInTimeZoneCorrectValuesAroundDaylightTimeChanges_SubtractingOneHour_ExtendedHours_NewYork()
+        {
+            var time = new DateTime(2014, 11, 2, 2, 0, 1);
+            var expected = new DateTime(2014, 11, 2, 2, 0, 0);
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.GDAX, null, SecurityType.Crypto);
+            var exchangeRounded = time.ExchangeRoundDownInTimeZone(Time.OneHour, hours, TimeZones.NewYork, true);
+            Assert.AreEqual(expected, exchangeRounded);
+        }
+
+        [Test]
+        public void RoundDownInTimeZoneReturnsCorrectValuesAroundDaylightTimeChanges_AddingOneHour_NewYork()
+        {
+            var timeAt = new DateTime(2014, 3, 9, 2, 0, 0);
+            var timeAfter = new DateTime(2014, 3, 9, 2, 0, 1);
+            var timeBefore = new DateTime(2014, 3, 9, 1, 59, 59);
+            var timeAfterDaylightTimeChanges = new DateTime(2014, 3, 9, 3, 0, 0);
+
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+
+            var exchangeRoundedAt = timeAt.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+            var exchangeRoundedAfter = timeAfter.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+            var exchangeRoundedBefore = timeBefore.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+            var exchangeRoundedAfterDaylightTimeChanges = timeAfterDaylightTimeChanges.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+
+            var expected = new DateTime(2014, 3, 9, 3, 0, 0);
+            Assert.AreEqual(expected, exchangeRoundedAt);
+            Assert.AreEqual(expected, exchangeRoundedAfter);
+            Assert.AreEqual(timeBefore, exchangeRoundedBefore);
+            Assert.AreEqual(expected, exchangeRoundedAfterDaylightTimeChanges);
+        }
+
+        [Test]
+        public void RoundDownInTimeZoneReturnsCorrectValuesAroundDaylightTimeChanges_SubtractingOneHour_NewYork()
+        {
+            var timeAt = new DateTime(2014, 11, 2, 2, 0, 0);
+            var timeAfter = new DateTime(2014, 11, 2, 2, 0, 1);
+            var timeBefore = new DateTime(2014, 11, 2, 1, 59, 59);
+            var timeAfterDaylightTimeChanges = new DateTime(2014, 11, 2, 3, 0, 0);
+
+            var hours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(Market.Oanda, null, SecurityType.Forex);
+
+            var exchangeRoundedAt = timeAt.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+            var exchangeRoundedAfter = timeAfter.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+            var exchangeRoundedBefore = timeBefore.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+            var exchangeRoundedAfterDaylightTimeChanges = timeAfterDaylightTimeChanges.RoundDownInTimeZone(Time.OneSecond, hours.TimeZone, TimeZones.NewYork);
+
+            Assert.AreEqual(timeAt, exchangeRoundedAt);
+            Assert.AreEqual(timeAfter, exchangeRoundedAfter);
+            Assert.AreEqual(timeBefore, exchangeRoundedBefore);
+            Assert.AreEqual(timeAfterDaylightTimeChanges, exchangeRoundedAfterDaylightTimeChanges);
         }
 
         [Test]
@@ -296,6 +495,267 @@ namespace QuantConnect.Tests.Common.Util
             var roundedTime = time.RoundDownInTimeZone(Time.OneDay, exchangeTimeZone, dataTimeZone);
             Assert.AreEqual(time, roundedTime);
         }
+
+        [Test]
+        public void GetStringBetweenCharsTests()
+        {
+            const string expected = "python3.6";
+
+            // Different characters cases
+            var input = "[ python3.6 ]";
+            var actual = input.GetStringBetweenChars('[', ']');
+            Assert.AreEqual(expected, actual);
+
+            input = "[ python3.6 ] [ python2.7 ]";
+            actual = input.GetStringBetweenChars('[', ']');
+            Assert.AreEqual(expected, actual);
+
+            input = "[ python2.7 [ python3.6 ] ]";
+            actual = input.GetStringBetweenChars('[', ']');
+            Assert.AreEqual(expected, actual);
+
+            // Same character cases
+            input = "\'python3.6\'";
+            actual = input.GetStringBetweenChars('\'', '\'');
+            Assert.AreEqual(expected, actual);
+
+            input = "\' python3.6 \' \' python2.7 \'";
+            actual = input.GetStringBetweenChars('\'', '\'');
+            Assert.AreEqual(expected, actual);
+
+            // In this case, it is not equal
+            input = "\' python2.7 \' python3.6 \' \'";
+            actual = input.GetStringBetweenChars('\'', '\'');
+            Assert.AreNotEqual(expected, actual);
+        }
+
+        [Test]
+        public void PyObjectTryConvertQuoteBar()
+        {
+            // Wrap a QuoteBar around a PyObject and convert it back
+            var value = ConvertToPyObject(new QuoteBar());
+
+            QuoteBar quoteBar;
+            var canConvert = value.TryConvert(out quoteBar);
+            Assert.IsTrue(canConvert);
+            Assert.IsNotNull(quoteBar);
+            Assert.IsAssignableFrom<QuoteBar>(quoteBar);
+        }
+
+        [Test]
+        public void PyObjectTryConvertSMA()
+        {
+            // Wrap a SimpleMovingAverage around a PyObject and convert it back
+            var value = ConvertToPyObject(new SimpleMovingAverage(14));
+
+            IndicatorBase<IndicatorDataPoint> indicatorBaseDataPoint;
+            var canConvert = value.TryConvert(out indicatorBaseDataPoint);
+            Assert.IsTrue(canConvert);
+            Assert.IsNotNull(indicatorBaseDataPoint);
+            Assert.IsAssignableFrom<SimpleMovingAverage>(indicatorBaseDataPoint);
+        }
+
+        [Test]
+        public void PyObjectTryConvertATR()
+        {
+            // Wrap a AverageTrueRange around a PyObject and convert it back
+            var value = ConvertToPyObject(new AverageTrueRange(14, MovingAverageType.Simple));
+
+            IndicatorBase<IBaseDataBar> indicatorBaseDataBar;
+            var canConvert = value.TryConvert(out indicatorBaseDataBar);
+            Assert.IsTrue(canConvert);
+            Assert.IsNotNull(indicatorBaseDataBar);
+            Assert.IsAssignableFrom<AverageTrueRange>(indicatorBaseDataBar);
+        }
+
+        [Test]
+        public void PyObjectTryConvertAD()
+        {
+            // Wrap a AccumulationDistribution around a PyObject and convert it back
+            var value = ConvertToPyObject(new AccumulationDistribution("AD"));
+
+            IndicatorBase<TradeBar> indicatorBaseTradeBar;
+            var canConvert = value.TryConvert(out indicatorBaseTradeBar);
+            Assert.IsTrue(canConvert);
+            Assert.IsNotNull(indicatorBaseTradeBar);
+            Assert.IsAssignableFrom<AccumulationDistribution>(indicatorBaseTradeBar);
+        }
+
+        [Test]
+        public void PyObjectTryConvertSymbolArray()
+        {
+            PyObject value;
+            using (Py.GIL())
+            {
+                // Wrap a Symbol Array around a PyObject and convert it back
+                value = new PyList(new[] { Symbols.SPY.ToPython(), Symbols.AAPL.ToPython() });
+            }
+
+            Symbol[] symbols;
+            var canConvert = value.TryConvert(out symbols);
+            Assert.IsTrue(canConvert);
+            Assert.IsNotNull(symbols);
+            Assert.IsAssignableFrom<Symbol[]>(symbols);
+        }
+
+        [Test]
+        public void PyObjectTryConvertFailCSharp()
+        {
+            // Try to convert a AccumulationDistribution as a QuoteBar
+            var value = ConvertToPyObject(new AccumulationDistribution("AD"));
+
+            QuoteBar quoteBar;
+            bool canConvert = value.TryConvert(out quoteBar);
+            Assert.IsFalse(canConvert);
+            Assert.IsNull(quoteBar);
+        }
+
+        [Test]
+        public void PyObjectTryConvertFailPython()
+        {
+            using (Py.GIL())
+            {
+                // Try to convert a python object as a IndicatorBase<TradeBar>
+                var locals = new PyDict();
+                PythonEngine.Exec("class A:\n    pass", null, locals.Handle);
+                var value = locals.GetItem("A").Invoke();
+
+                IndicatorBase<TradeBar> indicatorBaseTradeBar;
+                bool canConvert = value.TryConvert(out indicatorBaseTradeBar);
+                Assert.IsFalse(canConvert);
+                Assert.IsNull(indicatorBaseTradeBar);
+            }
+        }
+
+        [Test]
+        [TestCase("coarseSelector = lambda coarse: [ x.Symbol for x in coarse if x.Price % 2 == 0 ]")]
+        [TestCase("def coarseSelector(coarse): return [ x.Symbol for x in coarse if x.Price % 2 == 0 ]")]
+        public void PyObjectTryConvertToFunc(string code)
+        {
+            Func<IEnumerable<CoarseFundamental>, Symbol[]> coarseSelector;
+
+            using (Py.GIL())
+            {
+                var locals = new PyDict();
+                PythonEngine.Exec(code, null, locals.Handle);
+                var pyObject = locals.GetItem("coarseSelector");
+                pyObject.TryConvertToDelegate(out coarseSelector);
+            }
+
+            var coarse = Enumerable
+                .Range(0, 9)
+                .Select(x => new CoarseFundamental { Symbol = Symbol.Create(x.ToString(), SecurityType.Equity, Market.USA), Value = x });
+
+            var symbols = coarseSelector(coarse);
+
+            Assert.AreEqual(5, symbols.Length);
+            foreach (var symbol in symbols)
+            {
+                var price = Convert.ToInt32(symbol.Value);
+                Assert.AreEqual(0, price % 2);
+            }
+        }
+
+        [Test]
+        public void PyObjectTryConvertToAction1()
+        {
+            Action<int> action;
+
+            using (Py.GIL())
+            {
+                var locals = new PyDict();
+                PythonEngine.Exec("def raise_number(a): raise ValueError(a)", null, locals.Handle);
+                var pyObject = locals.GetItem("raise_number");
+                pyObject.TryConvertToDelegate(out action);
+            }
+
+            try
+            {
+                action(2);
+                Assert.Fail();
+            }
+            catch (PythonException e)
+            {
+                Assert.AreEqual($"ValueError : {2}", e.Message);
+            }
+        }
+
+        [Test]
+        public void PyObjectTryConvertToAction2()
+        {
+            Action<int, decimal> action;
+
+            using (Py.GIL())
+            {
+                var locals = new PyDict();
+                PythonEngine.Exec("def raise_number(a, b): raise ValueError(a * b)", null, locals.Handle);
+                var pyObject = locals.GetItem("raise_number");
+                pyObject.TryConvertToDelegate(out action);
+            }
+
+            try
+            {
+                action(2, 3m);
+                Assert.Fail();
+            }
+            catch (PythonException e)
+            {
+                Assert.AreEqual($"ValueError : {6}", e.Message);
+            }
+        }
+
+        [Test]
+        public void PyObjectTryConvertToNonDelegateFail()
+        {
+            int action;
+
+            using (Py.GIL())
+            {
+                var locals = new PyDict();
+                PythonEngine.Exec("def raise_number(a, b): raise ValueError(a * b)", null, locals.Handle);
+                var pyObject = locals.GetItem("raise_number");
+                Assert.Throws<ArgumentException>(() => pyObject.TryConvertToDelegate(out action));
+            }
+        }
+
+        [Test]
+        public void BatchByDoesNotDropItems()
+        {
+            var list = new List<int> {1, 2, 3, 4, 5};
+            var by2 = list.BatchBy(2).ToList();
+            Assert.AreEqual(3, by2.Count);
+            Assert.AreEqual(2, by2[0].Count);
+            Assert.AreEqual(2, by2[1].Count);
+            Assert.AreEqual(1, by2[2].Count);
+            CollectionAssert.AreEqual(list, by2.SelectMany(x => x));
+        }
+
+        [Test]
+        public void ToOrderTicketCreatesCorrectTicket()
+        {
+            var orderRequest = new SubmitOrderRequest(OrderType.Limit, SecurityType.Equity, Symbols.USDJPY, 1000, 0, 1.11m, DateTime.Now, "Pepe");
+            var order = Order.CreateOrder(orderRequest);
+            order.Status = OrderStatus.Submitted;
+            order.Id = 11;
+            var orderTicket = order.ToOrderTicket(null);
+            Assert.AreEqual(order.Id, orderTicket.OrderId);
+            Assert.AreEqual(order.Quantity, orderTicket.Quantity);
+            Assert.AreEqual(order.Status, orderTicket.Status);
+            Assert.AreEqual(order.Type, orderTicket.OrderType);
+            Assert.AreEqual(order.Symbol, orderTicket.Symbol);
+            Assert.AreEqual(order.Tag, orderTicket.Tag);
+            Assert.AreEqual(order.Time, orderTicket.Time);
+            Assert.AreEqual(order.SecurityType, orderTicket.SecurityType);
+        }
+
+        private PyObject ConvertToPyObject(object value)
+        {
+            using (Py.GIL())
+            {
+                return value.ToPython();
+            }
+        }
+
 
         private class Super<T>
         {

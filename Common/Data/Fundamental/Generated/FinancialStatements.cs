@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ namespace QuantConnect.Data.Fundamental
 	/// <summary>
 	/// Definition of the FinancialStatements class
 	/// </summary>
-	public class FinancialStatements : BaseData
+	public class FinancialStatements
 	{
 		/// <summary>
 		/// The exact date that is given in the financial statements for each quarter's end.
@@ -79,6 +79,15 @@ namespace QuantConnect.Data.Fundamental
 
 		/// <summary>
 		/// Auditor opinion code will be one of the following for each annual period:
+		/// Code Meaning
+		/// UQ Unqualified Opinion
+		/// UE Unqualified Opinion with Explanation
+		/// QM Qualified - Due to change in accounting method
+		/// QL Qualified - Due to litigation
+		/// OT Qualified Opinion - Other
+		/// AO Adverse Opinion
+		/// DS Disclaim an opinion
+		/// UA Unaudited
 		/// </summary>
 		/// <remarks>
 		/// Morningstar DataId: 28001
@@ -109,13 +118,24 @@ namespace QuantConnect.Data.Fundamental
 		/// The sum of Tier 1 and Tier 2 Capital. Tier 1 capital consists of common shareholders equity, perpetual preferred shareholders equity
 		/// with non-cumulative dividends, retained earnings, and minority interests in the equity accounts of consolidated subsidiaries. Tier 2
 		/// capital consists of subordinated debt, intermediate-term preferred stock, cumulative and long-term preferred stock, and a portion of
-		/// a banks allowance for loan and lease losses.
+		/// a bank's allowance for loan and lease losses.
 		/// </summary>
 		/// <remarks>
 		/// Morningstar DataId: 28004
 		/// </remarks>
 		[JsonProperty("28004")]
 		public TotalRiskBasedCapital TotalRiskBasedCapital { get; set; }
+
+		/// <summary>
+		/// The nature of the period covered by an individual set of financial results. The output can be: Quarter, Semi-annual or Annual.
+		/// Assuming a 12-month fiscal year, quarter typically covers a three-month period, semi-annual a six-month period, and annual a
+		/// twelve-month period. Annual could cover results collected either from preliminary results or an annual report
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 28006
+		/// </remarks>
+		[JsonProperty("28006")]
+		public string PeriodType { get; set; }
 
 		/// <summary>
 		/// The instance of the IncomeStatement class
@@ -144,18 +164,27 @@ namespace QuantConnect.Data.Fundamental
 		}
 
 		/// <summary>
-		/// Sets values for non existing periods from a previous instance
+		/// Applies updated values from <paramref name="update"/> to this instance
 		/// </summary>
-		/// <remarks>Used to fill-forward values from previous dates</remarks>
-		/// <param name="previous">The previous instance</param>
-		public void UpdateValues(FinancialStatements previous)
+		/// <remarks>Used to apply data updates to the current instance. This WILL overwrite existing values. Default update values are ignored.</remarks>
+		/// <param name="update">The next data update for this instance</param>
+		public void UpdateValues(FinancialStatements update)
 		{
-			if (previous == null) return;
+			if (update == null) return;
 
-			if (TotalRiskBasedCapital != null) TotalRiskBasedCapital.UpdateValues(previous.TotalRiskBasedCapital);
-			if (IncomeStatement != null) IncomeStatement.UpdateValues(previous.IncomeStatement);
-			if (BalanceSheet != null) BalanceSheet.UpdateValues(previous.BalanceSheet);
-			if (CashFlowStatement != null) CashFlowStatement.UpdateValues(previous.CashFlowStatement);
+			if (update.PeriodEndingDate != default(DateTime)) PeriodEndingDate = update.PeriodEndingDate;
+			if (update.FileDate != default(DateTime)) FileDate = update.FileDate;
+			if (!string.IsNullOrWhiteSpace(update.AccessionNumber)) AccessionNumber = update.AccessionNumber;
+			if (!string.IsNullOrWhiteSpace(update.FormType)) FormType = update.FormType;
+			if (!string.IsNullOrWhiteSpace(update.PeriodAuditor)) PeriodAuditor = update.PeriodAuditor;
+			if (!string.IsNullOrWhiteSpace(update.AuditorReportStatus)) AuditorReportStatus = update.AuditorReportStatus;
+			if (!string.IsNullOrWhiteSpace(update.InventoryValuationMethod)) InventoryValuationMethod = update.InventoryValuationMethod;
+			if (update.NumberOfShareHolders != default(long)) NumberOfShareHolders = update.NumberOfShareHolders;
+			TotalRiskBasedCapital?.UpdateValues(update.TotalRiskBasedCapital);
+			if (!string.IsNullOrWhiteSpace(update.PeriodType)) PeriodType = update.PeriodType;
+			IncomeStatement?.UpdateValues(update.IncomeStatement);
+			BalanceSheet?.UpdateValues(update.BalanceSheet);
+			CashFlowStatement?.UpdateValues(update.CashFlowStatement);
 		}
 	}
 }

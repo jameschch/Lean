@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,7 +16,6 @@
 
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -84,8 +83,8 @@ namespace QuantConnect.Util
                 if (_workers[0] != null) return;
                 for (int i = 0; i < _threadCount; i++)
                 {
-                    var worker = new ParallelRunnerWorker(this, _processQueue);
-                    worker.Start(token);
+                    var worker = new ParallelRunnerWorker(token, _processQueue);
+                    worker.Start();
                     _workers[i] = worker;
                 }
 
@@ -95,13 +94,20 @@ namespace QuantConnect.Util
             Task.Run(() =>
             {
                 WaitHandle.WaitAll(waitHandles);
-                _waitHandle.Set();
-
-                foreach (var worker in _workers)
+                lock (_sync)
                 {
-                    worker.Dispose();
+                    // if the handle is already closed means we already were disposed
+                    // and so were the workers
+                    if (_waitHandle != null && !_waitHandle.SafeWaitHandle.IsClosed)
+                    {
+                        for (int i = 0; i < _threadCount; i++)
+                        {
+                            _workers[i].DisposeSafely();
+                            _workers[i] = null;
+                        }
+                        _waitHandle.Set();
+                    }
                 }
-
             }, CancellationToken.None);
 
             _processQueueThread = new Thread(() => ProcessHoldQueue(token)) { IsBackground = true };
@@ -150,23 +156,34 @@ namespace QuantConnect.Util
         {
             lock (_sync)
             {
-                if (_holdQueue != null) _holdQueue.Dispose();
-                if (_processQueue != null) _processQueue.Dispose();
-
-                // Wait for _holdQueue disposal be completed
-                Thread.Sleep(10000);
-
-                if (_processQueueThread != null && _processQueueThread.IsAlive) _processQueueThread.Abort();
+                if (_processQueueThread != null && _processQueueThread.IsAlive)
+                {
+                    try
+                    {
+                        if (!_processQueueThread.Join(TimeSpan.FromSeconds(1)))
+                        {
+                            _processQueueThread.Abort();
+                        }
+                    }
+                    catch (Exception err)
+                    {
+                        Log.Error(err);
+                    }
+                }
 
                 foreach (var worker in _workers)
                 {
-                    worker.Dispose();
+                    worker?.DisposeSafely();
                 }
 
-                if (_waitHandle != null)
+                _holdQueue?.DisposeSafely();
+                _processQueue?.DisposeSafely();
+
+                // if IsClosed means its already disposed
+                if (_waitHandle != null && !_waitHandle.SafeWaitHandle.IsClosed)
                 {
                     _waitHandle.Set();
-                    _waitHandle.Dispose();
+                    _waitHandle.DisposeSafely();
                 }
             }
         }

@@ -15,10 +15,15 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using NodaTime;
 using NUnit.Framework;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
 using QuantConnect.Data.Market;
+using QuantConnect.Tests.Engine.DataFeeds;
 
 namespace QuantConnect.Tests.Common.Data
 {
@@ -105,18 +110,73 @@ namespace QuantConnect.Tests.Common.Data
             }
             else
             {
-                Assert.AreEqual(typeof(QuoteBar), types[0].Item1);
-                Assert.AreEqual(typeof(TradeBar), types[1].Item1);
+                Assert.AreEqual(typeof(TradeBar), types[0].Item1);
+                Assert.AreEqual(typeof(QuoteBar), types[1].Item1);
             }
 
-            Assert.AreEqual(TickType.Quote, types[0].Item2);
-            Assert.AreEqual(TickType.Trade, types[1].Item2);
+            Assert.AreEqual(TickType.Trade, types[0].Item2);
+            Assert.AreEqual(TickType.Quote, types[1].Item2);
+        }
+
+        [Test]
+        public void SubscriptionsMemberIsThreadSafe()
+        {
+            var subscriptionManager = new SubscriptionManager();
+            subscriptionManager.SetDataManager(new DataManagerStub());
+            var start = DateTime.UtcNow;
+            var end = start.AddSeconds(5);
+            var tickers = QuantConnect.Algorithm.CSharp.StressSymbols.StockSymbols.ToList();
+            var symbols = tickers.Select(ticker => Symbol.Create(ticker, SecurityType.Equity, QuantConnect.Market.USA)).ToList();
+
+            var readTask = new TaskFactory().StartNew(() =>
+            {
+                Console.WriteLine("Read task started");
+                while (DateTime.UtcNow < end)
+                {
+                    subscriptionManager.Subscriptions.Select(x => x.Resolution).DefaultIfEmpty(Resolution.Minute).Min();
+                    Thread.Sleep(1);
+                }
+                Console.WriteLine("Read task ended");
+            });
+
+            while (readTask.Status != TaskStatus.Running) Thread.Sleep(1);
+
+            var addTask = new TaskFactory().StartNew(() =>
+            {
+                Console.WriteLine("Add task started");
+                foreach (var symbol in symbols)
+                {
+                    subscriptionManager.Add(symbol, Resolution.Minute, DateTimeZone.Utc, DateTimeZone.Utc, true, false);
+                }
+                Console.WriteLine("Add task ended");
+            });
+
+            Task.WaitAll(addTask, readTask);
+        }
+
+        [Test]
+        public void GetsCustomSubscriptionDataTypes()
+        {
+            var subscriptionManager = new SubscriptionManager();
+            subscriptionManager.SetDataManager(new DataManagerStub());
+            subscriptionManager.AvailableDataTypes[SecurityType.Commodity] = new List<TickType> { TickType.OpenInterest, TickType.Quote, TickType.Trade };
+            var types = subscriptionManager.LookupSubscriptionConfigDataTypes(SecurityType.Commodity, Resolution.Daily, false);
+
+            Assert.AreEqual(3, types.Count);
+
+            Assert.AreEqual(typeof(OpenInterest), types[0].Item1);
+            Assert.AreEqual(typeof(QuoteBar), types[1].Item1);
+            Assert.AreEqual(typeof(TradeBar), types[2].Item1);
+
+            Assert.AreEqual(TickType.OpenInterest, types[0].Item2);
+            Assert.AreEqual(TickType.Quote, types[1].Item2);
+            Assert.AreEqual(TickType.Trade, types[2].Item2);
         }
 
         private static List<Tuple<Type, TickType>> GetSubscriptionDataTypes(SecurityType securityType, Resolution resolution, bool isCanonical = false)
         {
-            var timeKeeper = new TimeKeeper(DateTime.UtcNow);
-            var subscriptionManager = new SubscriptionManager(new AlgorithmSettings(), timeKeeper);
+            var subscriptionManager = new SubscriptionManager();
+            subscriptionManager.SetDataManager(new DataManagerStub());
             return subscriptionManager.LookupSubscriptionConfigDataTypes(securityType, resolution, isCanonical);
         }
     }

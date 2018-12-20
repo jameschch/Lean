@@ -53,6 +53,7 @@ namespace QuantConnect.Algorithm
         {
             _warmupBarCount = null;
             _warmupTimeSpan = timeSpan;
+            _warmupResolution = null;
         }
 
         /// <summary>
@@ -62,6 +63,28 @@ namespace QuantConnect.Algorithm
         public void SetWarmUp(TimeSpan timeSpan)
         {
             SetWarmup(timeSpan);
+        }
+
+        /// <summary>
+        /// Sets the warm up period to the specified value
+        /// </summary>
+        /// <param name="timeSpan">The amount of time to warm up, this does not take into account market hours/weekends</param>
+        /// <param name="resolution">The resolution to request</param>
+        public void SetWarmup(TimeSpan timeSpan, Resolution resolution)
+        {
+            _warmupBarCount = null;
+            _warmupTimeSpan = timeSpan;
+            _warmupResolution = resolution;
+        }
+
+        /// <summary>
+        /// Sets the warm up period to the specified value
+        /// </summary>
+        /// <param name="timeSpan">The amount of time to warm up, this does not take into account market hours/weekends</param>
+        /// <param name="resolution">The resolution to request</param>
+        public void SetWarmUp(TimeSpan timeSpan, Resolution resolution)
+        {
+            SetWarmup(timeSpan, resolution);
         }
 
         /// <summary>
@@ -75,6 +98,7 @@ namespace QuantConnect.Algorithm
         {
             _warmupTimeSpan = null;
             _warmupBarCount = barCount;
+            _warmupResolution = null;
         }
 
         /// <summary>
@@ -90,12 +114,46 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Sets the warm up period by resolving a start date that would send that amount of data into
+        /// the algorithm.
+        /// </summary>
+        /// <param name="barCount">The number of data points requested for warm up</param>
+        /// <param name="resolution">The resolution to request</param>
+        public void SetWarmup(int barCount, Resolution resolution)
+        {
+            _warmupTimeSpan = null;
+            _warmupBarCount = barCount;
+            _warmupResolution = resolution;
+        }
+
+        /// <summary>
+        /// Sets the warm up period by resolving a start date that would send that amount of data into
+        /// the algorithm.
+        /// </summary>
+        /// <param name="barCount">The number of data points requested for warm up</param>
+        /// <param name="resolution">The resolution to request</param>
+        public void SetWarmUp(int barCount, Resolution resolution)
+        {
+            SetWarmup(barCount, resolution);
+        }
+
+        /// <summary>
         /// Sets <see cref="IAlgorithm.IsWarmingUp"/> to false to indicate this algorithm has finished its warm up
         /// </summary>
         public void SetFinishedWarmingUp()
         {
             IsWarmingUp = false;
+
+            // notify the algorithm
+            OnWarmupFinished();
         }
+
+        /// <summary>
+        /// Message for exception that is thrown when the implicit conversion between symbol and string fails
+        /// </summary>
+        private readonly string _symbolEmptyErrorMessage = "Cannot create history for the given ticker. " +
+                                                           "Either explicitly use a symbol object to make the history request " +
+                                                           "or ensure the symbol has been added using the AddSecurity() method before making the history request.";
 
         /// <summary>
         /// Gets the history requests required for provide warm up data for the algorithm
@@ -105,12 +163,12 @@ namespace QuantConnect.Algorithm
         {
             if (_warmupBarCount.HasValue)
             {
-                return CreateBarCountHistoryRequests(Securities.Keys, _warmupBarCount.Value);
+                return CreateBarCountHistoryRequests(Securities.Keys, _warmupBarCount.Value, _warmupResolution);
             }
             if (_warmupTimeSpan.HasValue)
             {
                 var end = UtcTime.ConvertFromUtc(TimeZone);
-                return CreateDateRangeHistoryRequests(Securities.Keys, end - _warmupTimeSpan.Value, end);
+                return CreateDateRangeHistoryRequests(Securities.Keys, end - _warmupTimeSpan.Value, end, _warmupResolution);
             }
 
             // if not warmup requested return nothing
@@ -187,13 +245,12 @@ namespace QuantConnect.Algorithm
         {
             var requests = symbols.Select(x =>
             {
-                var security = Securities[x];
-                var config = GetMatchingSubscription(security, typeof(T));
+                var config = GetMatchingSubscription(x, typeof(T));
                 if (config == null) return null;
 
-                Resolution? res = resolution ?? security.Resolution;
-                var start = GetStartTimeAlgoTz(x, periods, resolution).ConvertToUtc(TimeZone);
-                return CreateHistoryRequest(security, config, start, UtcTime.RoundDown(res.Value.ToTimeSpan()), resolution);
+                var res = GetResolution(x, resolution);
+                var start = GetStartTimeAlgoTz(x, periods, res).ConvertToUtc(TimeZone);
+                return CreateHistoryRequest(config, start, UtcTime.RoundDown(res.Value.ToTimeSpan()), res);
             });
 
             return History(requests.Where(x => x != null)).Get<T>().Memoize();
@@ -213,11 +270,10 @@ namespace QuantConnect.Algorithm
         {
             var requests = symbols.Select(x =>
             {
-                var security = Securities[x];
-                var config = GetMatchingSubscription(security, typeof(T));
+                var config = GetMatchingSubscription(x, typeof(T));
                 if (config == null) return null;
 
-                return CreateHistoryRequest(security, config, start, end, resolution);
+                return CreateHistoryRequest(config, start, end, resolution);
             });
 
             return History(requests.Where(x => x != null)).Get<T>().Memoize();
@@ -247,16 +303,18 @@ namespace QuantConnect.Algorithm
         /// <returns>An enumerable of slice containing the requested historical data</returns>
         public IEnumerable<TradeBar> History(Symbol symbol, int periods, Resolution? resolution = null)
         {
-            var security = Securities[symbol];
-            var start = GetStartTimeAlgoTz(symbol, periods, resolution);
+            if (symbol == null) throw new ArgumentException(_symbolEmptyErrorMessage);
 
             var securityType = symbol.ID.SecurityType;
-            if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd || securityType == SecurityType.Crypto)
+            if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd)
             {
-                Error("Calling this method on a Forex or CFD or Crypto security will return an empty result. Please use the generic version with QuoteBar type parameter.");
+                Error("Calling History<TradeBar> method on a Forex or CFD security will return an empty result. Please use the generic version with QuoteBar type parameter.");
             }
 
-            return History(new[] {symbol}, start, Time.RoundDown((resolution ?? security.Resolution).ToTimeSpan()), resolution).Get(symbol).Memoize();
+            resolution = GetResolution(symbol, resolution);
+            var start = GetStartTimeAlgoTz(symbol, periods, resolution);
+
+            return History(new[] { symbol }, start, Time.RoundDown(resolution.Value.ToTimeSpan()), resolution).Get(symbol).Memoize();
         }
 
         /// <summary>
@@ -272,18 +330,20 @@ namespace QuantConnect.Algorithm
             where T : IBaseData
         {
             if (resolution == Resolution.Tick) throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
-            var security = Securities[symbol];
+            if (symbol == null) throw new ArgumentException(_symbolEmptyErrorMessage);
+
             // verify the types match
             var requestedType = typeof(T);
-            var config = GetMatchingSubscription(security, requestedType);
+            var config = GetMatchingSubscription(symbol, requestedType);
             if (config == null)
             {
-                var actualType = security.Subscriptions.Select(x => x.Type.Name).DefaultIfEmpty("[None]").FirstOrDefault();
+                var actualType = Securities[symbol].Subscriptions.Select(x => x.Type.Name).DefaultIfEmpty("[None]").FirstOrDefault();
                 throw new ArgumentException("The specified security is not of the requested type. Symbol: " + symbol.ToString() + " Requested Type: " + requestedType.Name + " Actual Type: " + actualType);
             }
 
+            resolution = GetResolution(symbol, resolution);
             var start = GetStartTimeAlgoTz(symbol, periods, resolution);
-            return History<T>(symbol, start, Time.RoundDown((resolution ?? security.Resolution).ToTimeSpan()), resolution).Memoize();
+            return History<T>(symbol, start, Time.RoundDown(resolution.Value.ToTimeSpan()), resolution).Memoize();
         }
 
         /// <summary>
@@ -297,17 +357,17 @@ namespace QuantConnect.Algorithm
         public IEnumerable<T> History<T>(Symbol symbol, DateTime start, DateTime end, Resolution? resolution = null)
             where T : IBaseData
         {
-            var security = Securities[symbol];
+            if (symbol == null) throw new ArgumentException(_symbolEmptyErrorMessage);
             // verify the types match
             var requestedType = typeof(T);
-            var config = GetMatchingSubscription(security, requestedType);
+            var config = GetMatchingSubscription(symbol, requestedType);
             if (config == null)
             {
-                var actualType = security.Subscriptions.Select(x => x.Type.Name).DefaultIfEmpty("[None]").FirstOrDefault();
+                var actualType = Securities[symbol].Subscriptions.Select(x => x.Type.Name).DefaultIfEmpty("[None]").FirstOrDefault();
                 throw new ArgumentException("The specified security is not of the requested type. Symbol: " + symbol.ToString() + " Requested Type: " + requestedType.Name + " Actual Type: " + actualType);
             }
 
-            var request = CreateHistoryRequest(security, config, start, end, resolution);
+            var request = CreateHistoryRequest(config, start, end, resolution);
             return History(request).Get<T>(symbol).Memoize();
         }
 
@@ -321,12 +381,12 @@ namespace QuantConnect.Algorithm
         public IEnumerable<TradeBar> History(Symbol symbol, TimeSpan span, Resolution? resolution = null)
         {
             var securityType = symbol.ID.SecurityType;
-            if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd || securityType == SecurityType.Crypto)
+            if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd)
             {
-                Error("Calling this method on a Forex or CFD or crypto security will return an empty result. Please use the generic version with QuoteBar type parameter.");
+                Error("Calling History<TradeBar> method on a Forex or CFD security will return an empty result. Please use the generic version with QuoteBar type parameter.");
             }
 
-            return History(new[] {symbol}, span, resolution).Get(symbol).Memoize();
+            return History(new[] { symbol }, span, resolution).Get(symbol).Memoize();
         }
 
         /// <summary>
@@ -340,12 +400,12 @@ namespace QuantConnect.Algorithm
         public IEnumerable<TradeBar> History(Symbol symbol, DateTime start, DateTime end, Resolution? resolution = null)
         {
             var securityType = symbol.ID.SecurityType;
-            if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd || securityType == SecurityType.Crypto)
+            if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd)
             {
-                Error("Calling this method on a Forex or CFD or cyrpto security will return an empty result. Please use the generic version with QuoteBar type parameter.");
+                Error("Calling History<TradeBar> method on a Forex or CFD security will return an empty result. Please use the generic version with QuoteBar type parameter.");
             }
 
-            return History(new[] {symbol}, start, end, resolution).Get(symbol).Memoize();
+            return History(new[] { symbol }, start, end, resolution).Get(symbol).Memoize();
         }
 
         /// <summary>
@@ -397,12 +457,20 @@ namespace QuantConnect.Algorithm
         /// </summary>
         private DateTime GetStartTimeAlgoTz(Symbol symbol, int periods, Resolution? resolution = null)
         {
-            var security = Securities[symbol];
-            var timeSpan = (resolution ?? security.Resolution).ToTimeSpan();
+            Security security;
+
+            resolution = GetResolution(symbol, resolution);
+            var exchange = GetExchangeHours(symbol);
+            var isExtendedMarketHours = Securities.TryGetValue(symbol, out security)
+                && SubscriptionManager.SubscriptionDataConfigService
+                    .GetSubscriptionDataConfigs(symbol)
+                    .IsExtendedMarketHours();
+
+            var timeSpan = resolution.Value.ToTimeSpan();
             // make this a minimum of one second
             timeSpan = timeSpan < QuantConnect.Time.OneSecond ? QuantConnect.Time.OneSecond : timeSpan;
-            var localStartTime = QuantConnect.Time.GetStartTimeForTradeBars(security.Exchange.Hours, UtcTime.ConvertFromUtc(security.Exchange.TimeZone), timeSpan, periods, security.IsExtendedMarketHours);
-            return localStartTime.ConvertTo(security.Exchange.TimeZone, TimeZone);
+            var localStartTime = QuantConnect.Time.GetStartTimeForTradeBars(exchange, UtcTime.ConvertFromUtc(exchange.TimeZone), timeSpan, periods, isExtendedMarketHours);
+            return localStartTime.ConvertTo(exchange.TimeZone, TimeZone);
         }
 
         /// <summary>
@@ -412,7 +480,7 @@ namespace QuantConnect.Algorithm
         /// <returns>An enumerable of slice satisfying the specified history request</returns>
         public IEnumerable<Slice> History(HistoryRequest request)
         {
-            return History(new[] {request}).Memoize();
+            return History(new[] { request }).Memoize();
         }
 
         /// <summary>
@@ -438,10 +506,14 @@ namespace QuantConnect.Algorithm
                 return null;
             }
 
-            // For speed and memory usage, use Resolution.Minute as the minimum resolution
-            var resolution = (Resolution)Math.Max((int)Resolution.Minute, (int)security.Resolution);
+            var configs = SubscriptionManager.SubscriptionDataConfigService
+                .GetSubscriptionDataConfigs(security.Symbol);
 
-            var startTime = GetStartTimeAlgoTzForSecurity(security, 1, resolution);
+            // For speed and memory usage, use Resolution.Minute as the minimum resolution
+            var resolution = (Resolution)Math.Max((int)Resolution.Minute, (int)configs.GetHighestResolution());
+            var isExtendedMarketHours = configs.IsExtendedMarketHours();
+
+            var startTime = GetStartTimeAlgoTzForSecurity(security.Exchange, 1, resolution, isExtendedMarketHours);
             var endTime   = Time.RoundDown(resolution.ToTimeSpan());
 
             // request QuoteBar for Options and Futures
@@ -452,7 +524,7 @@ namespace QuantConnect.Algorithm
             }
 
             // Get the config with the largest resolution
-            var subscriptionDataConfig = GetMatchingSubscription(security, dataType);
+            var subscriptionDataConfig = GetMatchingSubscription(security.Symbol, dataType);
 
             // if subscription resolution is Tick, we also need to update the data type from Tick to TradeBar/QuoteBar
             if (subscriptionDataConfig != null && subscriptionDataConfig.Resolution == Resolution.Tick)
@@ -470,9 +542,9 @@ namespace QuantConnect.Algorithm
                 security.Exchange.Hours,
                 MarketHoursDatabase.FromDataFolder().GetDataTimeZone(security.Symbol.ID.Market, security.Symbol, security.Symbol.SecurityType),
                 resolution,
-                security.IsExtendedMarketHours,
-                security.IsCustomData(),
-                security.DataNormalizationMode,
+                isExtendedMarketHours,
+                configs.IsCustomData(),
+                configs.DataNormalizationMode(),
                 subscriptionDataConfig == null ? LeanData.GetCommonTickTypeForCommonDataTypes(typeof(TradeBar), security.Type) : subscriptionDataConfig.TickType
             );
 
@@ -490,21 +562,30 @@ namespace QuantConnect.Algorithm
         /// Gets the start time required for the specified bar count for a security in terms of the algorithm's time zone
         /// Used when the security has not yet been subscribed to
         /// </summary>
-        private DateTime GetStartTimeAlgoTzForSecurity(Security security, int periods, Resolution? resolution = null)
+        private DateTime GetStartTimeAlgoTzForSecurity(SecurityExchange securityExchange,
+            int periods,
+            Resolution resolution,
+            bool isExtendedMarketHours)
         {
-            var timeSpan = (resolution ?? security.Resolution).ToTimeSpan();
+            var timeSpan = resolution.ToTimeSpan();
 
             // make this a minimum of one second
             timeSpan = timeSpan < QuantConnect.Time.OneSecond ? QuantConnect.Time.OneSecond : timeSpan;
 
-            var localStartTime = QuantConnect.Time.GetStartTimeForTradeBars(security.Exchange.Hours, UtcTime.ConvertFromUtc(security.Exchange.TimeZone), timeSpan, periods, security.IsExtendedMarketHours);
-            return localStartTime.ConvertTo(security.Exchange.TimeZone, TimeZone);
+            var localStartTime = QuantConnect.Time.GetStartTimeForTradeBars(
+                securityExchange.Hours,
+                UtcTime.ConvertFromUtc(securityExchange.TimeZone),
+                timeSpan,
+                periods,
+                isExtendedMarketHours);
+            return localStartTime.ConvertTo(securityExchange.TimeZone, TimeZone);
         }
 
         private IEnumerable<Slice> History(IEnumerable<HistoryRequest> requests, DateTimeZone timeZone)
         {
             var sentMessage = false;
-            var reqs = requests.ToList();
+            // filter out any universe securities that may have made it this far
+            var reqs = requests.Where(hr => !UniverseManager.ContainsKey(hr.Symbol)) .ToList();
             foreach (var request in reqs)
             {
                 // prevent future requests
@@ -524,7 +605,7 @@ namespace QuantConnect.Algorithm
             }
 
             // filter out future data to prevent look ahead bias
-            return ((IAlgorithm) this).HistoryProvider.GetHistory(reqs, timeZone);
+            return ((IAlgorithm)this).HistoryProvider.GetHistory(reqs, timeZone);
         }
 
         /// <summary>
@@ -536,13 +617,12 @@ namespace QuantConnect.Algorithm
             {
                 var requests = new List<HistoryRequest>();
 
-                var security = Securities[x];
-                foreach (var config in GetMatchingSubscriptions(security, typeof(BaseData)))
+                foreach (var config in GetMatchingSubscriptions(x, typeof(BaseData)))
                 {
-                    var request = CreateHistoryRequest(security, config, startAlgoTz, endAlgoTz, resolution);
+                    var request = CreateHistoryRequest(config, startAlgoTz, endAlgoTz, resolution);
 
                     // apply overrides
-                    Resolution? res = resolution ?? security.Resolution;
+                    var res = GetResolution(x, resolution);
                     if (fillForward.HasValue) request.FillForwardResolution = fillForward.Value ? res : null;
                     if (extendedMarket.HasValue) request.IncludeExtendedMarketHours = extendedMarket.Value;
 
@@ -560,45 +640,82 @@ namespace QuantConnect.Algorithm
         {
             return symbols.Where(x => !x.IsCanonical()).SelectMany(x =>
             {
-                var security = Securities[x];
-                Resolution? res = resolution ?? security.Resolution;
+                var res = GetResolution(x, resolution);
                 var start = GetStartTimeAlgoTz(x, periods, res);
                 var end = Time.RoundDown(res.Value.ToTimeSpan());
 
-                return GetMatchingSubscriptions(security, typeof(BaseData))
-                    .Select(config => CreateHistoryRequest(security, config, start, end, resolution));
+                return GetMatchingSubscriptions(x, typeof(BaseData))
+                    .Select(config => CreateHistoryRequest(config, start, end, resolution));
             });
         }
 
-        private HistoryRequest CreateHistoryRequest(Security security, SubscriptionDataConfig subscription, DateTime startAlgoTz, DateTime endAlgoTz, Resolution? resolution)
+        private HistoryRequest CreateHistoryRequest(SubscriptionDataConfig subscription, DateTime startAlgoTz, DateTime endAlgoTz, Resolution? resolution)
         {
-            resolution = resolution ?? security.Resolution;
+            resolution = resolution ?? subscription.Resolution;
 
             // find the correct data type for the history request
             var dataType = subscription.IsCustomData ? subscription.Type : LeanData.GetDataType(resolution.Value, subscription.TickType);
 
-            var request = new HistoryRequest(subscription, security.Exchange.Hours, startAlgoTz.ConvertToUtc(TimeZone), endAlgoTz.ConvertToUtc(TimeZone))
+            var request = new HistoryRequest(subscription, GetExchangeHours(subscription.Symbol), startAlgoTz.ConvertToUtc(TimeZone), endAlgoTz.ConvertToUtc(TimeZone))
             {
                 DataType = dataType,
                 Resolution = resolution.Value,
-                FillForwardResolution = subscription.FillDataForward ? resolution : null
+                FillForwardResolution = subscription.FillDataForward ? resolution : null,
+                TickType = subscription.TickType
             };
 
             return request;
         }
 
-        private static SubscriptionDataConfig GetMatchingSubscription(Security security, Type type)
+        private SubscriptionDataConfig GetMatchingSubscription(Symbol symbol, Type type)
         {
             // find the first subscription matching the requested type with a higher resolution than requested
-            return GetMatchingSubscriptions(security, type).FirstOrDefault();
+            return GetMatchingSubscriptions(symbol, type).FirstOrDefault();
         }
 
-        private static IEnumerable<SubscriptionDataConfig> GetMatchingSubscriptions(Security security, Type type)
+        private IEnumerable<SubscriptionDataConfig> GetMatchingSubscriptions(Symbol symbol, Type type)
         {
-            // find all subscriptions matching the requested type with a higher resolution than requested
-            return from sub in security.Subscriptions.OrderByDescending(s => s.Resolution)
-                where type.IsAssignableFrom(sub.Type)
-                select sub;
+            Security security;
+            if (Securities.TryGetValue(symbol, out security))
+            {
+                // find all subscriptions matching the requested type with a higher resolution than requested
+                return from sub in security.Subscriptions.OrderByDescending(s => s.Resolution)
+                       where type.IsAssignableFrom(sub.Type)
+                       select sub;
+            }
+            else
+            {
+                var resolution = UniverseSettings.Resolution;
+                var timeZone = GetExchangeHours(symbol).TimeZone;
+                var subscriptionDataTypes = SubscriptionManager.LookupSubscriptionConfigDataTypes(symbol.SecurityType, resolution, symbol.IsCanonical());
+                return subscriptionDataTypes.Select(x => new SubscriptionDataConfig(x.Item1, symbol, resolution, timeZone, timeZone, UniverseSettings.FillForward, UniverseSettings.ExtendedMarketHours, false, false, x.Item2));
+            }
+        }
+
+        private SecurityExchangeHours GetExchangeHours(Symbol symbol)
+        {
+            Security security;
+            if (Securities.TryGetValue(symbol, out security))
+            {
+                return security.Exchange.Hours;
+            }
+
+            return MarketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType).ExchangeHours;
+        }
+
+        private Resolution? GetResolution(Symbol symbol, Resolution? resolution)
+        {
+            Security security;
+            if (Securities.TryGetValue(symbol, out security))
+            {
+                return resolution ?? SubscriptionManager.SubscriptionDataConfigService
+                    .GetSubscriptionDataConfigs(symbol)
+                    .GetHighestResolution();
+            }
+            else
+            {
+                return resolution ?? UniverseSettings.Resolution;
+            }
         }
     }
 }

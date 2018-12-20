@@ -13,7 +13,6 @@
 
 from clr import AddReference
 AddReference("System.Core")
-AddReference("System.Collections")
 AddReference("QuantConnect.Common")
 AddReference("QuantConnect.Algorithm")
 
@@ -45,6 +44,7 @@ class CustomDataRegressionAlgorithm(QCAlgorithm):
 
         resolution = Resolution.Second if self.LiveMode else Resolution.Daily
         self.AddData(Bitcoin, "BTC", resolution)
+        self.SetWarmup(1)
 
     def OnData(self, data):
         if not self.Portfolio.Invested:
@@ -57,11 +57,11 @@ class Bitcoin(PythonData):
 
     def GetSource(self, config, date, isLiveMode):
         if isLiveMode:
-            return SubscriptionDataSource("https://www.bitstamp.net/api/ticker/", SubscriptionTransportMedium.Rest);
+            return SubscriptionDataSource("https://www.bitstamp.net/api/ticker/", SubscriptionTransportMedium.Rest)
 
-        #return "http://my-ftp-server.com/futures-data-" + date.ToString("Ymd") + ".zip";
+        #return "http://my-ftp-server.com/futures-data-" + date.ToString("Ymd") + ".zip"
         # OR simply return a fixed small data file. Large files will slow down your backtest
-        return SubscriptionDataSource("http://www.quandl.com/api/v1/datasets/BCHARTS/BITSTAMPUSD.csv?sort_order=asc", SubscriptionTransportMedium.RemoteFile);
+        return SubscriptionDataSource("https://www.quantconnect.com/api/v2/proxy/quandl/api/v3/datasets/BCHARTS/BITSTAMPUSD.csv?order=asc&api_key=WyAazVXnq7ATy_fefTqm", SubscriptionTransportMedium.RemoteFile)
 
 
     def Reader(self, config, line, date, isLiveMode):
@@ -100,13 +100,8 @@ class Bitcoin(PythonData):
 
         try:
             data = line.split(',')
-
-            # If value is zero, return None
-            value = decimal.Decimal(data[4])
-            if value == 0: return None
-
             coin.Time = datetime.strptime(data[0], "%Y-%m-%d")
-            coin.Value = value
+            coin.Value = float(data[4])
             coin["Open"] = float(data[1])
             coin["High"] = float(data[2])
             coin["Low"] = float(data[3])
@@ -114,7 +109,7 @@ class Bitcoin(PythonData):
             coin["VolumeBTC"] = float(data[5])
             coin["VolumeUSD"] = float(data[6])
             coin["WeightedPrice"] = float(data[7])
-            return coin;
+            return coin
 
         except ValueError:
             # Do nothing, possible error in json decoding

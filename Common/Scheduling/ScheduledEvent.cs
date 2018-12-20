@@ -38,8 +38,6 @@ namespace QuantConnect.Scheduling
 
         private bool _needsMoveNext;
         private bool _endOfScheduledEvents;
-
-        private readonly string _name;
         private readonly Action<string, DateTime> _callback;
         private readonly IEnumerator<DateTime> _orderedEventUtcTimes;
 
@@ -75,10 +73,7 @@ namespace QuantConnect.Scheduling
         /// <summary>
         /// Gets an identifier for this event
         /// </summary>
-        public string Name
-        {
-            get { return _name; }
-        }
+        public string Name { get; }
 
         /// <summary>
         /// Initalizes a new instance of the <see cref="ScheduledEvent"/> class
@@ -110,7 +105,7 @@ namespace QuantConnect.Scheduling
         /// <param name="callback">Delegate to be called each time an event passes</param>
         public ScheduledEvent(string name, IEnumerator<DateTime> orderedEventUtcTimes, Action<string, DateTime> callback = null)
         {
-            _name = name;
+            Name = name;
             _callback = callback;
             _orderedEventUtcTimes = orderedEventUtcTimes;
 
@@ -118,6 +113,23 @@ namespace QuantConnect.Scheduling
             _endOfScheduledEvents = !_orderedEventUtcTimes.MoveNext();
 
             Enabled = true;
+        }
+
+        /// <summary>Serves as the default hash function. </summary>
+        /// <returns>A hash code for the current object.</returns>
+        /// <filterpriority>2</filterpriority>
+        public override int GetHashCode()
+        {
+            return Name.GetHashCode();
+        }
+
+        /// <summary>Determines whether the specified object is equal to the current object.</summary>
+        /// <returns>true if the specified object  is equal to the current object; otherwise, false.</returns>
+        /// <param name="obj">The object to compare with the current object. </param>
+        /// <filterpriority>2</filterpriority>
+        public override bool Equals(object obj)
+        {
+            return !ReferenceEquals(null, obj) && ReferenceEquals(this, obj);
         }
 
         /// <summary>
@@ -214,6 +226,14 @@ namespace QuantConnect.Scheduling
         }
 
         /// <summary>
+        /// Will return the ScheduledEvents name
+        /// </summary>
+        public override string ToString()
+        {
+            return $"{Name}";
+        }
+
+        /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
         /// <filterpriority>2</filterpriority>
@@ -235,10 +255,10 @@ namespace QuantConnect.Scheduling
 
                 if (_callback != null)
                 {
-                    _callback(_name, _orderedEventUtcTimes.Current);
+                    _callback(Name, _orderedEventUtcTimes.Current);
                 }
                 var handler = EventFired;
-                if (handler != null) handler(_name, triggerTime);
+                if (handler != null) handler(Name, triggerTime);
             }
             catch (Exception ex)
             {
@@ -246,7 +266,7 @@ namespace QuantConnect.Scheduling
 
                 // This scheduled event failed, so don't repeat the same event
                 _needsMoveNext = true;
-                throw new ScheduledEventException(ex.ToString());
+                throw new ScheduledEventException(Name, ex.Message, ex);
             }
         }
     }
@@ -257,17 +277,19 @@ namespace QuantConnect.Scheduling
     public class ScheduledEventException : Exception
     {
         /// <summary>
-        /// Exception message
+        /// Gets the name of the scheduled event
         /// </summary>
-        public string ScheduledEventExceptionMessage { get; }
+        public string ScheduledEventName { get; }
 
         /// <summary>
         /// ScheduledEventException constructor
         /// </summary>
-        /// <param name="exceptionMessage">The exception as a string</param>
-        public ScheduledEventException(string exceptionMessage) : base(exceptionMessage)
+        /// <param name="name">The name of the scheduled event</param>
+        /// <param name="message">The exception as a string</param>
+        /// <param name="innerException">The exception that is the cause of the current exception</param>
+        public ScheduledEventException(string name, string message, Exception innerException) : base(message, innerException)
         {
-            ScheduledEventExceptionMessage = exceptionMessage;
+            ScheduledEventName = name;
         }
     }
 }

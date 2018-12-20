@@ -1,37 +1,31 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
-using QuantConnect.Data;
-using QuantConnect.Interfaces;
-using QuantConnect.Securities;
+
 using RestSharp;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace QuantConnect.Brokerages.GDAX
 {
-
     /// <summary>
     /// Utility methods for GDAX brokerage
     /// </summary>
-    public partial class GDAXBrokerage : BaseWebsocketsBrokerage, IDataQueueHandler
+    public partial class GDAXBrokerage
     {
-
         /// <summary>
         /// Sign Header
         /// </summary>
@@ -133,7 +127,7 @@ namespace QuantConnect.Brokerages.GDAX
         /// <returns>gdax product id</returns>
         protected static string ConvertSymbol(Symbol symbol)
         {
-            return symbol.Value.Substring(0, 3).ToLower() + "-" + symbol.Value.Substring(3, 3).ToLower();
+            return symbol.Value.Substring(0, 3).ToUpper() + "-" + symbol.Value.Substring(3, 3).ToUpper();
         }
 
         private static Orders.OrderStatus ConvertOrderStatus(Messages.Order order)
@@ -141,7 +135,7 @@ namespace QuantConnect.Brokerages.GDAX
             if (order.FilledSize != 0 && order.FilledSize != order.Size)
             {
                 return Orders.OrderStatus.PartiallyFilled;
-            }       
+            }
             else if (order.Status == Open || order.Status == Pending || order.Status == Active)
             {
                 return Orders.OrderStatus.Submitted;
@@ -154,5 +148,29 @@ namespace QuantConnect.Brokerages.GDAX
             return Orders.OrderStatus.None;
         }
 
+        private IRestResponse ExecuteRestRequest(IRestRequest request, GdaxEndpointType endpointType)
+        {
+            const int maxAttempts = 10;
+            var attempts = 0;
+            IRestResponse response;
+
+            do
+            {
+                var rateLimiter = endpointType == GdaxEndpointType.Private ? _privateEndpointRateLimiter : _publicEndpointRateLimiter;
+
+                if (!rateLimiter.WaitToProceed(TimeSpan.Zero))
+                {
+                    OnMessage(new BrokerageMessageEvent(BrokerageMessageType.Warning, "RateLimit",
+                        "The API request has been rate limited. To avoid this message, please reduce the frequency of API calls."));
+
+                    rateLimiter.WaitToProceed();
+                }
+
+                response = RestClient.Execute(request);
+                // 429 status code: Too Many Requests
+            } while (++attempts < maxAttempts && (int) response.StatusCode == 429);
+
+            return response;
+        }
     }
 }

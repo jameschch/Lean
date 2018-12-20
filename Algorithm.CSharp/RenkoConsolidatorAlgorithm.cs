@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -13,7 +13,8 @@
  * limitations under the License.
 */
 
-using System;
+using QuantConnect.Interfaces;
+using System.Collections.Generic;
 using QuantConnect.Data.Consolidators;
 using QuantConnect.Data.Market;
 
@@ -26,7 +27,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="indicators" />
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="consolidating data" />
-    public class RenkoConsolidatorAlgorithm : QCAlgorithm
+    public class RenkoConsolidatorAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         /// <summary>
         /// Initializes the algorithm state.
@@ -36,7 +37,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2012, 01, 01);
             SetEndDate(2013, 01, 01);
 
-            AddSecurity(SecurityType.Equity, "SPY");
+            AddEquity("SPY", Resolution.Daily);
 
             // this is the simple constructor that will perform the renko logic to the Value
             // property of the data it receives.
@@ -84,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 SetHoldings(data.Symbol, 1.0);
             }
-            Console.WriteLine("CLOSE - {0} - {1} {2}", data.Time.ToString("o"), data.Open, data.Close);
+            Log($"CLOSE - {data.Time.ToString("o")} - {data.Open} {data.Close}");
         }
 
         /// <summary>
@@ -93,7 +94,47 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">The new renko bar produced by the consolidator</param>
         public void HandleRenko7Bar(RenkoBar data)
         {
-            Console.WriteLine("7BAR  - {0} - {1} {2}", data.Time.ToString("o"), data.Open, data.Close);
+            if (Portfolio.Invested)
+            {
+                Liquidate(data.Symbol);
+            }
+            Log($"7BAR - {data.Time.ToString("o")} - {data.Open} {data.Close}");
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "29"},
+            {"Average Win", "1.14%"},
+            {"Average Loss", "-1.76%"},
+            {"Compounding Annual Return", "-2.010%"},
+            {"Drawdown", "11.000%"},
+            {"Expectancy", "-0.058"},
+            {"Net Profit", "-2.015%"},
+            {"Sharpe Ratio", "-0.161"},
+            {"Loss Rate", "43%"},
+            {"Win Rate", "57%"},
+            {"Profit-Loss Ratio", "0.65"},
+            {"Alpha", "-0.179"},
+            {"Beta", "8.103"},
+            {"Annual Standard Deviation", "0.098"},
+            {"Annual Variance", "0.01"},
+            {"Information Ratio", "-0.368"},
+            {"Tracking Error", "0.097"},
+            {"Treynor Ratio", "-0.002"},
+            {"Total Fees", "$117.47"}
+        };
     }
 }

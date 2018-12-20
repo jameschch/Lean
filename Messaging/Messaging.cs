@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,11 +14,15 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using QuantConnect.Configuration;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Notifications;
 using QuantConnect.Packets;
+using QuantConnect.Util;
 
 namespace QuantConnect.Messaging
 {
@@ -29,6 +33,7 @@ namespace QuantConnect.Messaging
     {
         // used to aid in generating regression tests via Cosole.WriteLine(...)
         private static readonly TextWriter Console = System.Console.Out;
+        private static readonly bool UpdateRegressionStatistics = Config.GetBool("regression-update-statistics", false);
 
         private AlgorithmNodePacket _job;
 
@@ -38,7 +43,7 @@ namespace QuantConnect.Messaging
         /// </summary>
         public bool HasSubscribers
         {
-            get; 
+            get;
             set;
         }
 
@@ -92,25 +97,34 @@ namespace QuantConnect.Messaging
                     Log.Error(handled.Message + hstack);
                     break;
 
+                case PacketType.AlphaResult:
+                    // spams the logs
+                    //var insights = ((AlphaResultPacket) packet).Insights;
+                    //foreach (var insight in insights)
+                    //{
+                    //    Log.Trace("Insight: " + insight);
+                    //}
+                    break;
+
                 case PacketType.BacktestResult:
                     var result = (BacktestResultPacket) packet;
 
                     if (result.Progress == 1)
                     {
-                        // uncomment these code traces to help write regression tests
-                        //Console.WriteLine("new Dictionary<string, string>");
-                        //Console.WriteLine("\t\t\t{");
+                        // inject alpha statistics into backtesting result statistics
+                        // this is primarily so we can easily regression test these values
+                        var alphaStatistics = result.Results.AlphaRuntimeStatistics?.ToDictionary().ToList() ?? new List<KeyValuePair<string, string>>();
+                        alphaStatistics.ForEach(kvp => result.Results.Statistics.Add(kvp));
+
+                        if (UpdateRegressionStatistics && _job.Language == Language.CSharp)
+                        {
+                            UpdateRegressionStatisticsInSourceFile(result);
+                        }
+
                         foreach (var pair in result.Results.Statistics)
                         {
-                            Log.Trace("STATISTICS:: " + pair.Key + " " + pair.Value);
-                            //Console.WriteLine("\t\t\t\t{{\"{0}\",\"{1}\"}},", pair.Key, pair.Value);
+                            Log.Trace($"STATISTICS:: {pair.Key} {pair.Value}");
                         }
-                        //Console.WriteLine("\t\t\t};");
-
-                        //foreach (var pair in statisticsResults.RollingPerformances)
-                        //{
-                        //    Log.Trace("ROLLINGSTATS:: " + pair.Key + " SharpeRatio: " + Math.Round(pair.Value.PortfolioStatistics.SharpeRatio, 3));
-                        //}
                     }
                     break;
             }
@@ -136,6 +150,70 @@ namespace QuantConnect.Messaging
                 return;
             }
             notification.Send();
+        }
+
+        private void UpdateRegressionStatisticsInSourceFile(BacktestResultPacket result)
+        {
+            if (!result.Results.Statistics.Any())
+            {
+                Log.Error("Messaging.UpdateRegressionStatisticsInSourceFile(): No statistics generated. Skipping update.");
+                return;
+            }
+
+            var algorithmSource = $"../../../Algorithm.CSharp/{_job.AlgorithmId}.cs";
+            var file = File.ReadAllLines(algorithmSource).ToList().GetEnumerator();
+            var lines = new List<string>();
+            var insideStats = false;
+            while (file.MoveNext())
+            {
+                var line = file.Current;
+                if (line == null)
+                {
+                    continue;
+                }
+
+                if (line.Contains("public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>"))
+                {
+                    insideStats = true;
+                    lines.Add(line);
+                    lines.Add("        {");
+                }
+
+                if (!insideStats)
+                {
+                    lines.Add(line);
+                }
+                else
+                {
+                    insideStats = false;
+                    foreach (var pair in result.Results.Statistics)
+                    {
+                        lines.Add($"            {{\"{pair.Key}\", \"{pair.Value}\"}},");
+                    }
+
+                    // remove trailing comma
+                    var lastLine = lines[lines.Count - 1];
+                    lines[lines.Count - 1] = lastLine.Substring(0, lastLine.Length - 1);
+
+                    while (file.MoveNext())
+                    {
+                        line = file.Current;
+                        if (line == null)
+                        {
+                            continue;
+                        }
+
+                        if (line.Contains("};"))
+                        {
+                            lines.Add(line);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            file.DisposeSafely();
+            File.WriteAllLines(algorithmSource, lines);
         }
     }
 }

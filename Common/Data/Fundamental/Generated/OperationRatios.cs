@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ namespace QuantConnect.Data.Fundamental
 	/// <summary>
 	/// Definition of the OperationRatios class
 	/// </summary>
-	public class OperationRatios : BaseData
+	public class OperationRatios
 	{
 		/// <summary>
 		/// The growth in the company's revenue on a percentage basis. Morningstar calculates the growth percentage based on the
@@ -63,7 +63,10 @@ namespace QuantConnect.Data.Fundamental
 		public NetIncomeGrowth NetIncomeGrowth { get; set; }
 
 		/// <summary>
-		/// The growth in the company's net income from continuing operati
+		/// The growth in the company's net income from continuing operations on a percentage basis. Morningstar calculates the growth
+		/// percentage based on the underlying net income from continuing operations data reported in the Income Statement within the
+		/// company filings or reports. This figure represents the rate of net income growth for parts of the business that will continue to
+		/// generate revenue in the future.
 		/// </summary>
 		/// <remarks>
 		/// Morningstar DataId: 10004
@@ -145,7 +148,7 @@ namespace QuantConnect.Data.Fundamental
 		/// <summary>
 		/// Refers to the ratio of tax provision to pretax income. Morningstar calculates the ratio by using the underlying data reported in the
 		/// company filings or reports:   Tax Provision / Pretax Income.
-		/// [Note: Valid only when positive pretax income, and  positive tax expense (not tax benefit)]
+		/// [Note: Valid only when positive pretax income, and positive tax expense (not tax benefit)]
 		/// </summary>
 		/// <remarks>
 		/// Morningstar DataId: 11005
@@ -195,7 +198,7 @@ namespace QuantConnect.Data.Fundamental
 
 		/// <summary>
 		/// Refers to the ratio of liquid assets to Current Liabilities. Morningstar calculates the ratio by using the underlying data reported in the
-		/// Balance Sheet within the company filings or reports:    ( Cash, Cash Equivalents, and ShortTerm Investments + Receivables ) /
+		/// Balance Sheet within the company filings or reports:(Cash, Cash Equivalents, and Short Term Investments + Receivables ) /
 		/// Current Liabilities.
 		/// </summary>
 		/// <remarks>
@@ -248,10 +251,9 @@ namespace QuantConnect.Data.Fundamental
 		public FinancialLeverage FinancialLeverage { get; set; }
 
 		/// <summary>
-		/// Refers to the ratio of Current Debt and Long Term Debt to Common Equity. Morningstar calculates the ratio by using the underlying
-		/// data reported in the Balance Sheet within the company filings or reports:    (Current Debt And Current Capital Lease Obligation +
-		/// Long-Term Debt And Long-Term Capital Lease Obligation / Common Equity.   [Note: Common Equity = Total Shareholder's Equity -
-		/// Preferred Stock]
+		/// Refers to the ratio of Total Debt to Common Equity. Morningstar calculates the ratio by using the underlying data reported in the
+		/// Balance Sheet within the company filings or reports: (Current Debt And Current Capital Lease Obligation + Long-Term Debt And
+		/// Long-Term Capital Lease Obligation / Common Equity.   [Note: Common Equity = Total Shareholder's Equity - Preferred Stock]
 		/// </summary>
 		/// <remarks>
 		/// Morningstar DataId: 11015
@@ -533,6 +535,199 @@ namespace QuantConnect.Data.Fundamental
 		public RegressionGrowthOperatingRevenue5Years RegressionGrowthOperatingRevenue5Years { get; set; }
 
 		/// <summary>
+		/// Indicates a company's short-term liquidity, defined as short term liquid investments (cash, cash equivalents, short term
+		/// investments) divided by current liabilities.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12029
+		/// </remarks>
+		[JsonProperty("12029")]
+		public CashRatio CashRatio { get; set; }
+
+		/// <summary>
+		/// Represents the percentage of a company's total assets is in cash.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12030
+		/// </remarks>
+		[JsonProperty("12030")]
+		public CashtoTotalAssets CashtoTotalAssets { get; set; }
+
+		/// <summary>
+		/// Measures the amount a company is investing in its business relative to EBITDA generated in a given period.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12031
+		/// </remarks>
+		[JsonProperty("12031")]
+		public CapitalExpendituretoEBITDA CapitalExpendituretoEBITDA { get; set; }
+
+		/// <summary>
+		/// Indicates the percentage of a company's operating cash flow is free to be invested in its business after capital expenditures.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12032
+		/// </remarks>
+		[JsonProperty("12032")]
+		public FCFtoCFO FCFtoCFO { get; set; }
+
+		/// <summary>
+		/// The growth in the stockholder's equity on a percentage basis. Morningstar calculates the growth percentage based on the residual
+		/// interest in the assets of the enterprise that remains after deducting its liabilities reported in the Balance Sheet within the company
+		/// filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12033
+		/// </remarks>
+		[JsonProperty("12033")]
+		public StockholdersEquityGrowth StockholdersEquityGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the total assets on a percentage basis. Morningstar calculates the growth percentage based on the total assets
+		/// reported in the Balance Sheet within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12034
+		/// </remarks>
+		[JsonProperty("12034")]
+		public TotalAssetsGrowth TotalAssetsGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the total liabilities on a percentage basis. Morningstar calculates the growth percentage based on the total liabilities
+		/// reported in the Balance Sheet within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12035
+		/// </remarks>
+		[JsonProperty("12035")]
+		public TotalLiabilitiesGrowth TotalLiabilitiesGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's total debt to equity ratio on a percentage basis. Morningstar calculates the growth percentage based
+		/// on the total debt divided by the shareholder's equity reported in the Balance Sheet within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12036
+		/// </remarks>
+		[JsonProperty("12036")]
+		public TotalDebtEquityRatioGrowth TotalDebtEquityRatioGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's cash ratio on a percentage basis. Morningstar calculates the growth percentage based on the short
+		/// term liquid investments (cash, cash equivalents, short term investments) divided by current liabilities reported in the Balance Sheet
+		/// within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12037
+		/// </remarks>
+		[JsonProperty("12037")]
+		public CashRatioGrowth CashRatioGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's EBITDA on a percentage basis. Morningstar calculates the growth percentage based on the earnings
+		/// minus expenses (excluding interest, tax, depreciation, and amortization expenses) reported in the Financial Statements within the
+		/// company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12038
+		/// </remarks>
+		[JsonProperty("12038")]
+		public EBITDAGrowth EBITDAGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's cash flows from financing on a percentage basis. Morningstar calculates the growth percentage
+		/// based on the financing cash flows reported in the Cash Flow Statement within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12039
+		/// </remarks>
+		[JsonProperty("12039")]
+		public CashFlowfromFinancingGrowth CashFlowfromFinancingGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's cash flows from investing on a percentage basis. Morningstar calculates the growth percentage
+		/// based on the cash flows from investing reported in the Cash Flow Statement within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12040
+		/// </remarks>
+		[JsonProperty("12040")]
+		public CashFlowfromInvestingGrowth CashFlowfromInvestingGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's capital expenditures on a percentage basis. Morningstar calculates the growth percentage based on
+		/// the capital expenditures reported in the Cash Flow Statement within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12041
+		/// </remarks>
+		[JsonProperty("12041")]
+		public CapExGrowth CapExGrowth { get; set; }
+
+		/// <summary>
+		/// The growth in the company's current ratio on a percentage basis. Morningstar calculates the growth percentage based on the
+		/// current assets divided by current liabilities reported in the Balance Sheet within the company filings or reports.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12042
+		/// </remarks>
+		[JsonProperty("12042")]
+		public CurrentRatioGrowth CurrentRatioGrowth { get; set; }
+
+		/// <summary>
+		/// Total revenue / working capital (current assets minus current liabilities)
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12043
+		/// </remarks>
+		[JsonProperty("12043")]
+		public WorkingCapitalTurnoverRatio WorkingCapitalTurnoverRatio { get; set; }
+
+		/// <summary>
+		/// Refers to the ratio of Net Income to Employees. Morningstar calculates the ratio by using the underlying data reported in the
+		/// company filings or reports:     Net Income / Employee Number.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12044
+		/// </remarks>
+		[JsonProperty("12044")]
+		public NetIncomePerEmployee NetIncomePerEmployee { get; set; }
+
+		/// <summary>
+		/// Measure of whether a company's cash flow is sufficient to meet its short-term and long-term debt requirements. The lower this
+		/// ratio is, the greater the probability that the company will be in financial distress. Net Income + Depreciation, Depletion and
+		/// Amortization/ average of annual Total Liabilities over the most recent two periods.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12045
+		/// </remarks>
+		[JsonProperty("12045")]
+		public SolvencyRatio SolvencyRatio { get; set; }
+
+		/// <summary>
+		/// A measure of operating performance for Insurance companies, as it shows the relationship between the premiums earned and
+		/// administrative expenses related to claims such as fees and commissions. A number of 1 or lower is preferred, as this means the
+		/// premiums exceed the expenses. Calculated as: (Deferred Policy Acquisition Amortization Expense+Fees and Commission
+		/// Expense+Other Underwriting Expenses+Selling, General and Administrative) / Net Premiums Earned
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12046
+		/// </remarks>
+		[JsonProperty("12046")]
+		public ExpenseRatio ExpenseRatio { get; set; }
+
+		/// <summary>
+		/// A measure of operating performance for Insurance companies, as it shows the relationship between the premiums earned and the
+		/// expenses related to claims. A number of 1 or lower is preferred, as this means the premiums exceed the expenses. Calculated as:
+		/// Benefits, Claims and Loss Adjustment Expense, Net / Net Premiums Earned
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 12047
+		/// </remarks>
+		[JsonProperty("12047")]
+		public LossRatio LossRatio { get; set; }
+
+		/// <summary>
 		/// Creates an instance of the OperationRatios class
 		/// </summary>
 		public OperationRatios()
@@ -588,68 +783,106 @@ namespace QuantConnect.Data.Fundamental
 			AVG5YrsROIC = new AVG5YrsROIC();
 			NormalizedROIC = new NormalizedROIC();
 			RegressionGrowthOperatingRevenue5Years = new RegressionGrowthOperatingRevenue5Years();
+			CashRatio = new CashRatio();
+			CashtoTotalAssets = new CashtoTotalAssets();
+			CapitalExpendituretoEBITDA = new CapitalExpendituretoEBITDA();
+			FCFtoCFO = new FCFtoCFO();
+			StockholdersEquityGrowth = new StockholdersEquityGrowth();
+			TotalAssetsGrowth = new TotalAssetsGrowth();
+			TotalLiabilitiesGrowth = new TotalLiabilitiesGrowth();
+			TotalDebtEquityRatioGrowth = new TotalDebtEquityRatioGrowth();
+			CashRatioGrowth = new CashRatioGrowth();
+			EBITDAGrowth = new EBITDAGrowth();
+			CashFlowfromFinancingGrowth = new CashFlowfromFinancingGrowth();
+			CashFlowfromInvestingGrowth = new CashFlowfromInvestingGrowth();
+			CapExGrowth = new CapExGrowth();
+			CurrentRatioGrowth = new CurrentRatioGrowth();
+			WorkingCapitalTurnoverRatio = new WorkingCapitalTurnoverRatio();
+			NetIncomePerEmployee = new NetIncomePerEmployee();
+			SolvencyRatio = new SolvencyRatio();
+			ExpenseRatio = new ExpenseRatio();
+			LossRatio = new LossRatio();
 		}
 
 		/// <summary>
-		/// Sets values for non existing periods from a previous instance
+		/// Applies updated values from <paramref name="update"/> to this instance
 		/// </summary>
-		/// <remarks>Used to fill-forward values from previous dates</remarks>
-		/// <param name="previous">The previous instance</param>
-		public void UpdateValues(OperationRatios previous)
+		/// <remarks>Used to apply data updates to the current instance. This WILL overwrite existing values. Default update values are ignored.</remarks>
+		/// <param name="update">The next data update for this instance</param>
+		public void UpdateValues(OperationRatios update)
 		{
-			if (previous == null) return;
+			if (update == null) return;
 
-			if (RevenueGrowth != null) RevenueGrowth.UpdateValues(previous.RevenueGrowth);
-			if (OperationIncomeGrowth != null) OperationIncomeGrowth.UpdateValues(previous.OperationIncomeGrowth);
-			if (NetIncomeGrowth != null) NetIncomeGrowth.UpdateValues(previous.NetIncomeGrowth);
-			if (NetIncomeContOpsGrowth != null) NetIncomeContOpsGrowth.UpdateValues(previous.NetIncomeContOpsGrowth);
-			if (CFOGrowth != null) CFOGrowth.UpdateValues(previous.CFOGrowth);
-			if (FCFGrowth != null) FCFGrowth.UpdateValues(previous.FCFGrowth);
-			if (OperationRevenueGrowth3MonthAvg != null) OperationRevenueGrowth3MonthAvg.UpdateValues(previous.OperationRevenueGrowth3MonthAvg);
-			if (GrossMargin != null) GrossMargin.UpdateValues(previous.GrossMargin);
-			if (OperationMargin != null) OperationMargin.UpdateValues(previous.OperationMargin);
-			if (PretaxMargin != null) PretaxMargin.UpdateValues(previous.PretaxMargin);
-			if (NetMargin != null) NetMargin.UpdateValues(previous.NetMargin);
-			if (TaxRate != null) TaxRate.UpdateValues(previous.TaxRate);
-			if (EBITMargin != null) EBITMargin.UpdateValues(previous.EBITMargin);
-			if (EBITDAMargin != null) EBITDAMargin.UpdateValues(previous.EBITDAMargin);
-			if (SalesPerEmployee != null) SalesPerEmployee.UpdateValues(previous.SalesPerEmployee);
-			if (CurrentRatio != null) CurrentRatio.UpdateValues(previous.CurrentRatio);
-			if (QuickRatio != null) QuickRatio.UpdateValues(previous.QuickRatio);
-			if (LongTermDebtTotalCapitalRatio != null) LongTermDebtTotalCapitalRatio.UpdateValues(previous.LongTermDebtTotalCapitalRatio);
-			if (InterestCoverage != null) InterestCoverage.UpdateValues(previous.InterestCoverage);
-			if (LongTermDebtEquityRatio != null) LongTermDebtEquityRatio.UpdateValues(previous.LongTermDebtEquityRatio);
-			if (FinancialLeverage != null) FinancialLeverage.UpdateValues(previous.FinancialLeverage);
-			if (TotalDebtEquityRatio != null) TotalDebtEquityRatio.UpdateValues(previous.TotalDebtEquityRatio);
-			if (NormalizedNetProfitMargin != null) NormalizedNetProfitMargin.UpdateValues(previous.NormalizedNetProfitMargin);
-			if (DaysInSales != null) DaysInSales.UpdateValues(previous.DaysInSales);
-			if (DaysInInventory != null) DaysInInventory.UpdateValues(previous.DaysInInventory);
-			if (DaysInPayment != null) DaysInPayment.UpdateValues(previous.DaysInPayment);
-			if (CashConversionCycle != null) CashConversionCycle.UpdateValues(previous.CashConversionCycle);
-			if (ReceivableTurnover != null) ReceivableTurnover.UpdateValues(previous.ReceivableTurnover);
-			if (InventoryTurnover != null) InventoryTurnover.UpdateValues(previous.InventoryTurnover);
-			if (PaymentTurnover != null) PaymentTurnover.UpdateValues(previous.PaymentTurnover);
-			if (FixAssetsTuronver != null) FixAssetsTuronver.UpdateValues(previous.FixAssetsTuronver);
-			if (AssetsTurnover != null) AssetsTurnover.UpdateValues(previous.AssetsTurnover);
-			if (ROE != null) ROE.UpdateValues(previous.ROE);
-			if (ROA != null) ROA.UpdateValues(previous.ROA);
-			if (ROIC != null) ROIC.UpdateValues(previous.ROIC);
-			if (FCFSalesRatio != null) FCFSalesRatio.UpdateValues(previous.FCFSalesRatio);
-			if (FCFNetIncomeRatio != null) FCFNetIncomeRatio.UpdateValues(previous.FCFNetIncomeRatio);
-			if (CapExSalesRatio != null) CapExSalesRatio.UpdateValues(previous.CapExSalesRatio);
-			if (DebttoAssets != null) DebttoAssets.UpdateValues(previous.DebttoAssets);
-			if (CommonEquityToAssets != null) CommonEquityToAssets.UpdateValues(previous.CommonEquityToAssets);
-			if (CapitalExpenditureAnnual5YrGrowth != null) CapitalExpenditureAnnual5YrGrowth.UpdateValues(previous.CapitalExpenditureAnnual5YrGrowth);
-			if (GrossProfitAnnual5YrGrowth != null) GrossProfitAnnual5YrGrowth.UpdateValues(previous.GrossProfitAnnual5YrGrowth);
-			if (GrossMargin5YrAvg != null) GrossMargin5YrAvg.UpdateValues(previous.GrossMargin5YrAvg);
-			if (PostTaxMargin5YrAvg != null) PostTaxMargin5YrAvg.UpdateValues(previous.PostTaxMargin5YrAvg);
-			if (PreTaxMargin5YrAvg != null) PreTaxMargin5YrAvg.UpdateValues(previous.PreTaxMargin5YrAvg);
-			if (ProfitMargin5YrAvg != null) ProfitMargin5YrAvg.UpdateValues(previous.ProfitMargin5YrAvg);
-			if (ROE5YrAvg != null) ROE5YrAvg.UpdateValues(previous.ROE5YrAvg);
-			if (ROA5YrAvg != null) ROA5YrAvg.UpdateValues(previous.ROA5YrAvg);
-			if (AVG5YrsROIC != null) AVG5YrsROIC.UpdateValues(previous.AVG5YrsROIC);
-			if (NormalizedROIC != null) NormalizedROIC.UpdateValues(previous.NormalizedROIC);
-			if (RegressionGrowthOperatingRevenue5Years != null) RegressionGrowthOperatingRevenue5Years.UpdateValues(previous.RegressionGrowthOperatingRevenue5Years);
+			RevenueGrowth?.UpdateValues(update.RevenueGrowth);
+			OperationIncomeGrowth?.UpdateValues(update.OperationIncomeGrowth);
+			NetIncomeGrowth?.UpdateValues(update.NetIncomeGrowth);
+			NetIncomeContOpsGrowth?.UpdateValues(update.NetIncomeContOpsGrowth);
+			CFOGrowth?.UpdateValues(update.CFOGrowth);
+			FCFGrowth?.UpdateValues(update.FCFGrowth);
+			OperationRevenueGrowth3MonthAvg?.UpdateValues(update.OperationRevenueGrowth3MonthAvg);
+			GrossMargin?.UpdateValues(update.GrossMargin);
+			OperationMargin?.UpdateValues(update.OperationMargin);
+			PretaxMargin?.UpdateValues(update.PretaxMargin);
+			NetMargin?.UpdateValues(update.NetMargin);
+			TaxRate?.UpdateValues(update.TaxRate);
+			EBITMargin?.UpdateValues(update.EBITMargin);
+			EBITDAMargin?.UpdateValues(update.EBITDAMargin);
+			SalesPerEmployee?.UpdateValues(update.SalesPerEmployee);
+			CurrentRatio?.UpdateValues(update.CurrentRatio);
+			QuickRatio?.UpdateValues(update.QuickRatio);
+			LongTermDebtTotalCapitalRatio?.UpdateValues(update.LongTermDebtTotalCapitalRatio);
+			InterestCoverage?.UpdateValues(update.InterestCoverage);
+			LongTermDebtEquityRatio?.UpdateValues(update.LongTermDebtEquityRatio);
+			FinancialLeverage?.UpdateValues(update.FinancialLeverage);
+			TotalDebtEquityRatio?.UpdateValues(update.TotalDebtEquityRatio);
+			NormalizedNetProfitMargin?.UpdateValues(update.NormalizedNetProfitMargin);
+			DaysInSales?.UpdateValues(update.DaysInSales);
+			DaysInInventory?.UpdateValues(update.DaysInInventory);
+			DaysInPayment?.UpdateValues(update.DaysInPayment);
+			CashConversionCycle?.UpdateValues(update.CashConversionCycle);
+			ReceivableTurnover?.UpdateValues(update.ReceivableTurnover);
+			InventoryTurnover?.UpdateValues(update.InventoryTurnover);
+			PaymentTurnover?.UpdateValues(update.PaymentTurnover);
+			FixAssetsTuronver?.UpdateValues(update.FixAssetsTuronver);
+			AssetsTurnover?.UpdateValues(update.AssetsTurnover);
+			ROE?.UpdateValues(update.ROE);
+			ROA?.UpdateValues(update.ROA);
+			ROIC?.UpdateValues(update.ROIC);
+			FCFSalesRatio?.UpdateValues(update.FCFSalesRatio);
+			FCFNetIncomeRatio?.UpdateValues(update.FCFNetIncomeRatio);
+			CapExSalesRatio?.UpdateValues(update.CapExSalesRatio);
+			DebttoAssets?.UpdateValues(update.DebttoAssets);
+			CommonEquityToAssets?.UpdateValues(update.CommonEquityToAssets);
+			CapitalExpenditureAnnual5YrGrowth?.UpdateValues(update.CapitalExpenditureAnnual5YrGrowth);
+			GrossProfitAnnual5YrGrowth?.UpdateValues(update.GrossProfitAnnual5YrGrowth);
+			GrossMargin5YrAvg?.UpdateValues(update.GrossMargin5YrAvg);
+			PostTaxMargin5YrAvg?.UpdateValues(update.PostTaxMargin5YrAvg);
+			PreTaxMargin5YrAvg?.UpdateValues(update.PreTaxMargin5YrAvg);
+			ProfitMargin5YrAvg?.UpdateValues(update.ProfitMargin5YrAvg);
+			ROE5YrAvg?.UpdateValues(update.ROE5YrAvg);
+			ROA5YrAvg?.UpdateValues(update.ROA5YrAvg);
+			AVG5YrsROIC?.UpdateValues(update.AVG5YrsROIC);
+			NormalizedROIC?.UpdateValues(update.NormalizedROIC);
+			RegressionGrowthOperatingRevenue5Years?.UpdateValues(update.RegressionGrowthOperatingRevenue5Years);
+			CashRatio?.UpdateValues(update.CashRatio);
+			CashtoTotalAssets?.UpdateValues(update.CashtoTotalAssets);
+			CapitalExpendituretoEBITDA?.UpdateValues(update.CapitalExpendituretoEBITDA);
+			FCFtoCFO?.UpdateValues(update.FCFtoCFO);
+			StockholdersEquityGrowth?.UpdateValues(update.StockholdersEquityGrowth);
+			TotalAssetsGrowth?.UpdateValues(update.TotalAssetsGrowth);
+			TotalLiabilitiesGrowth?.UpdateValues(update.TotalLiabilitiesGrowth);
+			TotalDebtEquityRatioGrowth?.UpdateValues(update.TotalDebtEquityRatioGrowth);
+			CashRatioGrowth?.UpdateValues(update.CashRatioGrowth);
+			EBITDAGrowth?.UpdateValues(update.EBITDAGrowth);
+			CashFlowfromFinancingGrowth?.UpdateValues(update.CashFlowfromFinancingGrowth);
+			CashFlowfromInvestingGrowth?.UpdateValues(update.CashFlowfromInvestingGrowth);
+			CapExGrowth?.UpdateValues(update.CapExGrowth);
+			CurrentRatioGrowth?.UpdateValues(update.CurrentRatioGrowth);
+			WorkingCapitalTurnoverRatio?.UpdateValues(update.WorkingCapitalTurnoverRatio);
+			NetIncomePerEmployee?.UpdateValues(update.NetIncomePerEmployee);
+			SolvencyRatio?.UpdateValues(update.SolvencyRatio);
+			ExpenseRatio?.UpdateValues(update.ExpenseRatio);
+			LossRatio?.UpdateValues(update.LossRatio);
 		}
 	}
 }

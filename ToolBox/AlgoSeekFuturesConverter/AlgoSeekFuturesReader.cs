@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -87,7 +87,7 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
         {
             string line;
             Tick tick = null;
-            while ((line = _streamReader.ReadLine()) != null && tick == null)
+            while (tick == null && (line = _streamReader.ReadLine()) != null)
             {
                 // If line is invalid continue looping to find next valid line.
                 tick = Parse(line);
@@ -157,7 +157,7 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
                 }
 
                 var ticker = csv[_columnTicker];
-                
+
                 // we filter out options and spreads
                 if (ticker.IndexOfAny(new [] { ' ', '-'}) != -1)
                 {
@@ -230,8 +230,11 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
                 var expirationYear = GetExpirationYear(time, expirationYearShort);
                 var expirationYearMonth = new DateTime(expirationYear, expirationMonth, DateTime.DaysInMonth(expirationYear, expirationMonth));
                 var symbol = Symbol.CreateFuture(underlying, Market.USA, expirationYearMonth);
-              
-                var price = csv[_columnPrice].ToDecimal() / 10000000000m;
+
+                // All futures but VIX are delivered with a scale factor of 10000000000.
+                var scaleFactor = symbol.ID.Symbol == "VX" ? decimal.One : 10000000000m;
+
+                var price = csv[_columnPrice].ToDecimal() / scaleFactor;
                 var quantity = csv[_columnQuantity].ToInt32();
 
                 price *= _symbolMultipliers.ContainsKey(underlying) ? _symbolMultipliers[underlying] : 1.0m;

@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -30,7 +30,7 @@ namespace QuantConnect.Data.Fundamental
 	/// <summary>
 	/// Definition of the EarningReports class
 	/// </summary>
-	public class EarningReports : BaseData
+	public class EarningReports
 	{
 		/// <summary>
 		/// The exact date that is given in the financial statements for each quarter's end.
@@ -286,13 +286,51 @@ namespace QuantConnect.Data.Fundamental
 		public NormalizedDilutedEPS NormalizedDilutedEPS { get; set; }
 
 		/// <summary>
-		/// Total Dividend Per Share is cash dividends and special cash dividends paid per share over a certain period of time
+		/// Total Dividend Per Share is cash dividends and special cash dividends paid per share over a certain period of time.
 		/// </summary>
 		/// <remarks>
 		/// Morningstar DataId: 29021
 		/// </remarks>
 		[JsonProperty("29021")]
 		public TotalDividendPerShare TotalDividendPerShare { get; set; }
+
+		/// <summary>
+		/// Normalized Basic EPS as reported by the company in the financial statements.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 29022
+		/// </remarks>
+		[JsonProperty("29022")]
+		public ReportedNormalizedBasicEPS ReportedNormalizedBasicEPS { get; set; }
+
+		/// <summary>
+		/// Normalized Diluted EPS as reported by the company in the financial statements.
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 29023
+		/// </remarks>
+		[JsonProperty("29023")]
+		public ReportedNormalizedDilutedEPS ReportedNormalizedDilutedEPS { get; set; }
+
+		/// <summary>
+		/// Reflects a firm's capacity to pay a dividend, and is defined as Earnings Per Share / Dividend Per Share
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 29024
+		/// </remarks>
+		[JsonProperty("29024")]
+		public DividendCoverageRatio DividendCoverageRatio { get; set; }
+
+		/// <summary>
+		/// The nature of the period covered by an individual set of financial results. The output can be: Quarter, Semi-annual or Annual.
+		/// Assuming a 12-month fiscal year, quarter typically covers a three-month period, semi-annual a six-month period, and annual a
+		/// twelve-month period. Annual could cover results collected either from preliminary results or an annual report
+		/// </summary>
+		/// <remarks>
+		/// Morningstar DataId: 28006
+		/// </remarks>
+		[JsonProperty("28006")]
+		public string PeriodType { get; set; }
 
 		/// <summary>
 		/// Creates an instance of the EarningReports class
@@ -321,39 +359,50 @@ namespace QuantConnect.Data.Fundamental
 			NormalizedBasicEPS = new NormalizedBasicEPS();
 			NormalizedDilutedEPS = new NormalizedDilutedEPS();
 			TotalDividendPerShare = new TotalDividendPerShare();
+			ReportedNormalizedBasicEPS = new ReportedNormalizedBasicEPS();
+			ReportedNormalizedDilutedEPS = new ReportedNormalizedDilutedEPS();
+			DividendCoverageRatio = new DividendCoverageRatio();
 		}
 
 		/// <summary>
-		/// Sets values for non existing periods from a previous instance
+		/// Applies updated values from <paramref name="update"/> to this instance
 		/// </summary>
-		/// <remarks>Used to fill-forward values from previous dates</remarks>
-		/// <param name="previous">The previous instance</param>
-		public void UpdateValues(EarningReports previous)
+		/// <remarks>Used to apply data updates to the current instance. This WILL overwrite existing values. Default update values are ignored.</remarks>
+		/// <param name="update">The next data update for this instance</param>
+		public void UpdateValues(EarningReports update)
 		{
-			if (previous == null) return;
+			if (update == null) return;
 
-			if (BasicContinuousOperations != null) BasicContinuousOperations.UpdateValues(previous.BasicContinuousOperations);
-			if (BasicDiscontinuousOperations != null) BasicDiscontinuousOperations.UpdateValues(previous.BasicDiscontinuousOperations);
-			if (BasicExtraordinary != null) BasicExtraordinary.UpdateValues(previous.BasicExtraordinary);
-			if (BasicAccountingChange != null) BasicAccountingChange.UpdateValues(previous.BasicAccountingChange);
-			if (BasicEPS != null) BasicEPS.UpdateValues(previous.BasicEPS);
-			if (DilutedContinuousOperations != null) DilutedContinuousOperations.UpdateValues(previous.DilutedContinuousOperations);
-			if (DilutedDiscontinuousOperations != null) DilutedDiscontinuousOperations.UpdateValues(previous.DilutedDiscontinuousOperations);
-			if (DilutedExtraordinary != null) DilutedExtraordinary.UpdateValues(previous.DilutedExtraordinary);
-			if (DilutedAccountingChange != null) DilutedAccountingChange.UpdateValues(previous.DilutedAccountingChange);
-			if (DilutedEPS != null) DilutedEPS.UpdateValues(previous.DilutedEPS);
-			if (BasicAverageShares != null) BasicAverageShares.UpdateValues(previous.BasicAverageShares);
-			if (DilutedAverageShares != null) DilutedAverageShares.UpdateValues(previous.DilutedAverageShares);
-			if (DividendPerShare != null) DividendPerShare.UpdateValues(previous.DividendPerShare);
-			if (BasicEPSOtherGainsLosses != null) BasicEPSOtherGainsLosses.UpdateValues(previous.BasicEPSOtherGainsLosses);
-			if (ContinuingAndDiscontinuedBasicEPS != null) ContinuingAndDiscontinuedBasicEPS.UpdateValues(previous.ContinuingAndDiscontinuedBasicEPS);
-			if (TaxLossCarryforwardBasicEPS != null) TaxLossCarryforwardBasicEPS.UpdateValues(previous.TaxLossCarryforwardBasicEPS);
-			if (DilutedEPSOtherGainsLosses != null) DilutedEPSOtherGainsLosses.UpdateValues(previous.DilutedEPSOtherGainsLosses);
-			if (ContinuingAndDiscontinuedDilutedEPS != null) ContinuingAndDiscontinuedDilutedEPS.UpdateValues(previous.ContinuingAndDiscontinuedDilutedEPS);
-			if (TaxLossCarryforwardDilutedEPS != null) TaxLossCarryforwardDilutedEPS.UpdateValues(previous.TaxLossCarryforwardDilutedEPS);
-			if (NormalizedBasicEPS != null) NormalizedBasicEPS.UpdateValues(previous.NormalizedBasicEPS);
-			if (NormalizedDilutedEPS != null) NormalizedDilutedEPS.UpdateValues(previous.NormalizedDilutedEPS);
-			if (TotalDividendPerShare != null) TotalDividendPerShare.UpdateValues(previous.TotalDividendPerShare);
+			if (update.PeriodEndingDate != default(DateTime)) PeriodEndingDate = update.PeriodEndingDate;
+			if (update.FileDate != default(DateTime)) FileDate = update.FileDate;
+			if (!string.IsNullOrWhiteSpace(update.AccessionNumber)) AccessionNumber = update.AccessionNumber;
+			if (!string.IsNullOrWhiteSpace(update.FormType)) FormType = update.FormType;
+			BasicContinuousOperations?.UpdateValues(update.BasicContinuousOperations);
+			BasicDiscontinuousOperations?.UpdateValues(update.BasicDiscontinuousOperations);
+			BasicExtraordinary?.UpdateValues(update.BasicExtraordinary);
+			BasicAccountingChange?.UpdateValues(update.BasicAccountingChange);
+			BasicEPS?.UpdateValues(update.BasicEPS);
+			DilutedContinuousOperations?.UpdateValues(update.DilutedContinuousOperations);
+			DilutedDiscontinuousOperations?.UpdateValues(update.DilutedDiscontinuousOperations);
+			DilutedExtraordinary?.UpdateValues(update.DilutedExtraordinary);
+			DilutedAccountingChange?.UpdateValues(update.DilutedAccountingChange);
+			DilutedEPS?.UpdateValues(update.DilutedEPS);
+			BasicAverageShares?.UpdateValues(update.BasicAverageShares);
+			DilutedAverageShares?.UpdateValues(update.DilutedAverageShares);
+			DividendPerShare?.UpdateValues(update.DividendPerShare);
+			BasicEPSOtherGainsLosses?.UpdateValues(update.BasicEPSOtherGainsLosses);
+			ContinuingAndDiscontinuedBasicEPS?.UpdateValues(update.ContinuingAndDiscontinuedBasicEPS);
+			TaxLossCarryforwardBasicEPS?.UpdateValues(update.TaxLossCarryforwardBasicEPS);
+			DilutedEPSOtherGainsLosses?.UpdateValues(update.DilutedEPSOtherGainsLosses);
+			ContinuingAndDiscontinuedDilutedEPS?.UpdateValues(update.ContinuingAndDiscontinuedDilutedEPS);
+			TaxLossCarryforwardDilutedEPS?.UpdateValues(update.TaxLossCarryforwardDilutedEPS);
+			NormalizedBasicEPS?.UpdateValues(update.NormalizedBasicEPS);
+			NormalizedDilutedEPS?.UpdateValues(update.NormalizedDilutedEPS);
+			TotalDividendPerShare?.UpdateValues(update.TotalDividendPerShare);
+			ReportedNormalizedBasicEPS?.UpdateValues(update.ReportedNormalizedBasicEPS);
+			ReportedNormalizedDilutedEPS?.UpdateValues(update.ReportedNormalizedDilutedEPS);
+			DividendCoverageRatio?.UpdateValues(update.DividendCoverageRatio);
+			if (!string.IsNullOrWhiteSpace(update.PeriodType)) PeriodType = update.PeriodType;
 		}
 	}
 }

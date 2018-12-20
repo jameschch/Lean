@@ -51,7 +51,7 @@ class QCUWeatherBasedRebalancing(QCAlgorithm):
 
     # When we have a new event trigger, buy some stock:
     def OnData(self, data):
-        if self.weather not in data: return
+        if not data.ContainsKey(self.weather): return
 
         # Scale from -5C to +25C :: -5C == 100%, +25C = 0% invested
         fraction = -(data[self.weather].MinC + 5) / 30 if self.weather in data else 0
@@ -72,8 +72,8 @@ class Weather(PythonData):
 
     def GetSource(self, config, date, isLive):
         source = "https://dl.dropboxusercontent.com/u/44311500/KNYC.csv"
-        source = "https://www.wunderground.com/history/airport/{0}/{1}/1/1/CustomHistory.html?dayend=31&monthend=12&yearend={1}&format=1".format(config.Symbol, date.year);
-        return SubscriptionDataSource(source, SubscriptionTransportMedium.RemoteFile);
+        source = "https://www.wunderground.com/history/airport/{0}/{1}/1/1/CustomHistory.html?dayend=31&monthend=12&yearend={1}&format=1".format(config.Symbol, date.year)
+        return SubscriptionDataSource(source, SubscriptionTransportMedium.RemoteFile)
 
 
     def Reader(self, config, line, date, isLive):

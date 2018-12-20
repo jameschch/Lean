@@ -412,6 +412,22 @@ namespace QuantConnect
     }
 
     /// <summary>
+    /// Specifies the type of <see cref="QuantConnect.Data.Market.Split"/> data
+    /// </summary>
+    public enum SplitType
+    {
+        /// <summary>
+        /// Specifies a warning of an imminent split event
+        /// </summary>
+        Warning = 0,
+
+        /// <summary>
+        /// Specifies the symbol has been split
+        /// </summary>
+        SplitOccurred = 1
+    }
+
+    /// <summary>
     /// Resolution of data requested.
     /// </summary>
     /// <remarks>Always sort the enum from the smallest to largest resolution</remarks>
@@ -488,10 +504,16 @@ namespace QuantConnect
         public AlgorithmControl()
         {
             // default to true, API can override
+            Initialized = false;
             HasSubscribers = true;
             Status = AlgorithmStatus.Running;
             ChartSubscription = "Strategy Equity";
         }
+
+        /// <summary>
+        /// Register this control packet as not defaults.
+        /// </summary>
+        public bool Initialized;
 
         /// <summary>
         /// Current run status of the algorithm id.

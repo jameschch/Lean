@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,6 +26,13 @@ namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
+        // save universe additions and apply at end of time step
+        // this removes temporal dependencies from w/in initialize method
+        // original motivation: adding equity/options to enforce equity raw data mode
+        private readonly object _pendingUniverseAdditionsLock = new object();
+        private readonly List<UserDefinedUniverseAddition> _pendingUserDefinedUniverseSecurityAdditions = new List<UserDefinedUniverseAddition>();
+        private readonly List<Universe> _pendingUniverseAdditions = new List<Universe>();
+
         /// <summary>
         /// Gets universe manager which holds universes keyed by their symbol
         /// </summary>
@@ -45,11 +52,126 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Invoked at the end of every time step. This allows the algorithm
+        /// to process events before advancing to the next time step.
+        /// </summary>
+        public void OnEndOfTimeStep()
+        {
+            if (_pendingUniverseAdditions.Count + _pendingUserDefinedUniverseSecurityAdditions.Count == 0)
+            {
+                // no point in looping through everything if there's no pending changes
+                return;
+            }
+
+            var requiredHistoryRequests = new Dictionary<Security, Resolution>();
+            // rewrite securities w/ derivatives to be in raw mode
+            lock (_pendingUniverseAdditionsLock)
+            {
+
+                foreach (var security in Securities.Select(kvp => kvp.Value).Union(
+                    _pendingUserDefinedUniverseSecurityAdditions.Select(x => x.Security)))
+                {
+                    // check for any derivative securities and mark the underlying as raw
+                    if (Securities.Any(skvp => skvp.Key.HasUnderlyingSymbol(security.Symbol)))
+                    {
+                        // set data mode raw and default volatility model
+                        ConfigureUnderlyingSecurity(security);
+                    }
+
+                    var configs = SubscriptionManager.SubscriptionDataConfigService
+                        .GetSubscriptionDataConfigs(security.Symbol);
+                    if (security.Symbol.HasUnderlying)
+                    {
+                        Security underlyingSecurity;
+                        var underlyingSymbol = security.Symbol.Underlying;
+                        var resolution = configs.GetHighestResolution();
+
+                        // create the underlying security object if it doesn't already exist
+                        if (!Securities.TryGetValue(underlyingSymbol, out underlyingSecurity))
+                        {
+                            underlyingSecurity = AddSecurity(underlyingSymbol.SecurityType,
+                                underlyingSymbol.Value,
+                                resolution,
+                                underlyingSymbol.ID.Market,
+                                false,
+                                0,
+                                configs.IsExtendedMarketHours());
+                        }
+
+                        // set data mode raw and default volatility model
+                        ConfigureUnderlyingSecurity(underlyingSecurity);
+
+                        if (LiveMode && underlyingSecurity.GetLastData() == null)
+                        {
+                            if (requiredHistoryRequests.ContainsKey(underlyingSecurity))
+                            {
+                                // lets request the higher resolution
+                                var currentResolutionRequest = requiredHistoryRequests[underlyingSecurity];
+                                if (currentResolutionRequest != Resolution.Minute  // Can not be less than Minute
+                                    && resolution < currentResolutionRequest)
+                                {
+                                    requiredHistoryRequests[underlyingSecurity] = (Resolution)Math.Max((int)resolution, (int)Resolution.Minute);
+                                }
+                            }
+                            else
+                            {
+                                requiredHistoryRequests.Add(underlyingSecurity, (Resolution)Math.Max((int)resolution, (int)Resolution.Minute));
+                            }
+                        }
+                        // set the underlying security on the derivative -- we do this in two places since it's possible
+                        // to do AddOptionContract w/out the underlying already added and normalized properly
+                        var derivative = security as IDerivativeSecurity;
+                        if (derivative != null)
+                        {
+                            derivative.Underlying = underlyingSecurity;
+                        }
+                    }
+                }
+
+                if (!requiredHistoryRequests.IsNullOrEmpty())
+                {
+                    // Create requests
+                    var historyRequests = Enumerable.Empty<HistoryRequest>();
+                    foreach (var byResolution in requiredHistoryRequests.GroupBy(x => x.Value))
+                    {
+                        historyRequests = historyRequests.Concat(
+                            CreateBarCountHistoryRequests(byResolution.Select(x => x.Key.Symbol), 3, byResolution.Key));
+                    }
+                    // Request data
+                    var historicLastData = History(historyRequests);
+                    historicLastData.PushThrough(x =>
+                    {
+                        var security = requiredHistoryRequests.Keys.FirstOrDefault(y => y.Symbol == x.Symbol);
+                        security?.Cache.AddData(x);
+                    });
+                }
+
+                // add subscriptionDataConfig to their respective user defined universes
+                foreach (var userDefinedUniverseAddition in _pendingUserDefinedUniverseSecurityAdditions)
+                {
+                    foreach (var subscriptionDataConfig in userDefinedUniverseAddition.SubscriptionDataConfigs)
+                    {
+                        userDefinedUniverseAddition.Universe.Add(subscriptionDataConfig);
+                    }
+                }
+
+                // finally add any pending universes, this will make them available to the data feed
+                foreach (var universe in _pendingUniverseAdditions)
+                {
+                    UniverseManager.Add(universe.Configuration.Symbol, universe);
+                }
+
+                _pendingUniverseAdditions.Clear();
+                _pendingUserDefinedUniverseSecurityAdditions.Clear();
+            }
+        }
+
+        /// <summary>
         /// Gets a helper that provides pre-defined universe defintions, such as top dollar volume
         /// </summary>
         public UniverseDefinitions Universe
         {
-            get; 
+            get;
             private set;
         }
 
@@ -216,7 +338,7 @@ namespace QuantConnect.Algorithm
         /// <param name="selector">Function delegate that performs selection on the universe data</param>
         public void AddUniverse<T>(SecurityType securityType, string name, Resolution resolution, string market, UniverseSettings universeSettings, Func<IEnumerable<T>, IEnumerable<Symbol>> selector)
         {
-            var marketHoursDbEntry = _marketHoursDatabase.GetEntry(market, name, securityType);
+            var marketHoursDbEntry = MarketHoursDatabase.GetEntry(market, name, securityType);
             var dataTimeZone = marketHoursDbEntry.DataTimeZone;
             var exchangeTimeZone = marketHoursDbEntry.ExchangeHours.TimeZone;
             var symbol = QuantConnect.Symbol.Create(name, securityType, market);
@@ -236,7 +358,7 @@ namespace QuantConnect.Algorithm
         /// <param name="selector">Function delegate that performs selection on the universe data</param>
         public void AddUniverse<T>(SecurityType securityType, string name, Resolution resolution, string market, UniverseSettings universeSettings, Func<IEnumerable<T>, IEnumerable<string>> selector)
         {
-            var marketHoursDbEntry = _marketHoursDatabase.GetEntry(market, name, securityType);
+            var marketHoursDbEntry = MarketHoursDatabase.GetEntry(market, name, securityType);
             var dataTimeZone = marketHoursDbEntry.DataTimeZone;
             var exchangeTimeZone = marketHoursDbEntry.ExchangeHours.TimeZone;
             var symbol = QuantConnect.Symbol.Create(name, securityType, market);
@@ -312,30 +434,32 @@ namespace QuantConnect.Algorithm
         /// <param name="selector">Function delegate that accepts a DateTime and returns a collection of string symbols</param>
         public void AddUniverse(SecurityType securityType, string name, Resolution resolution, string market, UniverseSettings universeSettings, Func<DateTime, IEnumerable<string>> selector)
         {
-            var marketHoursDbEntry = _marketHoursDatabase.GetEntry(market, name, securityType);
+            var marketHoursDbEntry = MarketHoursDatabase.GetEntry(market, name, securityType);
             var dataTimeZone = marketHoursDbEntry.DataTimeZone;
             var exchangeTimeZone = marketHoursDbEntry.ExchangeHours.TimeZone;
             var symbol = QuantConnect.Symbol.Create(name, securityType, market);
             var config = new SubscriptionDataConfig(typeof(CoarseFundamental), symbol, resolution, dataTimeZone, exchangeTimeZone, false, false, true, isFilteredSubscription: false);
-            AddUniverse(new UserDefinedUniverse(config, universeSettings, SecurityInitializer, resolution.ToTimeSpan(), selector));
+            AddUniverse(new UserDefinedUniverse(config, universeSettings, resolution.ToTimeSpan(), selector));
         }
 
         /// <summary>
-        /// Adds the security to the user defined universe for the specified 
+        /// Adds the security to the user defined universe
         /// </summary>
-        private void AddToUserDefinedUniverse(Security security)
+        /// <param name="security">The security to add</param>
+        /// <param name="configurations">The <see cref="SubscriptionDataConfig"/> instances we want to add</param>
+        private void AddToUserDefinedUniverse(
+            Security security,
+            List<SubscriptionDataConfig> configurations)
         {
-            // if we are adding a non-internal security which is also the benchmark, we remove it first
+            var subscription = configurations.First();
+            // if we are adding a non-internal security which already has an internal feed, we remove it first
             Security existingSecurity;
             if (Securities.TryGetValue(security.Symbol, out existingSecurity))
             {
-                if (!security.IsInternalFeed() && existingSecurity.Symbol == _benchmarkSymbol)
+                if (!subscription.IsInternalFeed && existingSecurity.IsInternalFeed())
                 {
-                    var securityUniverse = UniverseManager.Values.OfType<UserDefinedUniverse>().FirstOrDefault(x => x.Members.ContainsKey(security.Symbol));
-                    if (securityUniverse != null)
-                    {
-                        securityUniverse.Remove(security.Symbol);
-                    }
+                    var securityUniverse = UniverseManager.Select(x => x.Value).OfType<UserDefinedUniverse>().FirstOrDefault(x => x.Members.ContainsKey(security.Symbol));
+                    securityUniverse?.Remove(security.Symbol);
 
                     Securities.Remove(security.Symbol);
                 }
@@ -345,31 +469,97 @@ namespace QuantConnect.Algorithm
 
             // add this security to the user defined universe
             Universe universe;
-            var subscription = security.Subscriptions.First();
-            var universeSymbol = UserDefinedUniverse.CreateSymbol(subscription.SecurityType, subscription.Market);
-            if (!UniverseManager.TryGetValue(universeSymbol, out universe))
+            var universeSymbol = UserDefinedUniverse.CreateSymbol(security.Type, security.Symbol.ID.Market);
+            lock (_pendingUniverseAdditionsLock)
             {
-                // create a new universe, these subscription settings don't currently get used
-                // since universe selection proper is never invoked on this type of universe
-                var uconfig = new SubscriptionDataConfig(subscription, symbol: universeSymbol, isInternalFeed: true, fillForward: false);
-                universe = new UserDefinedUniverse(uconfig,
-                    new UniverseSettings(security.Resolution, security.Leverage, security.IsFillDataForward, security.IsExtendedMarketHours, TimeSpan.Zero),
-                    SecurityInitializer,
-                    QuantConnect.Time.OneDay,
-                    new List<Symbol> { security.Symbol }
-                    );
-                UniverseManager.Add(universeSymbol, universe);
+                if (!UniverseManager.TryGetValue(universeSymbol, out universe))
+                {
+                    universe = _pendingUniverseAdditions.FirstOrDefault(x => x.Configuration.Symbol == universeSymbol);
+                    if (universe == null)
+                    {
+                        // create a new universe, these subscription settings don't currently get used
+                        // since universe selection proper is never invoked on this type of universe
+                        var uconfig = new SubscriptionDataConfig(subscription, symbol: universeSymbol, isInternalFeed: true, fillForward: false);
+
+                        if (security.Type == SecurityType.Base)
+                        {
+                            // set entry in market hours database for the universe subscription to match the custom data
+                            var symbolString = MarketHoursDatabase.GetDatabaseSymbolKey(uconfig.Symbol);
+                            MarketHoursDatabase.SetEntry(uconfig.Market, symbolString, uconfig.SecurityType, security.Exchange.Hours, uconfig.DataTimeZone);
+                        }
+
+                        universe = new UserDefinedUniverse(uconfig,
+                            new UniverseSettings(
+                                subscription.Resolution,
+                                security.Leverage,
+                                subscription.FillDataForward,
+                                subscription.ExtendedMarketHours,
+                                TimeSpan.Zero),
+                            QuantConnect.Time.MaxTimeSpan,
+                            new List<Symbol>());
+                        _pendingUniverseAdditions.Add(universe);
+                    }
+                }
             }
-            
+
             var userDefinedUniverse = universe as UserDefinedUniverse;
             if (userDefinedUniverse != null)
             {
-                userDefinedUniverse.Add(security.Symbol);
+                lock (_pendingUniverseAdditionsLock)
+                {
+                    _pendingUserDefinedUniverseSecurityAdditions.Add(
+                        new UserDefinedUniverseAddition(userDefinedUniverse, configurations, security));
+                }
             }
             else
             {
                 // should never happen, someone would need to add a non-user defined universe with this symbol
                 throw new Exception("Expected universe with symbol '" + universeSymbol.Value + "' to be of type UserDefinedUniverse.");
+            }
+        }
+
+        /// <summary>
+        /// Configures the security to be in raw data mode and ensures that a reasonable default volatility model is supplied
+        /// </summary>
+        /// <param name="security">The underlying security</param>
+        private void ConfigureUnderlyingSecurity(Security security)
+        {
+            // force underlying securities to be raw data mode
+            var configs = SubscriptionManager.SubscriptionDataConfigService
+                .GetSubscriptionDataConfigs(security.Symbol);
+            if (configs.DataNormalizationMode() != DataNormalizationMode.Raw)
+            {
+                Debug($"Warning: The {security.Symbol.Value} equity security was set the raw price normalization mode to work with options.");
+                configs.SetDataNormalizationMode(DataNormalizationMode.Raw);
+                // For backward compatibility we need to refresh the security DataNormalizationMode Property
+                security.RefreshDataNormalizationModeProperty();
+            }
+
+            // ensure a volatility model has been set on the underlying
+            if (security.VolatilityModel == VolatilityModel.Null)
+            {
+                security.VolatilityModel = new StandardDeviationOfReturnsVolatilityModel(periods: 30);
+            }
+        }
+
+        /// <summary>
+        /// Helper class used to store <see cref="UserDefinedUniverse"/> additions.
+        /// They will be consumed at <see cref="OnEndOfTimeStep"/>
+        /// </summary>
+        private class UserDefinedUniverseAddition
+        {
+            public Security Security { get; }
+            public UserDefinedUniverse Universe { get; }
+            public List<SubscriptionDataConfig> SubscriptionDataConfigs { get; }
+
+            public UserDefinedUniverseAddition(
+                UserDefinedUniverse universe,
+                List<SubscriptionDataConfig> subscriptionDataConfigs,
+                Security security)
+            {
+                Universe = universe;
+                SubscriptionDataConfigs = subscriptionDataConfigs;
+                Security = security;
             }
         }
     }

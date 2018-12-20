@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,7 +15,11 @@
 */
 
 using Python.Runtime;
+using QuantConnect.Data.Fundamental;
+using QuantConnect.Data.UniverseSelection;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace QuantConnect.Util
 {
@@ -87,6 +91,90 @@ namespace QuantConnect.Util
         }
 
         /// <summary>
+        /// Encapsulates a python method in coarse fundamental universe selector.
+        /// </summary>
+        /// <param name="pyObject">The python method</param>
+        /// <returns>A <see cref="Func{T, TResult}"/> (parameter is <see cref="IEnumerable{CoarseFundamental}"/>, return value is <see cref="IEnumerable{Symbol}"/>) that encapsulates the python method</returns>
+        public static Func<IEnumerable<CoarseFundamental>, IEnumerable<Symbol>> ToCoarseFundamentalSelector(PyObject pyObject)
+        {
+            var selector = ToFunc<IEnumerable<CoarseFundamental>, Symbol[]>(pyObject);
+            if (selector == null)
+            {
+                using (Py.GIL())
+                {
+                    throw new ArgumentException($"{pyObject.Repr()} is not a valid coarse fundamental universe selector method.");
+                }
+            }
+            return selector;
+        }
+
+        /// <summary>
+        /// Encapsulates a python method in fine fundamental universe selector.
+        /// </summary>
+        /// <param name="pyObject">The python method</param>
+        /// <returns>A <see cref="Func{T, TResult}"/> (parameter is <see cref="IEnumerable{FineFundamental}"/>, return value is <see cref="IEnumerable{Symbol}"/>) that encapsulates the python method</returns>
+        public static Func<IEnumerable<FineFundamental>, IEnumerable<Symbol>> ToFineFundamentalSelector(PyObject pyObject)
+        {
+            var selector = ToFunc<IEnumerable<FineFundamental>, Symbol[]>(pyObject);
+            if (selector == null)
+            {
+                using (Py.GIL())
+                {
+                    throw new ArgumentException($"{pyObject.Repr()} is not a valid fine fundamental universe selector method.");
+                }
+            }
+            return selector;
+        }
+
+        /// <summary>
+        /// Parsers <see cref="PythonException.StackTrace"/> into a readable message
+        /// </summary>
+        /// <param name="value">String with the stacktrace information</param>
+        /// <returns>String with relevant part of the stacktrace</returns>
+        public static string PythonExceptionStackParser(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            // Get the directory where the user files are located
+            var baseScript = value.GetStringBetweenChars('\"', '\"');
+            var length = Math.Max(baseScript.LastIndexOf('/'), baseScript.LastIndexOf('\\'));
+            if (length < 0)
+            {
+                return string.Empty;
+            }
+            var directory = baseScript.Substring(0, 1 + length);
+
+            // Format the information in every line
+            var lines = value.Substring(1, value.Length - 1)
+                .Split(new[] { "\'  File " }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(x => x.Contains(directory))
+                .Where(x => x.Split(',').Length > 2)
+                .Select(x =>
+                {
+                    var info = x.Replace(directory, string.Empty).Split(',');
+                    var line = info[0].GetStringBetweenChars('\"', '\"');
+                    line = $" in {line}:{info[1].Trim()}";
+
+                    info = info[2].Split(new[] { "\\n" }, StringSplitOptions.RemoveEmptyEntries);
+                    line = $" {info[0].Replace(" in ", " at ")}{line}";
+
+                    // If we have the exact statement, add it to the error line
+                    if (info.Length > 2) line += $" :: {info[1].Trim()}";
+
+                    return line;
+                });
+
+            var errorLine = string.Join(Environment.NewLine, lines);
+
+            return string.IsNullOrWhiteSpace(errorLine)
+                ? string.Empty
+                : $"{Environment.NewLine}{errorLine}{Environment.NewLine}";
+        }
+
+        /// <summary>
         /// Try to get the length of arguments of a method
         /// </summary>
         /// <param name="pyObject">Object representing a method</param>
@@ -117,7 +205,7 @@ namespace QuantConnect.Util
         }
 
         /// <summary>
-        /// Creates a python module with utils methods 
+        /// Creates a python module with utils methods
         /// </summary>
         /// <returns>PyObject with a python module</returns>
         private static PyObject GetModule()

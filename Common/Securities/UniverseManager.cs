@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,6 +20,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Util;
 
 namespace QuantConnect.Securities
 {
@@ -34,6 +35,14 @@ namespace QuantConnect.Securities
         /// Event fired when a universe is added or removed
         /// </summary>
         public event NotifyCollectionChangedEventHandler CollectionChanged;
+
+        /// <summary>
+        /// Read-only dictionary containing all active securities. An active security is
+        /// a security that is currently selected by the universe or has holdings or open orders.
+        /// </summary>
+        public IReadOnlyDictionary<Symbol, Security> ActiveSecurities => this
+            .SelectMany(ukvp => ukvp.Value.Members.Select(mkvp => mkvp.Value))
+            .DistinctBy(s => s.Symbol).ToDictionary(s => s.Symbol);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UniverseManager"/> class
@@ -96,7 +105,7 @@ namespace QuantConnect.Securities
         /// <param name="item">The object to locate in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
         public bool Contains(KeyValuePair<Symbol, Universe> item)
         {
-            return _universes.Contains(item);
+            return ContainsKey(item.Key);
         }
 
         /// <summary>
@@ -117,8 +126,7 @@ namespace QuantConnect.Securities
         /// <param name="item">The object to remove from the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param><exception cref="T:System.NotSupportedException">The <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only.</exception>
         public bool Remove(KeyValuePair<Symbol, Universe> item)
         {
-            Universe universe;
-            return _universes.TryRemove(item.Key, out universe);
+            return Remove(item.Key);
         }
 
         /// <summary>
@@ -127,10 +135,7 @@ namespace QuantConnect.Securities
         /// <returns>
         /// The number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1"/>.
         /// </returns>
-        public int Count
-        {
-            get { return _universes.Count; }
-        }
+        public int Count => _universes.Skip(0).Count();
 
         /// <summary>
         /// Gets a value indicating whether the <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only.
@@ -179,6 +184,7 @@ namespace QuantConnect.Securities
             Universe universe;
             if (_universes.TryRemove(key, out universe))
             {
+                universe.Dispose();
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, universe));
                 return true;
             }
@@ -236,10 +242,7 @@ namespace QuantConnect.Securities
         /// <returns>
         /// An <see cref="T:System.Collections.Generic.ICollection`1"/> containing the keys of the object that implements <see cref="T:System.Collections.Generic.IDictionary`2"/>.
         /// </returns>
-        public ICollection<Symbol> Keys
-        {
-            get { return _universes.Keys; }
-        }
+        public ICollection<Symbol> Keys => _universes.Select(x => x.Key).ToList();
 
         /// <summary>
         /// Gets an <see cref="T:System.Collections.Generic.ICollection`1"/> containing the values in the <see cref="T:System.Collections.Generic.IDictionary`2"/>.
@@ -247,10 +250,7 @@ namespace QuantConnect.Securities
         /// <returns>
         /// An <see cref="T:System.Collections.Generic.ICollection`1"/> containing the values in the object that implements <see cref="T:System.Collections.Generic.IDictionary`2"/>.
         /// </returns>
-        public ICollection<Universe> Values
-        {
-            get { return _universes.Values; }
-        }
+        public ICollection<Universe> Values => _universes.Select(x => x.Value).ToList();
 
         #endregion
 
@@ -260,8 +260,7 @@ namespace QuantConnect.Securities
         /// <param name="e"></param>
         protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
-            var handler = CollectionChanged;
-            if (handler != null) handler(this, e);
+            CollectionChanged?.Invoke(this, e);
         }
     }
 }

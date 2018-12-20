@@ -14,14 +14,12 @@
 from clr import AddReference
 AddReference("System")
 AddReference("QuantConnect.Algorithm")
-AddReference("QuantConnect.Indicators")
 AddReference("QuantConnect.Common")
 
 from System import *
 from QuantConnect import *
 from QuantConnect.Algorithm import *
-from QuantConnect.Indicators import *
-from datetime import datetime
+from datetime import datetime, timedelta
 
 ### <summary>
 ### Options Open Interest data regression test.
@@ -31,23 +29,17 @@ from datetime import datetime
 class OptionOpenInterestRegressionAlgorithm(QCAlgorithm):
 
     def Initialize(self):
-        
         self.SetCash(1000000)
-        self.SetStartDate(2014,06,05)
-        self.SetEndDate(2014,06,06)
-        equity = self.AddEquity("twx")
-        option = self.AddOption("twx")
-        Underlying = equity.Symbol
-        self.OptionSymbol = option.Symbol
-        # set our strike/expiry filter for this option chain
-        option.SetFilter(-10, 10, TimeSpan.Zero, TimeSpan.FromDays(365*2))
-        # use the underlying equity as the benchmark
-        self.SetBenchmark(Underlying)
-        equity.SetDataNormalizationMode(DataNormalizationMode.Raw)
+        self.SetStartDate(2014,6,5)
+        self.SetEndDate(2014,6,6)
 
-    ''' Event - v3.0 DATA EVENT HANDLER: (Pattern) Basic template for user to override 
-        for receiving all subscription data in a single event
-        <param name="slice">The current slice of data keyed by symbol string</param> '''
+        option = self.AddOption("TWX")
+
+        # set our strike/expiry filter for this option chain
+        option.SetFilter(-10, 10, timedelta(0), timedelta(365*2))
+
+        # use the underlying equity as the benchmark
+        self.SetBenchmark("TWX")
 
     def OnData(self, slice):
         if not self.Portfolio.Invested: 
@@ -55,19 +47,14 @@ class OptionOpenInterestRegressionAlgorithm(QCAlgorithm):
                 for contract in chain.Value:
                     if float(contract.Symbol.ID.StrikePrice) == 72.5 and \
                        contract.Symbol.ID.OptionRight == OptionRight.Call and \
-                       contract.Symbol.ID.Date == datetime(2016, 01, 15):
-                        if slice.Time.date() == datetime(2014, 06, 5).date() and contract.OpenInterest != 50:
+                       contract.Symbol.ID.Date == datetime(2016, 1, 15):
+                        if slice.Time.date() == datetime(2014, 6, 5).date() and contract.OpenInterest != 50:
                             raise ValueError("Regression test failed: current open interest was not correctly loaded and is not equal to 50")  
-                        if slice.Time.date() == datetime(2014, 06, 6).date() and contract.OpenInterest != 70:
+                        if slice.Time.date() == datetime(2014, 6, 6).date() and contract.OpenInterest != 70:
                             raise ValueError("Regression test failed: current open interest was not correctly loaded and is not equal to 70")  
-                        if slice.Time.date() == datetime(2014, 06, 6).date():
+                        if slice.Time.date() == datetime(2014, 6, 6).date():
                             self.MarketOrder(contract.Symbol, 1)
                             self.MarketOnCloseOrder(contract.Symbol, -1)
-                            
- 
-    # Order fill event handler. On an order fill update the resulting information is passed to this method.
-    # </summary>
-    # <param name="orderEvent">Order event details containing details of the events</param> 
-        
+
     def OnOrderEvent(self, orderEvent):
         self.Log(str(orderEvent))

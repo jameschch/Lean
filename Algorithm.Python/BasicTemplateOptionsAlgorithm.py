@@ -36,36 +36,33 @@ class BasicTemplateOptionsAlgorithm(QCAlgorithm):
         self.SetEndDate(2015, 12, 24)
         self.SetCash(100000)
 
-        equity = self.AddEquity("GOOG", Resolution.Minute)
-        option = self.AddOption("GOOG", Resolution.Minute)
-        self.symbol = option.Symbol
+        option = self.AddOption("GOOG")
+        self.option_symbol = option.Symbol
 
         # set our strike/expiry filter for this option chain
         option.SetFilter(-2, +2, timedelta(0), timedelta(180))
 
         # use the underlying equity as the benchmark
-        self.SetBenchmark(equity.Symbol)
-
+        self.SetBenchmark("GOOG")
 
     def OnData(self,slice):
         if self.Portfolio.Invested: return
 
-        for kvp in slice.OptionChains:
-            if kvp.Key != self.symbol: continue
-            chain = kvp.Value
+        chain = slice.OptionChains.GetValue(self.option_symbol)
+        if chain is None:
+            return
 
-            # we sort the contracts to find at the money (ATM) contract with farthest expiration
-            contracts = sorted(sorted(sorted(chain, \
-                key = lambda x: abs(chain.Underlying.Price - x.Strike)), \
-                key = lambda x: x.Expiry, reverse=True), \
-                key = lambda x: x.Right, reverse=True)
+        # we sort the contracts to find at the money (ATM) contract with farthest expiration
+        contracts = sorted(sorted(sorted(chain, \
+            key = lambda x: abs(chain.Underlying.Price - x.Strike)), \
+            key = lambda x: x.Expiry, reverse=True), \
+            key = lambda x: x.Right, reverse=True)
 
-            # if found, trade it
-            if len(contracts) == 0: continue
-            symbol = contracts[0].Symbol
-            self.MarketOrder(symbol, 1)
-            self.MarketOnCloseOrder(symbol, -1)
-
+        # if found, trade it
+        if len(contracts) == 0: return
+        symbol = contracts[0].Symbol
+        self.MarketOrder(symbol, 1)
+        self.MarketOnCloseOrder(symbol, -1)
 
     def OnOrderEvent(self, orderEvent):
         self.Log(str(orderEvent))

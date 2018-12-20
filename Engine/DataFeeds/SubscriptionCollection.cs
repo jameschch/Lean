@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,10 +14,13 @@
  *
 */
 
+using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using QuantConnect.Data;
+using QuantConnect.Util;
 
 namespace QuantConnect.Lean.Engine.DataFeeds
 {
@@ -26,14 +29,23 @@ namespace QuantConnect.Lean.Engine.DataFeeds
     /// </summary>
     public class SubscriptionCollection : IEnumerable<Subscription>
     {
-        private readonly ConcurrentDictionary<Symbol, ConcurrentDictionary<SubscriptionDataConfig, Subscription>> _subscriptions;
+        private readonly ConcurrentDictionary<SubscriptionDataConfig, Subscription> _subscriptions;
+        private bool _sortingSubscriptionRequired;
+        private readonly Ref<TimeSpan> _fillForwardResolution;
+
+        // some asset types (options, futures, crypto) have multiple subscriptions for different tick types,
+        // we keep a sorted list of subscriptions so we can return them in a deterministic order
+        private List<Subscription> _subscriptionsByTickType;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SubscriptionCollection"/> class
         /// </summary>
         public SubscriptionCollection()
         {
-            _subscriptions = new ConcurrentDictionary<Symbol, ConcurrentDictionary<SubscriptionDataConfig, Subscription>>();
+            _subscriptions = new ConcurrentDictionary<SubscriptionDataConfig, Subscription>();
+            _subscriptionsByTickType = new List<Subscription>();
+            var ffres = Time.OneMinute;
+            _fillForwardResolution = Ref.Create(() => ffres, res => ffres = res);
         }
 
         /// <summary>
@@ -43,23 +55,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <returns>True if a subscription with the specified configuration is found in this collection, false otherwise</returns>
         public bool Contains(SubscriptionDataConfig configuration)
         {
-            ConcurrentDictionary<SubscriptionDataConfig, Subscription> dictionary;
-            if (!_subscriptions.TryGetValue(configuration.Symbol, out dictionary))
-            {
-                return false;
-            }
-
-            return dictionary.ContainsKey(configuration);
-        }
-
-        /// <summary>
-        /// Checks the collection for any subscriptions with the specified symbol
-        /// </summary>
-        /// <param name="symbol">The symbol to check</param>
-        /// <returns>True if any subscriptions are found with the specified symbol</returns>
-        public bool ContainsAny(Symbol symbol)
-        {
-            return _subscriptions.ContainsKey(symbol);
+            return _subscriptions.ContainsKey(configuration);
         }
 
         /// <summary>
@@ -70,14 +66,13 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <returns>True if the subscription is successfully added, false otherwise</returns>
         public bool TryAdd(Subscription subscription)
         {
-            ConcurrentDictionary<SubscriptionDataConfig, Subscription> dictionary;
-            if (!_subscriptions.TryGetValue(subscription.Configuration.Symbol, out dictionary))
+            if (_subscriptions.TryAdd(subscription.Configuration, subscription))
             {
-                dictionary = new ConcurrentDictionary<SubscriptionDataConfig, Subscription>();
-                _subscriptions[subscription.Configuration.Symbol] = dictionary;
+                UpdateFillForwardResolution(FillForwardResolutionOperation.AfterAdd, subscription.Configuration);
+                _sortingSubscriptionRequired = true;
+                return true;
             }
-
-            return dictionary.TryAdd(subscription.Configuration, subscription);
+            return false;
         }
 
         /// <summary>
@@ -88,33 +83,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <returns>True if the subscription is successfully retrieved, false otherwise</returns>
         public bool TryGetValue(SubscriptionDataConfig configuration, out Subscription subscription)
         {
-            ConcurrentDictionary<SubscriptionDataConfig, Subscription> dictionary;
-            if (!_subscriptions.TryGetValue(configuration.Symbol, out dictionary))
-            {
-                subscription = null;
-                return false;
-            }
-
-            return dictionary.TryGetValue(configuration, out subscription);
-        }
-        
-        /// <summary>
-        /// Attempts to retrieve the subscription with the specified configuration
-        /// </summary>
-        /// <param name="symbol">The symbol of the subscription's configuration</param>
-        /// <param name="subscriptions">The subscriptions matching the symbol, null if not found</param>
-        /// <returns>True if the subscriptions are successfully retrieved, false otherwise</returns>
-        public bool TryGetAll(Symbol symbol, out ICollection<Subscription> subscriptions)
-        {
-            ConcurrentDictionary<SubscriptionDataConfig, Subscription> dictionary;
-            if (!_subscriptions.TryGetValue(symbol, out dictionary))
-            {
-                subscriptions = null;
-                return false;
-            }
-            
-            subscriptions = dictionary.Values;
-            return true;
+            return _subscriptions.TryGetValue(configuration, out subscription);
         }
 
         /// <summary>
@@ -125,33 +94,13 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <returns>True if the subscription is successfully removed, false otherwise</returns>
         public bool TryRemove(SubscriptionDataConfig configuration, out Subscription subscription)
         {
-            ConcurrentDictionary<SubscriptionDataConfig, Subscription> dictionary;
-            if (!_subscriptions.TryGetValue(configuration.Symbol, out dictionary))
+            if (_subscriptions.TryRemove(configuration, out subscription))
             {
-                subscription = null;
-                return false;
+                UpdateFillForwardResolution(FillForwardResolutionOperation.AfterRemove, configuration);
+                _sortingSubscriptionRequired = true;
+                return true;
             }
-
-            return dictionary.TryRemove(configuration, out subscription);
-        }
-
-        /// <summary>
-        /// Attempts to remove all subscriptons for the specified symbol
-        /// </summary>
-        /// <param name="symbol">The symbol of the subscriptions to remove</param>
-        /// <param name="subscriptions">The removed subscriptions</param>
-        /// <returns></returns>
-        public bool TryRemoveAll(Symbol symbol, out ICollection<Subscription> subscriptions)
-        {
-            ConcurrentDictionary<SubscriptionDataConfig, Subscription> dictionary;
-            if (!_subscriptions.TryRemove(symbol, out dictionary))
-            {
-                subscriptions = null;
-                return false;
-            }
-
-            subscriptions = dictionary.Values;
-            return true;
+            return false;
         }
 
         /// <summary>
@@ -162,15 +111,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// </returns>
         public IEnumerator<Subscription> GetEnumerator()
         {
-            foreach (var subscriptionsBySymbol in _subscriptions)
-            {
-                var subscriptionsByConfig = subscriptionsBySymbol.Value;
-                foreach (var kvp in subscriptionsByConfig)
-                {
-                    var subscription = kvp.Value;
-                    yield return subscription;
-                }
-            }
+            SortSubscriptions();
+            return _subscriptionsByTickType.GetEnumerator();
         }
 
         /// <summary>
@@ -182,6 +124,82 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        /// <summary>
+        /// Gets and updates the fill forward resolution by checking specified subscription configurations and
+        /// selecting the smallest resoluton not equal to tick
+        /// </summary>
+        public Ref<TimeSpan> UpdateAndGetFillForwardResolution(SubscriptionDataConfig configuration = null)
+        {
+            if (configuration != null)
+            {
+                UpdateFillForwardResolution(FillForwardResolutionOperation.BeforeAdd, configuration);
+            }
+            return _fillForwardResolution;
+        }
+
+        /// <summary>
+        /// Helper method to validate a configuration to be included in the fill forward calculation
+        /// </summary>
+        private static bool ValidateFillForwardResolution(SubscriptionDataConfig configuration)
+        {
+            return !configuration.IsInternalFeed && configuration.Resolution != Resolution.Tick;
+        }
+        /// <summary>
+        /// Gets and updates the fill forward resolution by checking specified subscription configurations and
+        /// selecting the smallest resoluton not equal to tick
+        /// </summary>
+        private void UpdateFillForwardResolution(FillForwardResolutionOperation operation, SubscriptionDataConfig configuration)
+        {
+            // Due to performance implications let's be jealous in updating the _fillForwardResolution
+            if (ValidateFillForwardResolution(configuration) &&
+                (
+                    (new[] { FillForwardResolutionOperation.BeforeAdd, FillForwardResolutionOperation.AfterAdd }.Contains(operation)
+                     && configuration.Increment != _fillForwardResolution.Value) // check if the new Increment is different
+                ||
+                    (operation == FillForwardResolutionOperation.AfterRemove // We are removing
+                    && configuration.Increment == _fillForwardResolution.Value // True: We are removing the resolution we were using
+                    && _subscriptions.All(x => x.Key.Resolution != configuration.Resolution))) // False: there is at least another one equal, no need to update
+                )
+            {
+                var configurations = (operation == FillForwardResolutionOperation.BeforeAdd)
+                    ? _subscriptions.Keys.Concat(new[] { configuration }) : _subscriptions.Keys;
+
+                _fillForwardResolution.Value = configurations.Where(ValidateFillForwardResolution)
+                                                             .Select(x => x.Resolution)
+                                                             .Distinct()
+                                                             .DefaultIfEmpty(Resolution.Minute)
+                                                             .Min().ToTimeSpan();
+            }
+        }
+
+        /// <summary>
+        /// Sorts subscriptions so that equity subscriptions are enumerated before option
+        /// securities to ensure the underlying data is available when we process the options data
+        /// </summary>
+        private void SortSubscriptions()
+        {
+            if (_sortingSubscriptionRequired)
+            {
+                _sortingSubscriptionRequired = false;
+                // it's important that we enumerate underlying securities before derivatives to this end,
+                // we order by security type so that equity subscriptions are enumerated before option
+                // securities to ensure the underlying data is available when we process the options data
+                _subscriptionsByTickType = _subscriptions
+                    .Select(x => x.Value)
+                    .OrderBy(x => x.Configuration.SecurityType)
+                    .ThenBy(x => x.Configuration.TickType)
+                    .ThenBy(x => x.Configuration.Symbol)
+                    .ToList();
+            }
+        }
+
+        private enum FillForwardResolutionOperation
+        {
+            AfterRemove,
+            BeforeAdd,
+            AfterAdd
         }
     }
 }

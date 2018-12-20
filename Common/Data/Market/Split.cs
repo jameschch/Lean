@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,6 +15,7 @@
 */
 
 using System;
+using Newtonsoft.Json;
 
 namespace QuantConnect.Data.Market
 {
@@ -24,10 +25,39 @@ namespace QuantConnect.Data.Market
     public class Split : BaseData
     {
         /// <summary>
+        ///Gets the type of split event, warning or split.
+        /// </summary>
+        [JsonProperty]
+        public SplitType Type
+        {
+            get; private set;
+        }
+
+        /// <summary>
+        /// Gets the split factor
+        /// </summary>
+        [JsonProperty]
+        public decimal SplitFactor
+        {
+            get; private set;
+        }
+
+        /// <summary>
+        /// Gets the price at which the split occurred
+        /// This is typically the previous day's closing price
+        /// </summary>
+        public decimal ReferencePrice
+        {
+            get { return Value; }
+            set { Value = value; }
+        }
+
+        /// <summary>
         /// Initializes a new instance of the Split class
         /// </summary>
         public Split()
         {
+            Type = SplitType.SplitOccurred;
             DataType = MarketDataType.Auxiliary;
         }
 
@@ -38,35 +68,20 @@ namespace QuantConnect.Data.Market
         /// <param name="date">The date</param>
         /// <param name="price">The price at the time of the split</param>
         /// <param name="splitFactor">The split factor to be applied to current holdings</param>
-        public Split(Symbol symbol, DateTime date, decimal price, decimal splitFactor)
+        /// <param name="type">The type of split event, warning or split occurred</param>
+        public Split(Symbol symbol, DateTime date, decimal price, decimal splitFactor, SplitType type)
              : this()
         {
-            Symbol = symbol;
+            Type = type;
             Time = date;
+            Symbol = symbol;
             ReferencePrice = price;
             SplitFactor = splitFactor;
         }
 
         /// <summary>
-        /// Gets the split factor
-        /// </summary>
-        public decimal SplitFactor
-        {
-            get; private set;
-        }
-
-        /// <summary>
-        /// Gets the price at which the split occurred
-        /// </summary>
-        public decimal ReferencePrice
-        {
-            get { return Value; }
-            set { Value = value; }
-        }
-
-        /// <summary>
-        /// Reader converts each line of the data source into BaseData objects. Each data type creates its own factory method, and returns a new instance of the object 
-        /// each time it is called. 
+        /// Reader converts each line of the data source into BaseData objects. Each data type creates its own factory method, and returns a new instance of the object
+        /// each time it is called.
         /// </summary>
         /// <param name="config">Subscription data config setup object</param>
         /// <param name="line">Line of the source document</param>
@@ -80,7 +95,7 @@ namespace QuantConnect.Data.Market
         }
 
         /// <summary>
-        /// Return the URL string source of the file. This will be converted to a stream 
+        /// Return the URL string source of the file. This will be converted to a stream
         /// </summary>
         /// <param name="config">Configuration object</param>
         /// <param name="date">Date of this source file</param>
@@ -93,12 +108,13 @@ namespace QuantConnect.Data.Market
         }
 
         /// <summary>
-        /// Returns a <see cref="System.String"/> that represents the current <see cref="QuantConnect.Data.Market.Split"/>.
+        /// Formats a string with the symbol and value.
         /// </summary>
-        /// <returns>A <see cref="System.String"/> that represents the current <see cref="QuantConnect.Data.Market.Split"/>.</returns>
+        /// <returns>string - a string formatted as SPY: 167.753</returns>
         public override string ToString()
         {
-            return string.Format("{0}: {1}", Symbol, SplitFactor);
+            var type = Type == SplitType.Warning ? "Split Warning" : "Split";
+            return $"{type}: {Symbol}: {SplitFactor} | {ReferencePrice}";
         }
 
         /// <summary>
@@ -110,7 +126,7 @@ namespace QuantConnect.Data.Market
         /// <returns>A clone of the current object</returns>
         public override BaseData Clone()
         {
-            return new Split(Symbol, Time, Price, SplitFactor);
+            return new Split(Symbol, Time, Price, SplitFactor, Type);
         }
     }
 }

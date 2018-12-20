@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +18,8 @@ using QuantConnect.Data;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.Fills;
 using QuantConnect.Orders.Slippage;
-using System.Collections.Generic;
+using Python.Runtime;
+using QuantConnect.Util;
 
 namespace QuantConnect.Securities.Future
 {
@@ -26,7 +27,7 @@ namespace QuantConnect.Securities.Future
     /// Futures Security Object Implementation for Futures Assets
     /// </summary>
     /// <seealso cref="Security"/>
-    public class Future : Security
+    public class Future : Security, IDerivativeSecurity
     {
         /// <summary>
         /// The default number of days required to settle a futures sale
@@ -45,7 +46,9 @@ namespace QuantConnect.Securities.Future
         /// <param name="quoteCurrency">The cash object that represent the quote currency</param>
         /// <param name="config">The subscription configuration for this security</param>
         /// <param name="symbolProperties">The symbol properties for this security</param>
-        public Future(SecurityExchangeHours exchangeHours, SubscriptionDataConfig config, Cash quoteCurrency, SymbolProperties symbolProperties)
+        /// <param name="currencyConverter">Currency converter used to convert <see cref="CashAmount"/>
+        /// instances into units of the account currency</param>
+        public Future(SecurityExchangeHours exchangeHours, SubscriptionDataConfig config, Cash quoteCurrency, SymbolProperties symbolProperties, ICurrencyConverter currencyConverter)
             : base(config,
                 quoteCurrency,
                 symbolProperties,
@@ -59,12 +62,13 @@ namespace QuantConnect.Securities.Future
                 Securities.VolatilityModel.Null,
                 new FutureMarginModel(),
                 new SecurityDataFilter(),
-                new SecurityPriceVariationModel()
+                new SecurityPriceVariationModel(),
+                currencyConverter
                 )
         {
             // for now all futures are cash settled as we don't allow underlying (Live Cattle?) to be posted on the account
             SettlementType = SettlementType.Cash;
-            Holdings = new FutureHolding(this);
+            Holdings = new FutureHolding(this, currencyConverter);
             _symbolProperties = symbolProperties;
             SetFilter(TimeSpan.Zero, TimeSpan.FromDays(35));
         }
@@ -76,7 +80,9 @@ namespace QuantConnect.Securities.Future
         /// <param name="exchangeHours">Defines the hours this exchange is open</param>
         /// <param name="quoteCurrency">The cash object that represent the quote currency</param>
         /// <param name="symbolProperties">The symbol properties for this security</param>
-        public Future(Symbol symbol, SecurityExchangeHours exchangeHours, Cash quoteCurrency, SymbolProperties symbolProperties)
+        /// <param name="currencyConverter">Currency converter used to convert <see cref="CashAmount"/>
+        /// instances into units of the account currency</param>
+        public Future(Symbol symbol, SecurityExchangeHours exchangeHours, Cash quoteCurrency, SymbolProperties symbolProperties, ICurrencyConverter currencyConverter)
             : base(symbol,
                 quoteCurrency,
                 symbolProperties,
@@ -90,19 +96,29 @@ namespace QuantConnect.Securities.Future
                 Securities.VolatilityModel.Null,
                 new FutureMarginModel(),
                 new SecurityDataFilter(),
-                new SecurityPriceVariationModel()
+                new SecurityPriceVariationModel(),
+                currencyConverter
                 )
         {
             // for now all futures are cash settled as we don't allow underlying (Live Cattle?) to be posted on the account
             SettlementType = SettlementType.Cash;
-            Holdings = new FutureHolding(this);
+            Holdings = new FutureHolding(this, currencyConverter);
             _symbolProperties = symbolProperties;
             SetFilter(TimeSpan.Zero, TimeSpan.FromDays(35));
         }
 
-
         // save off a strongly typed version of symbol properties
         private readonly SymbolProperties _symbolProperties;
+
+        /// <summary>
+        /// Returns true if this is the future chain security, false if it is a specific future contract
+        /// </summary>
+        public bool IsFutureChain => Symbol.IsCanonical();
+
+        /// <summary>
+        /// Returns true if this is a specific future contract security, false if it is the future chain security
+        /// </summary>
+        public bool IsFutureContract => !Symbol.IsCanonical();
 
         /// <summary>
         /// Gets the expiration date
@@ -117,7 +133,7 @@ namespace QuantConnect.Securities.Future
         /// </summary>
         public SettlementType SettlementType
         {
-            get; set; 
+            get; set;
         }
 
         /// <summary>
@@ -149,7 +165,6 @@ namespace QuantConnect.Securities.Future
             SetFilter(universe => universe.Expiration(minExpiry, maxExpiry));
         }
 
-
         /// <summary>
         /// Sets the <see cref="ContractFilter"/> to a new universe selection function
         /// </summary>
@@ -163,6 +178,16 @@ namespace QuantConnect.Securities.Future
             };
 
             ContractFilter = new FuncSecurityDerivativeFilter(func);
+        }
+
+        /// <summary>
+        /// Sets the <see cref="ContractFilter"/> to a new universe selection function
+        /// </summary>
+        /// <param name="universeFunc">new universe selection function</param>
+        public void SetFilter(PyObject universeFunc)
+        {
+            var pyUniverseFunc = PythonUtil.ToFunc<FutureFilterUniverse, FutureFilterUniverse>(universeFunc);
+            SetFilter(pyUniverseFunc);
         }
     }
 }

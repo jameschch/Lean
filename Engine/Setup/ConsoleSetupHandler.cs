@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,12 +39,12 @@ namespace QuantConnect.Lean.Engine.Setup
         /// <summary>
         /// Error which occured during setup may appear here.
         /// </summary>
-        public List<string> Errors { get; set; }
+        public List<Exception> Errors { get; set; }
 
         /// <summary>
         /// Maximum runtime of the strategy. (Set to 10 years for local backtesting).
         /// </summary>
-        public TimeSpan MaximumRuntime { get; private set; }
+        public TimeSpan MaximumRuntime { get; }
 
         /// <summary>
         /// Starting capital for the algorithm (Loaded from the algorithm code).
@@ -59,7 +59,7 @@ namespace QuantConnect.Lean.Engine.Setup
         /// <summary>
         /// Maximum number of orders for this backtest.
         /// </summary>
-        public int MaxOrders { get; private set; }
+        public int MaxOrders { get; }
 
         /// <summary>
         /// Setup the algorithm data, cash, job start end date etc:
@@ -70,7 +70,7 @@ namespace QuantConnect.Lean.Engine.Setup
             StartingPortfolioValue = 0;
             StartingDate = new DateTime(1998, 01, 01);
             MaximumRuntime = TimeSpan.FromDays(10 * 365);
-            Errors = new List<string>();
+            Errors = new List<Exception>();
         }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace QuantConnect.Lean.Engine.Setup
             // and step through some code that may take us longer than the default 10 seconds
             var loader = new Loader(algorithmNodePacket.Language, TimeSpan.FromHours(1), names => names.SingleOrDefault(name => MatchTypeName(name, algorithmName)));
             var complete = loader.TryCreateAlgorithmInstanceWithIsolator(assemblyPath, algorithmNodePacket.RamAllocation, out algorithm, out error);
-            if (!complete) throw new Exception(error + ": try re-building algorithm.");
+            if (!complete) throw new AlgorithmSetupException($"During the algorithm initialization, the following exception has occurred: {error}");
 
             return algorithm;
         }
@@ -130,6 +130,11 @@ namespace QuantConnect.Lean.Engine.Setup
                 if (baseJob.Type == PacketType.BacktestNode)
                 {
                     var backtestJob = baseJob as BacktestNodePacket;
+                    if (backtestJob == null)
+                    {
+                        throw new ArgumentException("Expected BacktestNodePacket but received " + baseJob.GetType().Name);
+                    }
+
                     algorithm.SetMaximumOrders(int.MaxValue);
 
                     // set our parameters
@@ -143,8 +148,14 @@ namespace QuantConnect.Lean.Engine.Setup
                     // set the option chain provider
                     algorithm.SetOptionChainProvider(new CachingOptionChainProvider(new BacktestingOptionChainProvider()));
 
+                    // set the future chain provider
+                    algorithm.SetFutureChainProvider(new CachingFutureChainProvider(new BacktestingFutureChainProvider()));
+
                     //Setup Base Algorithm:
                     algorithm.Initialize();
+
+                    //Finalize Initialization
+                    algorithm.PostInitialize();
 
                     //Set the time frontier of the algorithm
                     algorithm.SetDateTime(algorithm.StartDate.ConvertToUtc(algorithm.TimeZone));
@@ -152,10 +163,6 @@ namespace QuantConnect.Lean.Engine.Setup
                     //Construct the backtest job packet:
                     backtestJob.PeriodStart = algorithm.StartDate;
                     backtestJob.PeriodFinish = algorithm.EndDate;
-                    backtestJob.BacktestId = algorithm.GetType().Name;
-                    backtestJob.Type = PacketType.BacktestNode;
-                    backtestJob.UserId = baseJob.UserId;
-                    backtestJob.Channel = baseJob.Channel;
 
                     //Backtest Specific Parameters:
                     StartingDate = backtestJob.PeriodStart;
@@ -169,15 +176,13 @@ namespace QuantConnect.Lean.Engine.Setup
             catch (Exception err)
             {
                 Log.Error(err);
-                Errors.Add("Failed to initialize algorithm: Initialize(): " + err);
+                Errors.Add(new AlgorithmSetupException("During the algorithm initialization, the following exception has occurred: ", err));
             }
 
             if (Errors.Count == 0)
             {
                 initializeComplete = true;
             }
-
-            algorithm.PostInitialize();
 
             return initializeComplete;
         }

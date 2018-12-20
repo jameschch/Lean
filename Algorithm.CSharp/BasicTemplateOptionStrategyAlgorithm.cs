@@ -15,9 +15,11 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
+using QuantConnect.Interfaces;
 using QuantConnect.Orders;
 using QuantConnect.Securities.Option;
 
@@ -32,11 +34,9 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="options" />
     /// <meta name="tag" content="option strategies" />
     /// <meta name="tag" content="filter selection" />
-    public class BasicTemplateOptionStrategyAlgorithm : QCAlgorithm
+    public class BasicTemplateOptionStrategyAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private const string UnderlyingTicker = "GOOG";
-        public readonly Symbol Underlying = QuantConnect.Symbol.Create(UnderlyingTicker, SecurityType.Equity, Market.USA);
-        public readonly Symbol OptionSymbol = QuantConnect.Symbol.Create(UnderlyingTicker, SecurityType.Option, Market.USA);
+        private Symbol _optionSymbol;
 
         public override void Initialize()
         {
@@ -44,16 +44,17 @@ namespace QuantConnect.Algorithm.CSharp
             SetEndDate(2015, 12, 24);
             SetCash(1000000);
 
-            var equity = AddEquity(UnderlyingTicker);
-            var option = AddOption(UnderlyingTicker);
-
-            equity.SetDataNormalizationMode(DataNormalizationMode.Raw);
+            var option = AddOption("GOOG");
+            _optionSymbol = option.Symbol;
 
             // set our strike/expiry filter for this option chain
             option.SetFilter(-2, +2, TimeSpan.Zero, TimeSpan.FromDays(180));
 
+            // Adding this to reproduce GH issue #2314
+            SetWarmup(TimeSpan.FromMinutes(1));
+
             // use the underlying equity as the benchmark
-            SetBenchmark(equity.Symbol);
+            SetBenchmark("GOOG");
         }
 
         public override void OnData(Slice slice)
@@ -61,7 +62,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (!Portfolio.Invested)
             {
                 OptionChain chain;
-                if (slice.OptionChains.TryGetValue(OptionSymbol, out chain))
+                if (slice.OptionChains.TryGetValue(_optionSymbol, out chain))
                 {
                     var atmStraddle = chain
                         .OrderBy(x => Math.Abs(chain.Underlying.Price - x.Strike))
@@ -70,7 +71,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                     if (atmStraddle != null)
                     {
-                        Sell(OptionStrategies.Straddle(OptionSymbol, atmStraddle.Strike, atmStraddle.Expiry), 2);
+                        Sell(OptionStrategies.Straddle(_optionSymbol, atmStraddle.Strike, atmStraddle.Expiry), 2);
                     }
                 }
             }
@@ -81,7 +82,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             foreach(var kpv in slice.Bars)
             {
-                Console.WriteLine("---> OnData: {0}, {1}, {2}", Time, kpv.Key.Value, kpv.Value.Close.ToString("0.00"));
+                Log($"---> OnData: {Time}, {kpv.Key.Value}, {kpv.Value.Close:0.00}");
             }
         }
 
@@ -94,5 +95,41 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Log(orderEvent.ToString());
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "778"},
+            {"Average Win", "0%"},
+            {"Average Loss", "-0.02%"},
+            {"Compounding Annual Return", "-100%"},
+            {"Drawdown", "6.800%"},
+            {"Expectancy", "-1"},
+            {"Net Profit", "-6.821%"},
+            {"Sharpe Ratio", "0"},
+            {"Loss Rate", "100%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "0"},
+            {"Beta", "0"},
+            {"Annual Standard Deviation", "0"},
+            {"Annual Variance", "0"},
+            {"Information Ratio", "0"},
+            {"Tracking Error", "0"},
+            {"Treynor Ratio", "0"},
+            {"Total Fees", "$389.00"}
+        };
     }
 }

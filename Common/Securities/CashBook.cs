@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,6 +21,8 @@ using System.Linq;
 using System.Text;
 using QuantConnect.Data;
 using System.Collections.Concurrent;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 
 namespace QuantConnect.Securities
@@ -28,12 +30,12 @@ namespace QuantConnect.Securities
     /// <summary>
     /// Provides a means of keeping track of the different cash holdings of an algorithm
     /// </summary>
-    public class CashBook : IDictionary<string, Cash>
+    public class CashBook : IDictionary<string, Cash>, ICurrencyConverter
     {
         /// <summary>
         /// Gets the base currency used
         /// </summary>
-        public const string AccountCurrency = "USD";
+        public string AccountCurrency { get; }
 
         private readonly ConcurrentDictionary<string, Cash> _currencies;
 
@@ -42,7 +44,7 @@ namespace QuantConnect.Securities
         /// </summary>
         public decimal TotalValueInAccountCurrency
         {
-            get { return _currencies.Values.Sum(x => x.ValueInAccountCurrency); }
+            get { return _currencies.Sum(x => x.Value.ValueInAccountCurrency); }
         }
 
         /// <summary>
@@ -50,6 +52,7 @@ namespace QuantConnect.Securities
         /// </summary>
         public CashBook()
         {
+            AccountCurrency = Currencies.USD;
             _currencies = new ConcurrentDictionary<string, Cash>();
             _currencies.AddOrUpdate(AccountCurrency, new Cash(AccountCurrency, 0, 1.0m));
         }
@@ -64,7 +67,7 @@ namespace QuantConnect.Securities
         public void Add(string symbol, decimal quantity, decimal conversionRate)
         {
             var cash = new Cash(symbol, quantity, conversionRate);
-            _currencies.AddOrUpdate(symbol, cash);
+            Add(symbol, cash);
         }
 
         /// <summary>
@@ -72,22 +75,34 @@ namespace QuantConnect.Securities
         /// </summary>
         /// <param name="securities">The SecurityManager for the algorithm</param>
         /// <param name="subscriptions">The SubscriptionManager for the algorithm</param>
-        /// <param name="marketHoursDatabase">A security exchange hours provider instance used to resolve exchange hours for new subscriptions</param>
-        /// <param name="symbolPropertiesDatabase">A symbol properties database instance</param>
         /// <param name="marketMap">The market map that decides which market the new security should be in</param>
-        /// <returns>Returns a list of added currency securities</returns>
-        public List<Security> EnsureCurrencyDataFeeds(SecurityManager securities, SubscriptionManager subscriptions, MarketHoursDatabase marketHoursDatabase, SymbolPropertiesDatabase symbolPropertiesDatabase, IReadOnlyDictionary<SecurityType, string> marketMap)
+        /// <param name="changes">Will be used to consume <see cref="SecurityChanges.AddedSecurities"/></param>
+        /// <param name="securityService">Will be used to create required new <see cref="Security"/></param>
+        /// <returns>Returns a list of added currency <see cref="SubscriptionDataConfig"/></returns>
+        public List<SubscriptionDataConfig> EnsureCurrencyDataFeeds(SecurityManager securities,
+            SubscriptionManager subscriptions,
+            IReadOnlyDictionary<SecurityType, string> marketMap,
+            SecurityChanges changes,
+            ISecurityService securityService)
         {
-            var addedSecurities = new List<Security>();
-            foreach (var cash in _currencies.Values)
+            var addedSubscriptionDataConfigs = new List<SubscriptionDataConfig>();
+            foreach (var kvp in _currencies)
             {
-                var security = cash.EnsureCurrencyDataFeed(securities, subscriptions, marketHoursDatabase, symbolPropertiesDatabase, marketMap, this);
-                if (security != null)
+                var cash = kvp.Value;
+
+                var subscriptionDataConfig = cash.EnsureCurrencyDataFeed(
+                    securities,
+                    subscriptions,
+                    marketMap,
+                    changes,
+                    securityService,
+                    AccountCurrency);
+                if (subscriptionDataConfig != null)
                 {
-                    addedSecurities.Add(security);
+                    addedSubscriptionDataConfigs.Add(subscriptionDataConfig);
                 }
             }
-            return addedSecurities;
+            return addedSubscriptionDataConfigs;
         }
 
         /// <summary>
@@ -99,10 +114,26 @@ namespace QuantConnect.Securities
         /// <returns>The converted value</returns>
         public decimal Convert(decimal sourceQuantity, string sourceCurrency, string destinationCurrency)
         {
+            if (sourceQuantity == 0)
+            {
+                return 0;
+            }
+
             var source = this[sourceCurrency];
             var destination = this[destinationCurrency];
-            var conversionRate = source.ConversionRate*destination.ConversionRate;
-            return sourceQuantity*conversionRate;
+
+            if (source.ConversionRate == 0)
+            {
+                throw new Exception($"The conversion rate for {sourceCurrency} is not available.");
+            }
+
+            if (destination.ConversionRate == 0)
+            {
+                throw new Exception($"The conversion rate for {destinationCurrency} is not available.");
+            }
+
+            var conversionRate = source.ConversionRate / destination.ConversionRate;
+            return sourceQuantity * conversionRate;
         }
 
         /// <summary>
@@ -113,6 +144,10 @@ namespace QuantConnect.Securities
         /// <returns>The converted value</returns>
         public decimal ConvertToAccountCurrency(decimal sourceQuantity, string sourceCurrency)
         {
+            if (sourceCurrency == AccountCurrency)
+            {
+                return sourceQuantity;
+            }
             return Convert(sourceQuantity, sourceCurrency, AccountCurrency);
         }
 
@@ -127,13 +162,13 @@ namespace QuantConnect.Securities
         {
             var sb = new StringBuilder();
             sb.AppendLine(string.Format("{0} {1,13}    {2,10} = {3}", "Symbol", "Quantity", "Conversion", "Value in " + AccountCurrency));
-            foreach (var value in Values)
+            foreach (var value in _currencies.Select(x => x.Value))
             {
                 sb.AppendLine(value.ToString());
             }
             sb.AppendLine("-------------------------------------------------");
-            sb.AppendLine(string.Format("CashBook Total Value:                {0}{1}", 
-                Currencies.GetCurrencySymbol(AccountCurrency), 
+            sb.AppendLine(string.Format("CashBook Total Value:                {0}{1}",
+                Currencies.GetCurrencySymbol(AccountCurrency),
                 Math.Round(TotalValueInAccountCurrency, 2))
                 );
 
@@ -146,10 +181,7 @@ namespace QuantConnect.Securities
         /// Gets the count of Cash items in this CashBook.
         /// </summary>
         /// <value>The count.</value>
-        public int Count
-        {
-            get { return _currencies.Count; }
-        }
+        public int Count => _currencies.Skip(0).Count();
 
         /// <summary>
         /// Gets a value indicating whether this instance is read only.
@@ -166,7 +198,7 @@ namespace QuantConnect.Securities
         /// <param name="item">KeyValuePair of symbol -> Cash item</param>
         public void Add(KeyValuePair<string, Cash> item)
         {
-            _currencies.AddOrUpdate(item.Key, item.Value);
+            Add(item.Key, item.Value);
         }
 
         /// <summary>
@@ -176,6 +208,10 @@ namespace QuantConnect.Securities
         /// <param name="value">Value.</param>
         public void Add(string symbol, Cash value)
         {
+            if (symbol == Currencies.NullCurrency)
+            {
+                return;
+            }
             _currencies.AddOrUpdate(symbol, value);
         }
 
@@ -266,6 +302,11 @@ namespace QuantConnect.Securities
         {
             get
             {
+                if (symbol == Currencies.NullCurrency)
+                {
+                    throw new InvalidOperationException(
+                        "Unexpected request for NullCurrency Cash instance");
+                }
                 Cash cash;
                 if (!_currencies.TryGetValue(symbol, out cash))
                 {
@@ -275,7 +316,11 @@ namespace QuantConnect.Securities
             }
             set
             {
-                _currencies[symbol] = value;
+                // wont add NullCurrency
+                if (symbol != Currencies.NullCurrency)
+                {
+                    _currencies[symbol] = value;
+                }
             }
         }
 
@@ -283,19 +328,13 @@ namespace QuantConnect.Securities
         /// Gets the keys.
         /// </summary>
         /// <value>The keys.</value>
-        public ICollection<string> Keys
-        {
-            get { return _currencies.Keys; }
-        }
+        public ICollection<string> Keys => _currencies.Select(x => x.Key).ToList();
 
         /// <summary>
         /// Gets the values.
         /// </summary>
         /// <value>The values.</value>
-        public ICollection<Cash> Values
-        {
-            get { return _currencies.Values; }
-        }
+        public ICollection<Cash> Values => _currencies.Select(x => x.Value).ToList();
 
         /// <summary>
         /// Gets the enumerator.
@@ -309,6 +348,26 @@ namespace QuantConnect.Securities
         IEnumerator IEnumerable.GetEnumerator()
         {
             return ((IEnumerable) _currencies).GetEnumerator();
+        }
+
+        #endregion
+
+        #region ICurrencyConverter Implementation
+
+        /// <summary>
+        /// Converts a cash amount to the account currency
+        /// </summary>
+        /// <param name="cashAmount">The <see cref="CashAmount"/> instance to convert</param>
+        /// <returns>A new <see cref="CashAmount"/> instance denominated in the account currency</returns>
+        public CashAmount ConvertToAccountCurrency(CashAmount cashAmount)
+        {
+            if (cashAmount.Currency == AccountCurrency)
+            {
+                return cashAmount;
+            }
+
+            var amount = Convert(cashAmount.Amount, cashAmount.Currency, AccountCurrency);
+            return new CashAmount(amount, AccountCurrency);
         }
 
         #endregion

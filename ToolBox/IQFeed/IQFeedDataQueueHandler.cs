@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,12 +25,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Net;
-using System.Linq;
-using System.Threading;
 using HistoryRequest = QuantConnect.Data.HistoryRequest;
 using Timer = System.Timers.Timer;
-using QuantConnect.Lean.Engine.DataFeeds.Transport;
 
 
 namespace QuantConnect.ToolBox.IQFeed
@@ -38,7 +34,7 @@ namespace QuantConnect.ToolBox.IQFeed
     /// <summary>
     /// IQFeedDataQueueHandler is an implementation of IDataQueueHandler and IHistoryProvider
     /// </summary>
-    public class IQFeedDataQueueHandler : IDataQueueHandler, IHistoryProvider, IDataQueueUniverseProvider
+    public class IQFeedDataQueueHandler : HistoryProviderBase, IDataQueueHandler, IDataQueueUniverseProvider
     {
         private bool _isConnected;
         private int _dataPointCount;
@@ -56,10 +52,7 @@ namespace QuantConnect.ToolBox.IQFeed
         /// <summary>
         /// Gets the total number of data points emitted by this history provider
         /// </summary>
-        public int DataPointCount
-        {
-            get { return _dataPointCount; }
-        }
+        public override int DataPointCount => _dataPointCount;
 
         /// <summary>
         /// IQFeedDataQueueHandler is an implementation of IDataQueueHandler:
@@ -92,8 +85,6 @@ namespace QuantConnect.ToolBox.IQFeed
             }
         }
 
-
-
         /// <summary>
         /// Adds the specified symbols to the subscription: new IQLevel1WatchItem("IBM", true)
         /// </summary>
@@ -124,7 +115,7 @@ namespace QuantConnect.ToolBox.IQFeed
 
                                 if (symbol.ID.SecurityType == SecurityType.Future && symbol.IsCanonical())
                                 {
-                                    // do nothing for now. Later might add continuous contract symbol. 
+                                    // do nothing for now. Later might add continuous contract symbol.
                                     return;
                                 }
 
@@ -192,15 +183,9 @@ namespace QuantConnect.ToolBox.IQFeed
         /// <summary>
         /// Initializes this history provider to work for the specified job
         /// </summary>
-        /// <param name="job">The job</param>
-        /// <param name="mapFileProvider">Provider used to get a map file resolver to handle equity mapping</param>
-        /// <param name="factorFileProvider">Provider used to get factor files to handle equity price scaling</param>
-        /// <param name="dataProvider">Provider used to get data when it is not present on disk</param>
-        /// <param name="statusUpdate">Function used to send status updates</param>
-        /// <param name="dataCacheProvider">Provider used to cache history data files</param>
-        public void Initialize(AlgorithmNodePacket job, IDataProvider dataProvider, IDataCacheProvider dataCacheProvider, IMapFileProvider mapFileProvider, IFactorFileProvider factorFileProvider, Action<int> statusUpdate)
+        /// <param name="parameters">The initialization parameters</param>
+        public override void Initialize(HistoryProviderInitializeParameters parameters)
         {
-            return;
         }
 
         /// <summary>
@@ -209,7 +194,7 @@ namespace QuantConnect.ToolBox.IQFeed
         /// <param name="requests">The historical data requests</param>
         /// <param name="sliceTimeZone">The time zone used when time stamping the slice instances</param>
         /// <returns>An enumerable of the slices of data covering the span specified in each request</returns>
-        public IEnumerable<Slice> GetHistory(IEnumerable<HistoryRequest> requests, DateTimeZone sliceTimeZone)
+        public override IEnumerable<Slice> GetHistory(IEnumerable<HistoryRequest> requests, DateTimeZone sliceTimeZone)
         {
             foreach (var request in requests)
             {
@@ -420,7 +405,7 @@ namespace QuantConnect.ToolBox.IQFeed
                     _prices.TryGetValue(e.Symbol, out referencePrice);
 
                     var symbol = GetLeanSymbol(e.Symbol);
-                    var split = new Split(symbol, FeedTime, (decimal)referencePrice, (decimal)e.SplitFactor1);
+                    var split = new Split(symbol, FeedTime, (decimal)referencePrice, (decimal)e.SplitFactor1, SplitType.SplitOccurred);
                     _dataQueue.Add(split);
                 }
             }
@@ -551,7 +536,7 @@ namespace QuantConnect.ToolBox.IQFeed
         }
 
         /// <summary>
-        /// Method returns a collection of Symbols that are available at the data source. 
+        /// Method returns a collection of Symbols that are available at the data source.
         /// </summary>
         /// <param name="lookupName">String representing the name to lookup</param>
         /// <param name="securityType">Expected security type of the returned symbols (if any)</param>
@@ -574,7 +559,7 @@ namespace QuantConnect.ToolBox.IQFeed
             private readonly IQFeedDataQueueUniverseProvider _symbolUniverse;
 
             /// <summary>
-            /// ... 
+            /// ...
             /// </summary>
             public HistoryPort(IQFeedDataQueueUniverseProvider symbolUniverse)
                 : base(80)
@@ -605,7 +590,7 @@ namespace QuantConnect.ToolBox.IQFeed
             /// </summary>
             public IEnumerable<Slice> ProcessHistoryRequests(HistoryRequest request)
             {
-                // skipping universe and canonical symbols 
+                // skipping universe and canonical symbols
                 if (!CanHandle(request.Symbol) ||
                     (request.Symbol.ID.SecurityType == SecurityType.Option && request.Symbol.IsCanonical()) ||
                     (request.Symbol.ID.SecurityType == SecurityType.Future && request.Symbol.IsCanonical()))
@@ -680,7 +665,7 @@ namespace QuantConnect.ToolBox.IQFeed
                 return lookupType + id.ToString("0000000");
             }
 
-            
+
             /// <summary>
             /// Method called when a new Lookup event is fired
             /// </summary>
@@ -728,7 +713,7 @@ namespace QuantConnect.ToolBox.IQFeed
                     current.Add(data);
                 }
             }
-            
+
             /// <summary>
             /// Transform received data into BaseData object
             /// </summary>

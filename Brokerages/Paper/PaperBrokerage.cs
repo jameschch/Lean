@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,6 +14,7 @@
  *
 */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Brokerages.Backtesting;
@@ -28,6 +29,7 @@ namespace QuantConnect.Brokerages.Paper
     /// </summary>
     public class PaperBrokerage : BacktestingBrokerage
     {
+        private DateTime _lastScanTime;
         private readonly LiveNodePacket _job;
 
         /// <summary>
@@ -35,7 +37,7 @@ namespace QuantConnect.Brokerages.Paper
         /// </summary>
         /// <param name="algorithm">The algorithm under analysis</param>
         /// <param name="job">The job packet</param>
-        public PaperBrokerage(IAlgorithm algorithm, LiveNodePacket job) 
+        public PaperBrokerage(IAlgorithm algorithm, LiveNodePacket job)
             : base(algorithm, "Paper Brokerage")
         {
             _job = job;
@@ -52,11 +54,40 @@ namespace QuantConnect.Brokerages.Paper
             {
                 // remove the key, we really only want to return the cached value on the first request
                 _job.BrokerageData.Remove("project-paper-equity");
-                return new List<Cash>{new Cash("USD", decimal.Parse(value), 1)};
+                return new List<Cash>{new Cash(Currencies.USD, decimal.Parse(value), 1)};
             }
 
             // if we've already begun running, just return the current state
-            return Algorithm.Portfolio.CashBook.Values.ToList();
+            return Algorithm.Portfolio.CashBook.Select(x => x.Value).ToList();
+        }
+
+        /// <summary>
+        /// Scans all the outstanding orders and applies the algorithm model fills to generate the order events.
+        /// This override adds dividend detection and application
+        /// </summary>
+        public override void Scan()
+        {
+            // Scan is called twice per time loop, this check enforces that we only check
+            // on the first call for each time loop
+            if (Algorithm.UtcTime != _lastScanTime && Algorithm.CurrentSlice != null)
+            {
+                _lastScanTime = Algorithm.UtcTime;
+
+                // apply each dividend directly to the quote cash holdings of the security
+                // this assumes dividends are paid out in a security's quote cash (reasonable assumption)
+                foreach (var dividend in Algorithm.CurrentSlice.Dividends.Values)
+                {
+                    Security security;
+                    if (Algorithm.Securities.TryGetValue(dividend.Symbol, out security))
+                    {
+                        // compute the total distribution and apply as security's quote currency
+                        var distribution = security.Holdings.Quantity * dividend.Distribution;
+                        security.QuoteCurrency.AddAmount(distribution);
+                    }
+                }
+            }
+
+            base.Scan();
         }
     }
 }

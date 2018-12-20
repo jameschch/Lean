@@ -305,6 +305,7 @@
         "11/25/2021",
         "11/24/2022",
         "11/23/2023",
+        "12/05/2018",
         "12/25/1998",
         "12/24/1999",
         "12/25/2000",
@@ -359,7 +360,7 @@
     },
 
     "Future-usa-[*]": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -408,7 +409,7 @@
     },
 
     "Future-usa-ZW": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -501,7 +502,7 @@
       "holidays": []
     },
     "Future-usa-ZC": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -594,7 +595,7 @@
       "holidays": []
     },
     "Future-usa-ZS": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -687,7 +688,7 @@
       "holidays": []
     },
     "Future-usa-ZM": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -780,7 +781,7 @@
       "holidays": []
     },
     "Future-usa-ZL": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -873,7 +874,7 @@
       "holidays": []
     },
     "Future-usa-ZO": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1034,7 +1035,7 @@
       "holidays": []
     },
     "Future-usa-6B": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1102,7 +1103,7 @@
       "holidays": []
     },
     "Future-usa-6C": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1170,7 +1171,7 @@
       "holidays": []
     },
     "Future-usa-6J": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1238,7 +1239,7 @@
       "holidays": []
     },
     "Future-usa-6S": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1306,7 +1307,7 @@
       "holidays": []
     },
     "Future-usa-6E": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1374,7 +1375,7 @@
       "holidays": []
     },
     "Future-usa-6A": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1442,7 +1443,7 @@
       "holidays": []
     },
     "Future-usa-6N": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1510,7 +1511,7 @@
       "holidays": []
     },
     "Future-usa-CL": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -1578,7 +1579,7 @@
       "holidays": []
     },
     "Future-usa-HO": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -1646,7 +1647,7 @@
       "holidays": []
     },
     "Future-usa-RB": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -1714,7 +1715,7 @@
       "holidays": []
     },
     "Future-usa-NG": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -1782,7 +1783,7 @@
       "holidays": []
     },
     "Future-usa-ZB": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1850,7 +1851,7 @@
       "holidays": []
     },
     "Future-usa-ZN": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1918,7 +1919,7 @@
       "holidays": []
     },
     "Future-usa-ZF": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -1986,7 +1987,7 @@
       "holidays": []
     },
     "Future-usa-ZT": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -2054,7 +2055,7 @@
       "holidays": []
     },
     "Future-usa-GE": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
@@ -2122,11 +2123,11 @@
       "holidays": []
     },
     "Future-usa-ES": {
-      "dataTimeZone": "America/Chicago",
-      "exchangeTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
+      "exchangeTimeZone": "America/New_York",
       "sunday": [
-        {
-          "start": "17:00:00",
+        {   
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2134,16 +2135,16 @@
       "monday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2151,16 +2152,16 @@
       "tuesday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2168,16 +2169,16 @@
       "wednesday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2185,16 +2186,16 @@
       "thursday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2202,12 +2203,12 @@
       "friday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         }
       ],
@@ -2215,11 +2216,11 @@
       "holidays": []
     },
     "Future-usa-NQ": {
-      "dataTimeZone": "America/Chicago",
-      "exchangeTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
+      "exchangeTimeZone": "America/New_York",
       "sunday": [
-        {
-          "start": "17:00:00",
+        {   
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2227,16 +2228,16 @@
       "monday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2244,16 +2245,16 @@
       "tuesday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2261,16 +2262,16 @@
       "wednesday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2278,16 +2279,16 @@
       "thursday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2295,12 +2296,12 @@
       "friday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         }
       ],
@@ -2308,11 +2309,11 @@
       "holidays": []
     },
     "Future-usa-YM": {
-      "dataTimeZone": "America/Chicago",
-      "exchangeTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
+      "exchangeTimeZone": "America/New_York",
       "sunday": [
-        {
-          "start": "17:00:00",
+        {   
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2320,16 +2321,16 @@
       "monday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2337,16 +2338,16 @@
       "tuesday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2354,16 +2355,16 @@
       "wednesday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2371,16 +2372,16 @@
       "thursday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "17:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2388,12 +2389,12 @@
       "friday": [
         {
           "start": "00:00:00",
-          "end": "15:15:00",
+          "end": "16:15:00",
           "state": "market"
         },
         {
-          "start": "15:30:00",
-          "end": "16:00:00",
+          "start": "16:30:00",
+          "end": "17:00:00",
           "state": "market"
         }
       ],
@@ -2401,11 +2402,11 @@
       "holidays": []
     },
     "Future-usa-VX": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [
         {
-          "start": "15:30:00",
+          "start": "17:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2469,7 +2470,7 @@
       "holidays": []
     },
     "Future-usa-LE": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [],
       "monday": [
@@ -2511,7 +2512,7 @@
       "holidays": []
     },
     "Future-usa-GF": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [],
       "monday": [
@@ -2553,7 +2554,7 @@
       "holidays": []
     },
     "Future-usa-HE": {
-      "dataTimeZone": "America/Chicago",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/Chicago",
       "sunday": [],
       "monday": [
@@ -2595,7 +2596,7 @@
       "holidays": []
     },
     "Future-usa-GC": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -2663,7 +2664,7 @@
       "holidays": []
     },
     "Future-usa-SI": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -2731,7 +2732,7 @@
       "holidays": []
     },
     "Future-usa-PL": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -2799,7 +2800,7 @@
       "holidays": []
     },
     "Future-usa-PA": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
@@ -2867,11 +2868,11 @@
       "holidays": []
     },
     "Future-usa-CT": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [
         {
-          "start": "21:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2879,11 +2880,11 @@
       "monday": [
         {
           "start": "00:00:00",
-          "end": "14:20:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "21:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2891,11 +2892,11 @@
       "tuesday": [
         {
           "start": "00:00:00",
-          "end": "14:20:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "21:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2903,11 +2904,11 @@
       "wednesday": [
         {
           "start": "00:00:00",
-          "end": "14:20:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "21:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2915,11 +2916,11 @@
       "thursday": [
         {
           "start": "00:00:00",
-          "end": "14:20:00",
+          "end": "17:00:00",
           "state": "market"
         },
         {
-          "start": "21:00:00",
+          "start": "18:00:00",
           "end": "1.00:00:00",
           "state": "market"
         }
@@ -2927,7 +2928,7 @@
       "friday": [
         {
           "start": "00:00:00",
-          "end": "14:20:00",
+          "end": "17:00:00",
           "state": "market"
         }
       ],
@@ -2935,7 +2936,7 @@
       "holidays": []
     },
     "Future-usa-OJ": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [],
       "monday": [
@@ -2977,7 +2978,7 @@
       "holidays": []
     },
     "Future-usa-KC": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [],
       "monday": [
@@ -3019,7 +3020,7 @@
       "holidays": []
     },
     "Future-usa-SB": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [],
       "monday": [
@@ -3061,7 +3062,7 @@
       "holidays": []
     },
     "Future-usa-CC": {
-      "dataTimeZone": "America/New_York",
+      "dataTimeZone": "UTC",
       "exchangeTimeZone": "America/New_York",
       "sunday": [],
       "monday": [
@@ -3357,6 +3358,7 @@
         "11/25/2021",
         "11/24/2022",
         "11/23/2023",
+        "12/05/2018",
         "12/25/1998",
         "12/24/1999",
         "12/25/2000",
@@ -3457,6 +3459,7 @@
         "1/2/2018",
         "1/2/2019",
         "1/2/2020",
+        "12/24/2017",
         "12/25/2007",
         "12/25/2008",
         "12/25/2009",
@@ -3480,7 +3483,8 @@
         "12/26/2016",
         "12/26/2017",
         "12/26/2018",
-        "12/26/2019"
+        "12/26/2019",
+        "12/31/2017"
       ]
     },
     "Forex-oanda-[*]": {
@@ -6964,40 +6968,76 @@
     },
     "Cfd-oanda-SG30SGD": {
       "dataTimeZone": "UTC",
-      "exchangeTimeZone": "Asia/Hong_Kong",
-      "sunday": [],
-      "monday": [
+      "exchangeTimeZone": "UTC",
+      "sunday": [
         {
-          "start": "09:00:00",
-          "end": "05:00:00",
+          "start": "00:30:00",
+          "end": "09:10:00",
+          "state": "market"
+        },
+        {
+          "start": "10:15:00",
+          "end": "18:00:00",
           "state": "market"
         }
       ],
-      "tuesday": [
+      "monday": [
         {
-          "start": "09:00:00",
-          "end": "05:00:00",
+          "start": "00:30:00",
+          "end": "09:10:00",
+          "state": "market"
+        },
+        {
+          "start": "10:15:00",
+          "end": "18:00:00",
+          "state": "market"
+        }
+      ],
+      "tuesday": [        
+        {
+          "start": "00:30:00",
+          "end": "09:10:00",
+          "state": "market"
+        },
+        {
+          "start": "10:15:00",
+          "end": "18:00:00",
           "state": "market"
         }
       ],
       "wednesday": [
         {
-          "start": "09:00:00",
-          "end": "05:00:00",
+          "start": "00:30:00",
+          "end": "09:10:00",
+          "state": "market"
+        },
+        {
+          "start": "10:15:00",
+          "end": "18:00:00",
           "state": "market"
         }
       ],
       "thursday": [
+       {
+          "start": "00:30:00",
+          "end": "09:10:00",
+          "state": "market"
+        },
         {
-          "start": "09:00:00",
-          "end": "05:00:00",
+          "start": "10:15:00",
+          "end": "18:00:00",
           "state": "market"
         }
       ],
       "friday": [
         {
-          "start": "09:00:00",
-          "end": "05:00:00",
+          "start": "00:30:00",
+          "end": "09:10:00",
+          "state": "market"
+        },
+        {
+          "start": "10:15:00",
+          "end": "18:00:00",
           "state": "market"
         }
       ],
@@ -10228,6 +10268,80 @@
       ]
     },
     "Crypto-gdax-[*]": {
+      "dataTimeZone": "UTC",
+      "exchangeTimeZone": "UTC",
+      "sunday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "monday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        },
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "tuesday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        },
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "wednesday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        },
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "thursday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        },
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "friday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "saturday": [
+        {
+          "start": "00:00:00",
+          "end": "1.00:00:00",
+          "state": "market"
+        }
+      ],
+      "holidays": []
+    },
+    "Crypto-bitfinex-[*]": {
       "dataTimeZone": "UTC",
       "exchangeTimeZone": "UTC",
       "sunday": [

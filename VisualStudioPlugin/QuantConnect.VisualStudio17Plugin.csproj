@@ -75,11 +75,29 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AuthorizationManager.cs" />
+    <Compile Include="BacktestNameProvider.cs" />
+    <Compile Include="ComboboxProjectItem.cs" />
+    <Compile Include="EditBacktestDialog.xaml.cs">
+      <DependentUpon>EditBacktestDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="DataGridItem.cs" />
+    <Compile Include="ErrorDialog.xaml.cs">
+      <DependentUpon>ErrorDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Credentials.cs" />
     <Compile Include="CredentialsManager.cs" />
-    <Compile Include="Log.cs" />
-    <Compile Include="LogInCommand.cs" />
-    <Compile Include="LogInDialog.xaml.cs" />
+    <Compile Include="IBacktestObserver.cs" />
+    <Compile Include="NewProjectDialog.xaml.cs">
+      <DependentUpon>NewProjectDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ToolWindow1.cs" />
+    <Compile Include="ToolWindow1Command.cs" />
+    <Compile Include="ToolWindow1Control.xaml.cs">
+      <DependentUpon>ToolWindow1Control.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="VSActivityLog.cs" />
+    <Compile Include="AuthenticationCommand.cs" />
+    <Compile Include="LoginDialog.xaml.cs" />
     <Compile Include="PathUtils.cs" />
     <Compile Include="ProjectFinder.cs" />
     <Compile Include="ProjectNameDialog.xaml.cs" />
@@ -92,13 +110,31 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="Key.snk" />
-    <None Include="packages.QuantConnect.VisualStudio17Plugin.config" />
+    <None Include="packages.QuantConnect.VisualStudio17Plugin.config">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
   <ItemGroup>
+    <Page Include="EditBacktestDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ErrorDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="NewProjectDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ProjectNameDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ToolWindow1Control.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -106,20 +142,31 @@
       <ResourceName>Menus.ctmenu</ResourceName>
       <SubType>Designer</SubType>
     </VSCTCompile>
-    <Page Include="LogInDialog.xaml">
+    <Page Include="LoginDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Content Include="icon_128x128.png">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    <Resource Include="..\UserInterface\Icons\dialog-close-32.png">
+      <Link>Resources\dialog-close-32.png</Link>
+    </Resource>
+    <Resource Include="..\UserInterface\Icons\dialog-ok-apply-32.png">
+      <Link>Resources\dialog-ok-apply-32.png</Link>
+    </Resource>
+    <Content Include="..\UserInterface\Icons\icon_128x128.png">
+      <Link>icon_128x128.png</Link>
       <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="LICENSE.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
-    <Content Include="Resources\QuantConnectPackage.ico" />
-    <Content Include="Resources\ToolMenuCommand.png" />
+    <Resource Include="Resources\icon_128x128_resource.png" />
+    <Content Include="Resources\icon_16x16.png" />
+    <Content Include="Resources\login.png" />
+    <Content Include="Resources\logout.png" />
+    <Content Include="Resources\saveToQuantConnect.png" />
+    <Content Include="Resources\sendForBacktesting.png" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CredentialManagement, Version=1.0.2.0, Culture=neutral, processorArchitecture=MSIL">
@@ -220,6 +267,7 @@
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="PresentationFramework.Aero2" />
     <Reference Include="stdole, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
       <EmbedInteropTypes>False</EmbedInteropTypes>
     </Reference>
@@ -237,6 +285,7 @@
     <EmbeddedResource Include="VSPackage.resx">
       <MergeWithCTO>true</MergeWithCTO>
       <ManifestResourceName>VSPackage</ManifestResourceName>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

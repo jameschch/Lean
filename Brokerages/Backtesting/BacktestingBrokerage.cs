@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,6 +20,8 @@ using System.Linq;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
+using QuantConnect.Orders.Fills;
+using QuantConnect.Orders.Fees;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Option;
 
@@ -37,6 +39,7 @@ namespace QuantConnect.Brokerages.Backtesting
         private bool _needsScan;
         private readonly ConcurrentDictionary<int, Order> _pending;
         private readonly object _needsScanLock = new object();
+        private readonly HashSet<Symbol> _pendingOptionAssignments = new HashSet<Symbol>();
 
         /// <summary>
         /// This is the algorithm under test
@@ -78,16 +81,14 @@ namespace QuantConnect.Brokerages.Backtesting
             MarketSimulation = marketSimulation;
             _pending = new ConcurrentDictionary<int, Order>();
         }
+
         /// <summary>
         /// Gets the connection status
         /// </summary>
         /// <remarks>
         /// The BacktestingBrokerage is always connected
         /// </remarks>
-        public override bool IsConnected
-        {
-            get { return true; }
-        }
+        public override bool IsConnected => true;
 
         /// <summary>
         /// Gets all open orders on the account
@@ -95,7 +96,7 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>The open orders returned from IB</returns>
         public override List<Order> GetOpenOrders()
         {
-            return Algorithm.Transactions.GetOpenOrders();
+            return Algorithm.Transactions.GetOpenOrders().ToList();
         }
 
         /// <summary>
@@ -105,9 +106,9 @@ namespace QuantConnect.Brokerages.Backtesting
         public override List<Holding> GetAccountHoldings()
         {
             // grab everything from the portfolio with a non-zero absolute quantity
-            return (from security in Algorithm.Portfolio.Securities.Values.OrderBy(x => x.Symbol) 
-                    where security.Holdings.AbsoluteQuantity > 0 
-                    select new Holding(security)).ToList();
+            return (from kvp in Algorithm.Portfolio.Securities.OrderBy(x => x.Value.Symbol)
+                    where kvp.Value.Holdings.AbsoluteQuantity > 0
+                    select new Holding(kvp.Value)).ToList();
         }
 
         /// <summary>
@@ -116,7 +117,7 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>The current cash balance for each currency available for trading</returns>
         public override List<Cash> GetCashBalance()
         {
-            return Algorithm.Portfolio.CashBook.Values.ToList();
+            return Algorithm.Portfolio.CashBook.Select(x => x.Value).ToList();
         }
 
         /// <summary>
@@ -126,6 +127,11 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>True if the request for a new order has been placed, false otherwise</returns>
         public override bool PlaceOrder(Order order)
         {
+            if (Algorithm.LiveMode)
+            {
+                Log.Trace("BacktestingBrokerage.PlaceOrder(): Type: " + order.Type + " Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity);
+            }
+
             if (order.Status == OrderStatus.New)
             {
                 lock (_needsScanLock)
@@ -138,8 +144,10 @@ namespace QuantConnect.Brokerages.Backtesting
                 if (!order.BrokerId.Contains(orderId)) order.BrokerId.Add(orderId);
 
                 // fire off the event that says this order has been submitted
-                const int orderFee = 0;
-                var submitted = new OrderEvent(order, Algorithm.UtcTime, orderFee) { Status = OrderStatus.Submitted };
+                var submitted = new OrderEvent(order,
+                        Algorithm.UtcTime,
+                        OrderFee.Zero)
+                    { Status = OrderStatus.Submitted };
                 OnOrderEvent(submitted);
 
                 return true;
@@ -154,7 +162,12 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>True if the request was made for the order to be updated, false otherwise</returns>
         public override bool UpdateOrder(Order order)
         {
-            if (true)
+            if (Algorithm.LiveMode)
+            {
+                Log.Trace("BacktestingBrokerage.UpdateOrder(): Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity + " Status: " + order.Status);
+            }
+
+            lock (_needsScanLock)
             {
                 Order pending;
                 if (!_pending.TryGetValue(order.Id, out pending))
@@ -163,22 +176,21 @@ namespace QuantConnect.Brokerages.Backtesting
                     return false;
                 }
 
-                lock (_needsScanLock)
-                {
-                    _needsScan = true;
-                    SetPendingOrder(order);
-                }
-
-                var orderId = order.Id.ToString();
-                if (!order.BrokerId.Contains(orderId)) order.BrokerId.Add(orderId);
-
-                // fire off the event that says this order has been updated
-                const int orderFee = 0;
-                var updated = new OrderEvent(order, Algorithm.UtcTime, orderFee) { Status = OrderStatus.Submitted };
-                OnOrderEvent(updated);
-
-                return true;
+                _needsScan = true;
+                SetPendingOrder(order);
             }
+
+            var orderId = order.Id.ToString();
+            if (!order.BrokerId.Contains(orderId)) order.BrokerId.Add(orderId);
+
+            // fire off the event that says this order has been updated
+            var updated = new OrderEvent(order,
+                    Algorithm.UtcTime,
+                    OrderFee.Zero)
+                { Status = OrderStatus.Submitted };
+            OnOrderEvent(updated);
+
+            return true;
         }
 
         /// <summary>
@@ -188,19 +200,29 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <returns>True if the request was made for the order to be canceled, false otherwise</returns>
         public override bool CancelOrder(Order order)
         {
-            Order pending;
-            if (!_pending.TryRemove(order.Id, out pending))
+            if (Algorithm.LiveMode)
             {
-                // can't cancel something that isn't there
-                return false;
+                Log.Trace("BacktestingBrokerage.CancelOrder(): Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity);
+            }
+
+            lock (_needsScanLock)
+            {
+                Order pending;
+                if (!_pending.TryRemove(order.Id, out pending))
+                {
+                    // can't cancel something that isn't there
+                    return false;
+                }
             }
 
             var orderId = order.Id.ToString();
             if (!order.BrokerId.Contains(orderId)) order.BrokerId.Add(order.Id.ToString());
 
             // fire off the event that says this order has been canceled
-            const int orderFee = 0;
-            var canceled = new OrderEvent(order, Algorithm.UtcTime, orderFee) { Status = OrderStatus.Canceled };
+            var canceled = new OrderEvent(order,
+                    Algorithm.UtcTime,
+                    OrderFee.Zero)
+                { Status = OrderStatus.Canceled };
             OnOrderEvent(canceled);
 
             return true;
@@ -214,7 +236,7 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <summary>
         /// Scans all the outstanding orders and applies the algorithm model fills to generate the order events
         /// </summary>
-        public void Scan()
+        public virtual void Scan()
         {
             lock (_needsScanLock)
             {
@@ -230,6 +252,12 @@ namespace QuantConnect.Brokerages.Backtesting
                 foreach (var kvp in _pending.OrderBy(x => x.Key))
                 {
                     var order = kvp.Value;
+                    if (order == null)
+                    {
+                        Log.Error("BacktestingBrokerage.Scan(): Null pending order found: " + kvp.Key);
+                        _pending.TryRemove(kvp.Key, out order);
+                        continue;
+                    }
 
                     if (order.Status.IsClosed())
                     {
@@ -245,14 +273,33 @@ namespace QuantConnect.Brokerages.Backtesting
                         continue;
                     }
 
-                    var fills = new[] { new OrderEvent(order, Algorithm.UtcTime, 0) };
+                    var fills = new[] { new OrderEvent(order,
+                        Algorithm.UtcTime,
+                        OrderFee.Zero) };
 
                     Security security;
                     if (!Algorithm.Securities.TryGetValue(order.Symbol, out security))
                     {
                         Log.Error("BacktestingBrokerage.Scan(): Unable to process order: " + order.Id + ". The security no longer exists.");
                         // invalidate the order in the algorithm before removing
-                        OnOrderEvent(new OrderEvent(order, Algorithm.UtcTime, 0m){Status = OrderStatus.Invalid});
+                        OnOrderEvent(new OrderEvent(order,
+                                Algorithm.UtcTime,
+                                OrderFee.Zero)
+                        {Status = OrderStatus.Invalid});
+                        _pending.TryRemove(order.Id, out order);
+                        continue;
+                    }
+
+                    // check if the time in force handler allows fills
+                    if (order.TimeInForce.IsOrderExpired(security, order))
+                    {
+                        OnOrderEvent(new OrderEvent(order,
+                            Algorithm.UtcTime,
+                            OrderFee.Zero)
+                        {
+                            Status = OrderStatus.Canceled,
+                            Message = "The order has expired."
+                        });
                         _pending.TryRemove(order.Id, out order);
                         continue;
                     }
@@ -264,26 +311,29 @@ namespace QuantConnect.Brokerages.Backtesting
                     }
 
                     // verify sure we have enough cash to perform the fill
-                    bool sufficientBuyingPower;
+                    HasSufficientBuyingPowerForOrderResult hasSufficientBuyingPowerResult;
                     try
                     {
-                        sufficientBuyingPower = Algorithm.Transactions.GetSufficientCapitalForOrder(Algorithm.Portfolio, order);
+                        hasSufficientBuyingPowerResult = security.BuyingPowerModel.HasSufficientBuyingPowerForOrder(Algorithm.Portfolio, security, order);
                     }
                     catch (Exception err)
                     {
                         // if we threw an error just mark it as invalid and remove the order from our pending list
+                        OnOrderEvent(new OrderEvent(order,
+                                Algorithm.UtcTime,
+                                OrderFee.Zero,
+                                err.Message)
+                            { Status = OrderStatus.Invalid });
                         Order pending;
                         _pending.TryRemove(order.Id, out pending);
-                        order.Status = OrderStatus.Invalid;
-                        OnOrderEvent(new OrderEvent(order, Algorithm.UtcTime, 0, "Error in GetSufficientCapitalForOrder"));
 
                         Log.Error(err);
-                        Algorithm.Error(string.Format("Order Error: id: {0}, Error executing margin models: {1}", order.Id, err.Message));
+                        Algorithm.Error($"Order Error: id: {order.Id}, Error executing margin models: {err.Message}");
                         continue;
                     }
 
                     //Before we check this queued order make sure we have buying power:
-                    if (sufficientBuyingPower)
+                    if (hasSufficientBuyingPowerResult.IsSufficient)
                     {
                         //Model:
                         var model = security.FillModel;
@@ -291,55 +341,68 @@ namespace QuantConnect.Brokerages.Backtesting
                         //Based on the order type: refresh its model to get fill price and quantity
                         try
                         {
-                            switch (order.Type)
+                            if (order.Type == OrderType.OptionExercise)
                             {
-                                case OrderType.Limit:
-                                    fills = new[] { model.LimitFill(security, order as LimitOrder) };
-                                    break;
+                                var option = (Option)security;
+                                fills = option.OptionExerciseModel.OptionExercise(option, order as OptionExerciseOrder).ToArray();
+                            }
+                            else
+                            {
+                                var context = new FillModelParameters(
+                                    security,
+                                    order,
+                                    Algorithm.SubscriptionManager.SubscriptionDataConfigService);
+                                fills = new[] { model.Fill(context).OrderEvent };
+                            }
 
-                                case OrderType.StopMarket:
-                                    fills = new[] { model.StopMarketFill(security, order as StopMarketOrder) };
-                                    break;
-
-                                case OrderType.Market:
-                                    fills = new[] { model.MarketFill(security, order as MarketOrder) };
-                                    break;
-
-                                case OrderType.StopLimit:
-                                    fills = new[] { model.StopLimitFill(security, order as StopLimitOrder) };
-                                    break;
-
-                                case OrderType.MarketOnOpen:
-                                    fills = new[] { model.MarketOnOpenFill(security, order as MarketOnOpenOrder) };
-                                    break;
-
-                                case OrderType.MarketOnClose:
-                                    fills = new[] { model.MarketOnCloseFill(security, order as MarketOnCloseOrder) };
-                                    break;
-
-                                case OrderType.OptionExercise:
-                                    var option = (Option)security;
-                                    fills = option.OptionExerciseModel.OptionExercise(option, order as OptionExerciseOrder).ToArray();
-                                    break;
+                            // invoke fee models for completely filled order events
+                            foreach (var fill in fills)
+                            {
+                                if (fill.Status == OrderStatus.Filled)
+                                {
+                                    // this check is provided for backwards compatibility of older user-defined fill models
+                                    // that may be performing fee computation inside the fill model w/out invoking the fee model
+                                    // TODO : This check can be removed in April, 2019 -- a 6-month window to upgrade (also, suspect small % of users, if any are impacted)
+                                    if (fill.OrderFee.Value.Amount == 0m)
+                                    {
+                                        fill.OrderFee = security.FeeModel.GetOrderFee(
+                                            new OrderFeeParameters(security,
+                                                order,
+                                                Algorithm.Portfolio.CashBook.AccountCurrency));
+                                    }
+                                }
                             }
                         }
                         catch (Exception err)
                         {
                             Log.Error(err);
-                            Algorithm.Error(string.Format("Order Error: id: {0}, Transaction model failed to fill for order type: {1} with error: {2}",
-                                order.Id, order.Type, err.Message));
+                            Algorithm.Error($"Order Error: id: {order.Id}, Transaction model failed to fill for order type: {order.Type} with error: {err.Message}");
                         }
                     }
                     else
                     {
-                        //Flag order as invalid and push off queue:
-                        order.Status = OrderStatus.Invalid;
-                        Algorithm.Error(string.Format("Order Error: id: {0}, Insufficient buying power to complete order (Value:{1}).", order.Id,
-                            order.GetValue(security).SmartRounding()));
+                        // invalidate the order in the algorithm before removing
+                        var message = $"Insufficient buying power to complete order (Value:{order.GetValue(security).SmartRounding()}), Reason: {hasSufficientBuyingPowerResult.Reason}.";
+                        OnOrderEvent(new OrderEvent(order,
+                                Algorithm.UtcTime,
+                                OrderFee.Zero,
+                                message)
+                            { Status = OrderStatus.Invalid });
+                        Order pending;
+                        _pending.TryRemove(order.Id, out pending);
+
+                        Algorithm.Error($"Order Error: id: {order.Id}, {message}");
+                        continue;
                     }
 
                     foreach (var fill in fills)
                     {
+                        // check if the fill should be emitted
+                        if (!order.TimeInForce.IsFillValid(security, order, fill))
+                        {
+                            break;
+                        }
+
                         // change in status or a new fill
                         if (order.Status != fill.Status || fill.FillQuantity != 0)
                         {
@@ -349,6 +412,7 @@ namespace QuantConnect.Brokerages.Backtesting
 
                         if (order.Type == OrderType.OptionExercise)
                         {
+                            fill.Message = order.Tag;
                             OnOptionPositionAssigned(fill);
                         }
                     }
@@ -369,13 +433,12 @@ namespace QuantConnect.Brokerages.Backtesting
         }
 
         /// <summary>
-        /// Runs market simulation 
+        /// Runs market simulation
         /// </summary>
         public void SimulateMarket()
         {
             // if simulator is installed, we run it
-            if (MarketSimulation != null)
-                MarketSimulation.SimulateMarketConditions(this, Algorithm);
+            MarketSimulation?.SimulateMarketConditions(this, Algorithm);
         }
 
         /// <summary>
@@ -385,19 +448,29 @@ namespace QuantConnect.Brokerages.Backtesting
         /// <param name="quantity">Quantity to assign</param>
         public virtual void ActivateOptionAssignment(Option option, int quantity)
         {
-            var request = new SubmitOrderRequest(OrderType.OptionExercise, option.Type, option.Symbol, -quantity, 0.0m, 0.0m, Algorithm.UtcTime, "Simulated option assignment");
-            var order = (OptionExerciseOrder)Order.CreateOrder(request);
-            var fills = option.OptionExerciseModel.OptionExercise(option, order);
-            var portfolioModel = (OptionPortfolioModel)option.PortfolioModel;
+            // do not process the same assignment more than once
+            if (_pendingOptionAssignments.Contains(option.Symbol)) return;
 
-            foreach (var fill in fills)
+            _pendingOptionAssignments.Add(option.Symbol);
+
+            var request = new SubmitOrderRequest(OrderType.OptionExercise, option.Type, option.Symbol, -quantity, 0m, 0m, Algorithm.UtcTime, "Simulated option assignment before expiration");
+
+            var ticket = Algorithm.Transactions.ProcessRequest(request);
+            Log.Trace($"BacktestingBrokerage.ActivateOptionAssignment(): OrderId: {ticket.OrderId}");
+        }
+
+        /// <summary>
+        /// Event invocator for the OrderFilled event
+        /// </summary>
+        /// <param name="e">The OrderEvent</param>
+        protected override void OnOrderEvent(OrderEvent e)
+        {
+            if (e.Status.IsClosed() && _pendingOptionAssignments.Contains(e.Symbol))
             {
-                // processing assignment in the portfolio first
-                portfolioModel.ProcessFill(Algorithm.Portfolio, option, fill);
-
-                // firing event informing interested parties that option position has been assigned
-                OnOptionPositionAssigned(fill);
+                _pendingOptionAssignments.Remove(e.Symbol);
             }
+
+            base.OnOrderEvent(e);
         }
 
         /// <summary>

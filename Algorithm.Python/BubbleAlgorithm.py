@@ -1,4 +1,4 @@
-﻿# QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
+﻿ # QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
 # Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,13 @@
 from clr import AddReference
 AddReference("System")
 AddReference("QuantConnect.Algorithm")
+AddReference("QuantConnect.Indicators")
 AddReference("QuantConnect.Common")
 
 from System import *
 from QuantConnect import *
 from QuantConnect.Algorithm import *
+from QuantConnect.Indicators import *
 from QuantConnect.Data import SubscriptionDataSource
 from QuantConnect.Python import PythonData
 from datetime import date, timedelta, datetime
@@ -83,7 +85,6 @@ class BubbleAlgorithm(QCAlgorithm):
             try:
                 # Bubble territory
                 if self._currCape > 20 and self._newLow == False:
-                    self.Log(" Time " + str(self.Time))
                     for stock in self._symbols:
                     # Order stock based on MACD
                     # During market hours, stock is trading, and sufficient cash
@@ -113,14 +114,14 @@ class BubbleAlgorithm(QCAlgorithm):
                 # Cape Ratio is missing from orignial data
                 # Most recent cape data is most likely to be missing 
                 elif self._currCape == 0:
-                    self.Debug("Exiting due to no CAPE!");
+                    self.Debug("Exiting due to no CAPE!")
                     self.Quit("CAPE ratio not supplied in data, exiting.")
                 
             except:
                 # Do nothing
                 return None       
 
-        if "CAPE" not in data: return
+        if not data.ContainsKey("CAPE"): return
         self._newLow = False
         # Adds first four Cape Ratios to array c
         self._currCape = data["CAPE"].Cape

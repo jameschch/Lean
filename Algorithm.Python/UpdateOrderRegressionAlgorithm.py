@@ -38,8 +38,8 @@ class UpdateOrderRegressionAlgorithm(QCAlgorithm):
     def Initialize(self):
         '''Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.'''
 
-        self.SetStartDate(2013,01,01)  #Set Start Date
-        self.SetEndDate(2015,01,01)    #Set End Date
+        self.SetStartDate(2013,1,1)    #Set Start Date
+        self.SetEndDate(2015,1,1)      #Set End Date
         self.SetCash(100000)           #Set Strategy Cash
         # Find more symbols here: http://quantconnect.com/data
 
@@ -72,8 +72,8 @@ class UpdateOrderRegressionAlgorithm(QCAlgorithm):
 
         if self.Time.month != self.last_month:
             # we'll submit the next type of order from the queue
-            orderType = self.order_types_queue.Dequeue();
-            #Log("");
+            orderType = self.order_types_queue.Dequeue()
+            #Log("")
             self.Log("\r\n--------------MONTH: {0}:: {1}\r\n".format(self.Time.strftime("%B"), orderType))
             #Log("")
             self.last_month = self.Time.month
@@ -85,7 +85,7 @@ class UpdateOrderRegressionAlgorithm(QCAlgorithm):
             if orderType == OrderType.Limit:
                 limitPrice = d.Decimal(1 + self.limit_percentage)*data["SPY"].High if not isLong else d.Decimal(1 - self.limit_percentage)*data["SPY"].Low
 
-            request = SubmitOrderRequest(orderType, self.security.Symbol.SecurityType, "SPY", self.quantity, stopPrice, limitPrice, self.Time, str(orderType))
+            request = SubmitOrderRequest(orderType, self.security.Symbol.SecurityType, "SPY", self.quantity, stopPrice, limitPrice, self.UtcTime, str(orderType))
             ticket = self.Transactions.AddOrder(request)
             self.tickets.append(ticket)
 
@@ -116,6 +116,21 @@ class UpdateOrderRegressionAlgorithm(QCAlgorithm):
 
 
     def OnOrderEvent(self, orderEvent):
+        order = self.Transactions.GetOrderById(orderEvent.OrderId)
+        ticket = self.Transactions.GetOrderTicket(orderEvent.OrderId)
+
+        #order cancelations update CanceledTime
+        if order.Status == OrderStatus.Canceled and order.CanceledTime != orderEvent.UtcTime:
+            raise ValueError("Expected canceled order CanceledTime to equal canceled order event time.")
+
+        #fills update LastFillTime
+        if (order.Status == OrderStatus.Filled or order.Status == OrderStatus.PartiallyFilled) and order.LastFillTime != orderEvent.UtcTime:
+            raise ValueError("Expected filled order LastFillTime to equal fill order event time.")
+
+        # check the ticket to see if the update was successfully processed
+        if len([ur for ur in ticket.UpdateRequests if ur.Response is not None and ur.Response.IsSuccess]) > 0 and order.CreatedTime != self.UtcTime and order.LastUpdateTime is None:
+            raise ValueError("Expected updated order LastUpdateTime to equal submitted update order event time")
+
         if orderEvent.Status == OrderStatus.Filled:
             self.Log("FILLED:: {0} FILL PRICE:: {1}".format(self.Transactions.GetOrderById(orderEvent.OrderId), orderEvent.FillPrice))
         else:

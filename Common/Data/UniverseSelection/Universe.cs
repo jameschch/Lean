@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,7 +27,7 @@ namespace QuantConnect.Data.UniverseSelection
     /// <summary>
     /// Provides a base class for all universes to derive from.
     /// </summary>
-    public abstract class Universe
+    public abstract class Universe : IDisposable
     {
         /// <summary>
         /// Gets a value indicating that no change to the universe should be made
@@ -62,6 +62,15 @@ namespace QuantConnect.Data.UniverseSelection
         }
 
         /// <summary>
+        /// Flag indicating if disposal of this universe has been requested
+        /// </summary>
+        public bool DisposeRequested
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
         /// Gets the settings used for subscriptons added for this universe
         /// </summary>
         public abstract UniverseSettings UniverseSettings
@@ -80,6 +89,8 @@ namespace QuantConnect.Data.UniverseSelection
         /// <summary>
         /// Gets the instance responsible for initializing newly added securities
         /// </summary>
+        /// <obsolete>The SecurityInitializer won't be used</obsolete>
+        [Obsolete("SecurityInitializer is obsolete and will not be used.")]
         public ISecurityInitializer SecurityInitializer
         {
             get; private set;
@@ -98,14 +109,25 @@ namespace QuantConnect.Data.UniverseSelection
         /// Initializes a new instance of the <see cref="Universe"/> class
         /// </summary>
         /// <param name="config">The configuration used to source data for this universe</param>
-        /// <param name="securityInitializer">Initializes securities when they're added to the universe</param>
-        protected Universe(SubscriptionDataConfig config, ISecurityInitializer securityInitializer = null)
+        protected Universe(SubscriptionDataConfig config)
         {
             _previousSelections = new HashSet<Symbol>();
             Securities = new ConcurrentDictionary<Symbol, Member>();
 
             Configuration = config;
-            SecurityInitializer = securityInitializer ?? QuantConnect.Securities.SecurityInitializer.Null;
+            SecurityInitializer = QuantConnect.Securities.SecurityInitializer.Null;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Universe"/> class
+        /// </summary>
+        /// <param name="config">The configuration used to source data for this universe</param>
+        /// <param name="securityInitializer">Initializes securities when they're added to the universe</param>
+        [Obsolete("This constructor is obsolete because SecurityInitializer is obsolete and will not be used.")]
+        protected Universe(SubscriptionDataConfig config, ISecurityInitializer securityInitializer)
+            : this(config)
+        {
+            SecurityInitializer = securityInitializer;
         }
 
         /// <summary>
@@ -119,6 +141,18 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>True if we can remove the security, false otherwise</returns>
         public virtual bool CanRemoveMember(DateTime utcTime, Security security)
         {
+            // can always remove securities after dispose requested
+            if (DisposeRequested)
+            {
+                return true;
+            }
+
+            // can always remove delisted securities from the universe
+            if (security.IsDelisted)
+            {
+                return true;
+            }
+
             Member member;
             if (Securities.TryGetValue(security.Symbol, out member))
             {
@@ -139,6 +173,12 @@ namespace QuantConnect.Data.UniverseSelection
         /// <returns>The data that passes the filter</returns>
         public IEnumerable<Symbol> PerformSelection(DateTime utcTime, BaseDataCollection data)
         {
+            // select empty set of symbols after dispose requested
+            if (DisposeRequested)
+            {
+                return Enumerable.Empty<Symbol>();
+            }
+
             var result = SelectSymbols(utcTime, data);
             if (ReferenceEquals(result, Unchanged))
             {
@@ -146,7 +186,7 @@ namespace QuantConnect.Data.UniverseSelection
             }
 
             var selections = result.ToHashSet();
-            var hasDiffs = _previousSelections.Except(selections).Union(selections.Except(_previousSelections)).Any();
+            var hasDiffs = _previousSelections.AreDifferent(selections);
             _previousSelections = selections;
             if (!hasDiffs)
             {
@@ -171,12 +211,12 @@ namespace QuantConnect.Data.UniverseSelection
         /// <param name="marketHoursDatabase">The market hours database</param>
         /// <param name="symbolPropertiesDatabase">The symbol properties database</param>
         /// <returns>The newly initialized security object</returns>
+        /// <obsolete>The CreateSecurity won't be called</obsolete>
+        [Obsolete("CreateSecurity is obsolete and will not be called. The system will create the required Securities based on selected symbols")]
         public virtual Security CreateSecurity(Symbol symbol, IAlgorithm algorithm, MarketHoursDatabase marketHoursDatabase, SymbolPropertiesDatabase symbolPropertiesDatabase)
         {
-            // by default invoke the create security method to handle security initialization
-            return SecurityManager.CreateSecurity(algorithm.Portfolio, algorithm.SubscriptionManager, marketHoursDatabase, symbolPropertiesDatabase,
-                SecurityInitializer, symbol, UniverseSettings.Resolution, UniverseSettings.FillForward, UniverseSettings.Leverage,
-                UniverseSettings.ExtendedMarketHours, false, false, algorithm.LiveMode, symbol.ID.SecurityType == SecurityType.Option);
+            throw new Exception("CreateSecurity is obsolete and should not be called." +
+                "The system will create the required Securities based on selected symbols");
         }
 
         /// <summary>
@@ -186,18 +226,38 @@ namespace QuantConnect.Data.UniverseSelection
         /// <param name="currentTimeUtc">The current time in utc. This is the frontier time of the algorithm</param>
         /// <param name="maximumEndTimeUtc">The max end time</param>
         /// <returns>All subscriptions required by this security</returns>
+        [Obsolete("This overload is obsolete and will not be called. It was not capable of creating new SubscriptionDataConfig due to lack of information")]
         public virtual IEnumerable<SubscriptionRequest> GetSubscriptionRequests(Security security, DateTime currentTimeUtc, DateTime maximumEndTimeUtc)
         {
-            return security.Subscriptions.Select(config =>
-                new SubscriptionRequest(
-                    isUniverseSubscription: false,
-                    universe: this,
-                    security: security,
-                    configuration: new SubscriptionDataConfig(config),
-                    startTimeUtc: currentTimeUtc,
-                    endTimeUtc: maximumEndTimeUtc
-                    )
-                );
+            throw new Exception("This overload is obsolete and should not be called." +
+                "It was not capable of creating new SubscriptionDataConfig due to lack of information");
+        }
+
+
+        /// <summary>
+        /// Gets the subscription requests to be added for the specified security
+        /// </summary>
+        /// <param name="security">The security to get subscriptions for</param>
+        /// <param name="currentTimeUtc">The current time in utc. This is the frontier time of the algorithm</param>
+        /// <param name="maximumEndTimeUtc">The max end time</param>
+        /// <param name="subscriptionService">Instance which implements <see cref="ISubscriptionDataConfigService"/> interface</param>
+        /// <returns>All subscriptions required by this security</returns>
+        public virtual IEnumerable<SubscriptionRequest> GetSubscriptionRequests(Security security,
+            DateTime currentTimeUtc,
+            DateTime maximumEndTimeUtc,
+            ISubscriptionDataConfigService subscriptionService)
+        {
+
+            var result = subscriptionService.Add(security.Symbol,
+                UniverseSettings.Resolution,
+                UniverseSettings.FillForward,
+                UniverseSettings.ExtendedMarketHours);
+            return result.Select(config => new SubscriptionRequest(isUniverseSubscription: false,
+                universe: this,
+                security: security,
+                configuration: config,
+                startTimeUtc: currentTimeUtc,
+                endTimeUtc: maximumEndTimeUtc));
         }
 
         /// <summary>
@@ -219,10 +279,17 @@ namespace QuantConnect.Data.UniverseSelection
         /// false if the security was already in the universe</returns>
         internal virtual bool AddMember(DateTime utcTime, Security security)
         {
-            if (Securities.ContainsKey(security.Symbol))
+            // never add members to disposed universes
+            if (DisposeRequested)
             {
                 return false;
             }
+
+            if (security.IsDelisted)
+            {
+                return false;
+            }
+
             return Securities.TryAdd(security.Symbol, new Member(utcTime, security));
         }
 
@@ -246,8 +313,26 @@ namespace QuantConnect.Data.UniverseSelection
         }
 
         /// <summary>
+        /// Sets the security initializer, used to initialize/configure securities after creation
+        /// </summary>
+        /// <param name="securityInitializer">The security initializer</param>
+        [Obsolete("SecurityInitializer is obsolete and will not be used.")]
+        public virtual void SetSecurityInitializer(ISecurityInitializer securityInitializer)
+        {
+            SecurityInitializer = securityInitializer;
+        }
+
+        /// <summary>
+        /// Marks this universe as disposed and ready to remove all child subscriptions
+        /// </summary>
+        public void Dispose()
+        {
+            DisposeRequested = true;
+        }
+
+        /// <summary>
         /// Provides a value to indicate that no changes should be made to the universe.
-        /// This value is intended to be return reference via <see cref="Universe.SelectSymbols"/>
+        /// This value is intended to be returned by reference via <see cref="Universe.SelectSymbols"/>
         /// </summary>
         public sealed class UnchangedUniverse : IEnumerable<string>, IEnumerable<Symbol>
         {

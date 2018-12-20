@@ -37,17 +37,17 @@ class MovingAverageCrossAlgorithm(QCAlgorithm):
     def Initialize(self):
         '''Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.'''
 
-        self.SetStartDate(2009, 01, 01)  #Set Start Date
-        self.SetEndDate(2015, 01, 01)    #Set End Date
+        self.SetStartDate(2009, 1, 1)    #Set Start Date
+        self.SetEndDate(2015, 1, 1)      #Set End Date
         self.SetCash(100000)             #Set Strategy Cash
         # Find more symbols here: http://quantconnect.com/data
         self.AddEquity("SPY")
 
         # create a 15 day exponential moving average
-        self.fast = self.EMA("SPY", 15, Resolution.Daily);
+        self.fast = self.EMA("SPY", 15, Resolution.Daily)
 
         # create a 30 day exponential moving average
-        self.slow = self.EMA("SPY", 30, Resolution.Daily);
+        self.slow = self.EMA("SPY", 30, Resolution.Daily)
 
         self.previous = None
 
@@ -68,7 +68,7 @@ class MovingAverageCrossAlgorithm(QCAlgorithm):
             return
 
         # define a small tolerance on our checks to avoid bouncing
-        tolerance = 0.00015;
+        tolerance = 0.00015
 
         holdings = self.Portfolio["SPY"].Quantity
 

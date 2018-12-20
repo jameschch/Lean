@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -14,10 +14,12 @@
 */
 
 using System;
+using System.Collections.Generic;
 using QuantConnect.Data;
 using QuantConnect.Data.Custom;
 using QuantConnect.Data.Market;
 using QuantConnect.Indicators;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -29,10 +31,14 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="plotting indicators" />
     /// <meta name="tag" content="charting" />
     /// <meta name="tag" content="indicator field selection" />
-    public class IndicatorSuiteAlgorithm : QCAlgorithm
+    public class IndicatorSuiteAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private string _symbol = "SPY";
-        private string _customSymbol = "WIKI/FB";
+        private string _ticker = "SPY";
+        private string _customTicker = "WIKI/FB";
+
+        private Symbol _symbol;
+        private Symbol _customSymbol;
+
         private Indicators _indicators;
         private Indicators _selectorIndicators;
         private IndicatorBase<IndicatorDataPoint> _ratio;
@@ -55,10 +61,10 @@ namespace QuantConnect.Algorithm.CSharp
             SetCash(25000);
 
             //Add as many securities as you like. All the data will be passed into the event handler:
-            AddSecurity(SecurityType.Equity, _symbol, Resolution.Daily);
+            _symbol = AddSecurity(SecurityType.Equity, _ticker, Resolution.Daily).Symbol;
 
             //Add the Custom Data:
-            AddData<Quandl>(_customSymbol);
+            _customSymbol = AddData<Quandl>(_customTicker, Resolution.Daily).Symbol;
 
             //Set up default Indicators, these indicators are defined on the Value property of incoming data (except ATR and AROON which use the full TradeBar object)
             _indicators = new Indicators
@@ -112,9 +118,9 @@ namespace QuantConnect.Algorithm.CSharp
             // these are indicators that require multiple inputs. the most common of which is a ratio.
             // suppose we seek the ratio of BTC to SPY, we could write the following:
             var spyClose = Identity(_symbol);
-            var btcClose = Identity(_customSymbol);
-            // this will create a new indicator whose value is BTC/SPY
-            _ratio = btcClose.Over(spyClose);
+            var fbClose = Identity(_customSymbol);
+            // this will create a new indicator whose value is FB/SPY
+            _ratio = fbClose.Over(spyClose);
             // we can also easily plot our indicators each time they update using th PlotIndicator function
             PlotIndicator("Ratio", _ratio);
         }
@@ -219,5 +225,41 @@ namespace QuantConnect.Algorithm.CSharp
                 Period = bar.Period
             };
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "1"},
+            {"Average Win", "0%"},
+            {"Average Loss", "0%"},
+            {"Compounding Annual Return", "19.104%"},
+            {"Drawdown", "7.300%"},
+            {"Expectancy", "0"},
+            {"Net Profit", "41.858%"},
+            {"Sharpe Ratio", "1.649"},
+            {"Loss Rate", "0%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "0.317"},
+            {"Beta", "-6.83"},
+            {"Annual Standard Deviation", "0.109"},
+            {"Annual Variance", "0.012"},
+            {"Information Ratio", "1.467"},
+            {"Tracking Error", "0.109"},
+            {"Treynor Ratio", "-0.026"},
+            {"Total Fees", "$1.00"}
+        };
     }
 }

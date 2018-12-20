@@ -16,9 +16,11 @@
 
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using QuantConnect.Configuration;
 using QuantConnect.Logging;
 
@@ -34,7 +36,7 @@ namespace QuantConnect.Data.Auxiliary
         /// <summary>
         /// Gets the entity's unique symbol, i.e OIH.1
         /// </summary>
-        public string Permtick { get; private set; }
+        public string Permtick { get; }
 
         /// <summary>
         /// Gets the last date in the map file which is indicative of a delisting event
@@ -53,22 +55,45 @@ namespace QuantConnect.Data.Auxiliary
         }
 
         /// <summary>
+        /// Gets the first ticker for the security represented by this map file
+        /// </summary>
+        public string FirstTicker { get; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="MapFile"/> class.
         /// </summary>
         public MapFile(string permtick, IEnumerable<MapFileRow> data)
         {
             Permtick = permtick.ToUpper();
             _data = new SortedDictionary<DateTime, MapFileRow>(data.Distinct().ToDictionary(x => x.Date));
+
+            var firstTicker = GetMappedSymbol(FirstDate, Permtick);
+            if (char.IsDigit(firstTicker.Last()))
+            {
+                var dotIndex = firstTicker.LastIndexOf(".", StringComparison.Ordinal);
+                if (dotIndex > 0)
+                {
+                    int value;
+                    var number = firstTicker.Substring(dotIndex + 1);
+                    if (int.TryParse(number, out value))
+                    {
+                        firstTicker = firstTicker.Substring(0, dotIndex);
+                    }
+                }
+            }
+
+            FirstTicker = firstTicker;
         }
 
         /// <summary>
         /// Memory overload search method for finding the mapped symbol for this date.
         /// </summary>
         /// <param name="searchDate">date for symbol we need to find.</param>
+        /// <param name="defaultReturnValue">Default return value if search was got no result.</param>
         /// <returns>Symbol on this date.</returns>
-        public string GetMappedSymbol(DateTime searchDate)
+        public string GetMappedSymbol(DateTime searchDate, string defaultReturnValue = "")
         {
-            var mappedSymbol = "";
+            var mappedSymbol = defaultReturnValue;
             //Iterate backwards to find the most recent factor:
             foreach (var splitDate in _data.Keys)
             {
@@ -152,11 +177,17 @@ namespace QuantConnect.Data.Auxiliary
         /// <returns>An enumerable of all map files</returns>
         public static IEnumerable<MapFile> GetMapFiles(string mapFileDirectory)
         {
-            return from file in Directory.EnumerateFiles(mapFileDirectory)
-                   where file.EndsWith(".csv")
-                   let permtick = Path.GetFileNameWithoutExtension(file)
-                   let fileRead = SafeMapFileRowRead(file)
-                   select new MapFile(permtick, fileRead);
+            var mapFiles = new ConcurrentBag<MapFile>();
+            Parallel.ForEach(Directory.EnumerateFiles(mapFileDirectory), file =>
+            {
+                if (file.EndsWith(".csv"))
+                {
+                    var permtick = Path.GetFileNameWithoutExtension(file);
+                    var fileRead = SafeMapFileRowRead(file);
+                    mapFiles.Add(new MapFile(permtick, fileRead));
+                }
+            });
+            return mapFiles;
         }
 
         /// <summary>

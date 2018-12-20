@@ -13,6 +13,8 @@
     <FileAlignment>512</FileAlignment>
     <LangVersion>6</LangVersion>
     <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,14 +38,17 @@
     <LangVersion>6</LangVersion>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>QuantConnect.ToolBox.OandaDownloader.Program</StartupObject>
+    <StartupObject>QuantConnect.ToolBox.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="DotNetZip, Version=1.10.1.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
       <HintPath>..\packages\DotNetZip.1.10.1\lib\net20\DotNetZip.dll</HintPath>
     </Reference>
-    <Reference Include="EngineIoClientDotNet, Version=0.9.22.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\EngineIoClientDotNet.0.9.22\lib\net45\EngineIoClientDotNet.dll</HintPath>
+    <Reference Include="EngineIoClientDotNet, Version=1.0.7.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\EngineIoClientDotNet.1.0.7\lib\net45\EngineIoClientDotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=0.85.4.369, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <HintPath>..\packages\ICSharpCode.SharpZipLib.dll.0.85.4.369\lib\net20\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
     <Reference Include="IKVM.AWT.WinForms">
       <HintPath>..\packages\IKVM-WithExes.7.3.4830.1\tools\IKVM.AWT.WinForms.dll</HintPath>
@@ -123,11 +128,17 @@
     <Reference Include="IKVM.Runtime.JNI">
       <HintPath>..\packages\IKVM-WithExes.7.3.4830.1\tools\IKVM.Runtime.JNI.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Extensions.CommandLineUtils, Version=1.1.1.0, Culture=neutral, PublicKeyToken=adb9793829ddae60, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Extensions.CommandLineUtils.1.1.1\lib\net451\Microsoft.Extensions.CommandLineUtils.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NodaTime, Version=1.3.0.0, Culture=neutral, PublicKeyToken=4226afe0d9b296d1, processorArchitecture=MSIL">
       <HintPath>..\packages\NodaTime.1.3.4\lib\net35-Client\NodaTime.dll</HintPath>
+    </Reference>
+    <Reference Include="Python.Runtime, Version=1.0.5.12, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.12\lib\Python.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="QuantConnect.Fxcm">
       <HintPath>..\Brokerages\Fxcm\QuantConnect.Fxcm.dll</HintPath>
@@ -135,10 +146,16 @@
     <Reference Include="SevenZipSharp">
       <HintPath>..\packages\SevenZipSharp.0.64\lib\SevenZipSharp.dll</HintPath>
     </Reference>
-    <Reference Include="SocketIoClientDotNet, Version=0.9.13.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\SocketIoClientDotNet.0.9.13\lib\net45\SocketIoClientDotNet.dll</HintPath>
+    <Reference Include="SocketIoClientDotNet, Version=1.0.7.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SocketIoClientDotNet.1.0.7.1\lib\net45\SocketIoClientDotNet.dll</HintPath>
+    </Reference>
+    <Reference Include="SuperSocket.ClientEngine, Version=0.10.0.0, Culture=neutral, PublicKeyToken=ee9af13f57f00acc, processorArchitecture=MSIL">
+      <HintPath>..\packages\SuperSocket.ClientEngine.Core.0.10.0\lib\net45\SuperSocket.ClientEngine.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Collections.Immutable, Version=1.2.2.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.1.4.0\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
+    </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
@@ -148,39 +165,51 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="WebSocket4Net, Version=0.14.1.0, Culture=neutral, PublicKeyToken=eb4e154b696bf72a, processorArchitecture=MSIL">
-      <HintPath>..\packages\WebSocket4Net.0.14.1\lib\net45\WebSocket4Net.dll</HintPath>
+    <Reference Include="WebSocket4Net, Version=0.15.2.11, Culture=neutral, PublicKeyToken=eb4e154b696bf72a, processorArchitecture=MSIL">
+      <HintPath>..\packages\WebSocket4Net.0.15.2\lib\net45\WebSocket4Net.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BitfinexDownloader\BitfinexDataDownloader.cs" />
+    <Compile Include="BitfinexDownloader\BitfinexDownloaderProgram.cs" />
+    <Compile Include="GDAXDownloader\GDAXDownloader.cs" />
+    <Compile Include="GDAXDownloader\GDAXDownloaderProgram.cs" />
+    <Compile Include="GzipStreamProvider.cs" />
+    <Compile Include="IBDownloader\IBDataDownloader.cs" />
+    <Compile Include="IBDownloader\IBDownloaderProgram.cs" />
+    <Compile Include="IEX\IEXDataDownloader.cs" />
+    <Compile Include="IEX\IEXDownloaderProgram.cs" />
+    <Compile Include="IVolatilityEquityConverter\IVolatilityEquityConverterProgram.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="TickAggregator.cs" />
     <Compile Include="AlgoSeekFuturesConverter\AlgoSeekFuturesConverter.cs" />
     <Compile Include="AlgoSeekFuturesConverter\AlgoSeekFuturesProcessor.cs" />
     <Compile Include="AlgoSeekFuturesConverter\AlgoSeekFuturesReader.cs" />
-    <Compile Include="AlgoSeekFuturesConverter\Program.cs" />
+    <Compile Include="AlgoSeekFuturesConverter\AlgoSeekFuturesProgram.cs" />
     <Compile Include="AlgoSeekOptionsConverter\AlgoSeekOptionsConverter.cs" />
     <Compile Include="AlgoSeekOptionsConverter\AlgoSeekOptionsProcessor.cs" />
     <Compile Include="AlgoSeekOptionsConverter\AlgoSeekOptionsReader.cs" />
-    <Compile Include="AlgoSeekOptionsConverter\Program.cs" />
+    <Compile Include="AlgoSeekOptionsConverter\AlgoSeekOptionsConverterProgram.cs" />
     <Compile Include="Bz2StreamProvider.cs" />
-    <Compile Include="CoarseUniverseGenerator\Program.cs" />
+    <Compile Include="CoarseUniverseGenerator\CoarseUniverseGeneratorProgram.cs" />
     <Compile Include="ConsolidatorDataProcessor.cs" />
     <Compile Include="CryptoiqDownloader\CryptoiqBitcoin.cs" />
     <Compile Include="CryptoiqDownloader\CryptoiqDownloader.cs" />
-    <Compile Include="CryptoiqDownloader\Program.cs" />
+    <Compile Include="CryptoiqDownloader\CryptoiqDownloaderProgram.cs" />
     <Compile Include="DukascopyDownloader\DukascopyDataDownloader.cs" />
     <Compile Include="DukascopyDownloader\DukascopySymbolMapper.cs" />
-    <Compile Include="DukascopyDownloader\Program.cs" />
+    <Compile Include="DukascopyDownloader\DukascopyDownloaderProgram.cs" />
     <Compile Include="FactorFileGenerator.cs" />
     <Compile Include="FileStreamProvider.cs" />
     <Compile Include="FilteredDataProcessor.cs" />
     <Compile Include="FxcmVolumeDownloader\FxcmVolumeAuxiliaryMethods.cs" />
     <Compile Include="FxcmVolumeDownloader\FxcmVolumeWriter.cs" />
     <Compile Include="FxcmVolumeDownloader\FxcmVolumeDownloader.cs" />
-    <Compile Include="FxcmVolumeDownloader\Program.cs" />
+    <Compile Include="FxcmVolumeDownloader\FxcmVolumeDownloadProgram.cs" />
     <Compile Include="FxcmDownloader\FxcmDataDownloader.cs" />
-    <Compile Include="FxcmDownloader\Program.cs" />
+    <Compile Include="FxcmDownloader\FxcmDownloaderProgram.cs" />
     <Compile Include="GoogleDownloader\GoogleDataDownloader.cs" />
-    <Compile Include="GoogleDownloader\Program.cs" />
+    <Compile Include="GoogleDownloader\GoogleDownloaderProgram.cs" />
     <Compile Include="IDataProcessor.cs" />
     <Compile Include="IEX\IEXDataQueueHandler.cs" />
     <Compile Include="IQFeed\IQFeedDataQueueHandler.cs" />
@@ -196,24 +225,27 @@
     <Compile Include="IQFeed\IQ\SocketClient.cs" />
     <Compile Include="IStreamParser.cs" />
     <Compile Include="IStreamProvider.cs" />
+    <Compile Include="KaikoDataConverter\KaikoDataConverterProgram.cs" />
+    <Compile Include="KrakenDataDownloader\KrakenDataDownloader.cs" />
+    <Compile Include="KrakenDataDownloader\KrakenDownloaderProgram.cs" />
     <Compile Include="LazyStreamWriter.cs" />
     <Compile Include="LeanDataReader.cs" />
     <Compile Include="LeanDataWriter.cs" />
     <Compile Include="LeanInstrument.cs" />
     <Compile Include="LeanParser.cs" />
-    <Compile Include="NseMarketDataConverter\Program.cs" />
+    <Compile Include="NseMarketDataConverter\NseMarketDataConverterProgram.cs" />
     <Compile Include="OandaDownloader\OandaDataDownloader.cs" />
-    <Compile Include="OandaDownloader\Program.cs" />
+    <Compile Include="OandaDownloader\OandaDownloaderProgram.cs" />
     <Compile Include="PipeDataProcessor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="QuandlBitfinexDownloader\Program.cs" />
+    <Compile Include="QuandlBitfinexDownloader\QuandlBitfinexDownloaderProgram.cs" />
     <Compile Include="QuandlBitfinexDownloader\QuandlBitfinexDownloader.cs" />
-    <Compile Include="QuantQuoteConverter\Program.cs" />
+    <Compile Include="QuantQuoteConverter\QuantQuoteConverterProgram.cs" />
     <Compile Include="IDataDownloader.cs" />
     <Compile Include="RawFileProcessor.cs" />
     <Compile Include="CsvDataProcessor.cs" />
     <Compile Include="YahooDownloader\Historical.cs" />
-    <Compile Include="YahooDownloader\Program.cs" />
+    <Compile Include="YahooDownloader\YahooDownloaderProgram.cs" />
     <Compile Include="YahooDownloader\Token.cs" />
     <Compile Include="YahooDownloader\YahooDataDownloader.cs" />
     <Compile Include="ZipStreamProvider.cs" />
@@ -232,6 +264,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
+    <Content Include="Visualizer\QuantConnect.Visualizer.py">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Visualizer\__init__.py">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <None Include="instruments_oanda.txt">
@@ -279,7 +317,14 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets'))" />
+  </Target>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">
   </Target>

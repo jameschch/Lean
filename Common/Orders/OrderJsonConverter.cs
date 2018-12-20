@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -98,13 +98,17 @@ namespace QuantConnect.Orders
             order.Time = jObject["Time"].Value<DateTime>();
             order.Tag = jObject["Tag"].Value<string>();
 
-            try { order.Quantity = jObject["Quantity"].Value<int>(); }
-            catch { order.Quantity = jObject["Quantity"].Value<decimal>(); }
+            order.Quantity = jObject["Quantity"].Value<decimal>();
 
             order.Price = jObject["Price"].Value<decimal>();
             var securityType = (SecurityType) jObject["SecurityType"].Value<int>();
             order.BrokerId = jObject["BrokerId"].Select(x => x.Value<string>()).ToList();
             order.ContingentId = jObject["ContingentId"].Value<int>();
+
+            var timeInForce = jObject["TimeInForce"] ?? jObject["Duration"];
+            order.Properties.TimeInForce = timeInForce != null
+                ? CreateTimeInForce(timeInForce, jObject)
+                : TimeInForce.GoodTilCanceled;
 
             string market = Market.USA;
 
@@ -116,7 +120,7 @@ namespace QuantConnect.Orders
             }
             else
             {
-                //no data, use default                
+                //no data, use default
                 new DefaultBrokerageModel().DefaultMarkets.TryGetValue(securityType, out market);
             }
 
@@ -137,6 +141,7 @@ namespace QuantConnect.Orders
                 var tickerstring = jObject["Symbol"].Value<string>();
                 order.Symbol = Symbol.Create(tickerstring, securityType, market);
             }
+
             return order;
         }
 
@@ -187,6 +192,37 @@ namespace QuantConnect.Orders
                     throw new ArgumentOutOfRangeException();
             }
             return order;
+        }
+
+        /// <summary>
+        /// Creates a Time In Force of the correct type
+        /// </summary>
+        private static TimeInForce CreateTimeInForce(JToken timeInForce, JObject jObject)
+        {
+            // for backward-compatibility support deserialization of old JSON format
+            if (timeInForce is JValue)
+            {
+                var value = timeInForce.Value<int>();
+
+                switch (value)
+                {
+                    case 0:
+                        return TimeInForce.GoodTilCanceled;
+
+                    case 1:
+                        return TimeInForce.Day;
+
+                    case 2:
+                        var expiry = jObject["DurationValue"].Value<DateTime>();
+                        return TimeInForce.GoodTilDate(expiry);
+
+                    default:
+                        throw new Exception($"Unknown time in force value: {value}");
+                }
+            }
+
+            // convert with TimeInForceJsonConverter
+            return timeInForce.ToObject<TimeInForce>();
         }
     }
 }

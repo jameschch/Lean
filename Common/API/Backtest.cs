@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using QuantConnect.Packets;
@@ -59,6 +60,24 @@ namespace QuantConnect.Api
         /// </summary>
         [JsonProperty(PropertyName = "result")]
         public BacktestResult Result;
+
+        /// <summary>
+        /// Backtest error message
+        /// </summary>
+        [JsonProperty(PropertyName = "error")]
+        public string Error;
+
+        /// <summary>
+        /// Backtest error stacktrace
+        /// </summary>
+        [JsonProperty(PropertyName = "stacktrace")]
+        public string StackTrace;
+
+        /// <summary>
+        /// Backtest creation date and time
+        /// </summary>
+        [JsonProperty(PropertyName = "created")]
+        public DateTime Created;
     }
 
     /// <summary>

@@ -264,11 +264,7 @@ namespace QuantConnect.Data
         {
             PriceScaleFactor = config.PriceScaleFactor;
             SumOfDividends = config.SumOfDividends;
-
-            foreach (var consolidator in config.Consolidators)
-            {
-                Consolidators.Add(consolidator);
-            }
+            Consolidators = config.Consolidators;
         }
 
         /// <summary>
@@ -383,7 +379,7 @@ namespace QuantConnect.Data
         /// <filterpriority>2</filterpriority>
         public override string ToString()
         {
-            return Symbol.Value + "," + MappedSymbol + "," + Resolution + "," + Type.Name + "," + TickType;
+            return Symbol.Value + "," + MappedSymbol + "," + Resolution + "," + Type.Name + "," + TickType + "," + DataNormalizationMode;
         }
     }
 }

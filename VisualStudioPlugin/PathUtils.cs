@@ -1,4 +1,18 @@
-﻿using EnvDTE80;
+﻿/*
+ * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
+ * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+using EnvDTE80;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,17 +22,15 @@ namespace QuantConnect.VisualStudioPlugin
     /// <summary>
     /// Collections of util methods to work with directories
     /// </summary>
-    static class PathUtils
+    internal static class PathUtils
     {
-
-        private static Dictionary<string, Language> _extensionsDictionary = new Dictionary<string, Language>();
+        private static readonly Dictionary<string, Language> _extensionsDictionary = new Dictionary<string, Language>();
 
         static PathUtils()
         {
             _extensionsDictionary[".cs"] = Language.CSharp;
-            _extensionsDictionary[".java"] = Language.Java;
-            _extensionsDictionary[".vb"] = Language.VisualBasic;
             _extensionsDictionary[".fs"] = Language.FSharp;
+            _extensionsDictionary[".py"] = Language.Python;
         }
 
         /// <summary>
@@ -50,17 +62,6 @@ namespace QuantConnect.VisualStudioPlugin
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Validate if a provided path is a valid data folder path
-        /// </summary>
-        /// <param name="dataFolderPath">Path to a data folder</param>
-        /// <returns>True if this is a valid data folder path, false otherwise</returns>
-        public static bool DataFolderPathValid(string dataFolderPath)
-        {
-            var databasePath = Path.Combine(dataFolderPath, "market-hours", "market-hours-database.json");
-            return File.Exists(databasePath);
         }
     }
 }

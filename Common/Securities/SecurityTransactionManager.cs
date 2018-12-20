@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,16 +17,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 
-namespace QuantConnect.Securities 
+namespace QuantConnect.Securities
 {
     /// <summary>
     /// Algorithm Transactions Manager - Recording Transactions
     /// </summary>
     public class SecurityTransactionManager : IOrderProvider
     {
+        private readonly Dictionary<DateTime, decimal> _transactionRecord;
+        private readonly IAlgorithm _algorithm;
         private int _orderId;
         private readonly SecurityManager _securities;
         private const decimal _minimumOrderSize = 0;
@@ -34,7 +37,6 @@ namespace QuantConnect.Securities
         private TimeSpan _marketOrderFillTimeout = TimeSpan.FromSeconds(5);
 
         private IOrderProcessor _orderProcessor;
-        private Dictionary<DateTime, decimal> _transactionRecord;
 
         /// <summary>
         /// Gets the time the security information was last updated
@@ -43,12 +45,14 @@ namespace QuantConnect.Securities
         {
             get { return _securities.UtcTime; }
         }
-        
+
         /// <summary>
         /// Initialise the transaction manager for holding and processing orders.
         /// </summary>
-        public SecurityTransactionManager(SecurityManager security)
+        public SecurityTransactionManager(IAlgorithm algorithm, SecurityManager security)
         {
+            _algorithm = algorithm;
+
             //Private reference for processing transactions
             _securities = security;
 
@@ -59,15 +63,16 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Trade record of profits and losses for each trade statistics calculations
         /// </summary>
+        /// <remarks>Will return a shallow copy, modifying the returned container
+        /// will have no effect <see cref="AddTransactionRecord"/></remarks>
         public Dictionary<DateTime, decimal> TransactionRecord
         {
             get
             {
-                return _transactionRecord;
-            }
-            set
-            {
-                _transactionRecord = value;
+                lock (_transactionRecord)
+                {
+                    return new Dictionary<DateTime, decimal>(_transactionRecord);
+                }
             }
         }
 
@@ -75,9 +80,9 @@ namespace QuantConnect.Securities
         /// Configurable minimum order value to ignore bad orders, or orders with unrealistic sizes
         /// </summary>
         /// <remarks>Default minimum order size is $0 value</remarks>
-        public decimal MinimumOrderSize 
+        public decimal MinimumOrderSize
         {
-            get 
+            get
             {
                 return _minimumOrderSize;
             }
@@ -87,9 +92,9 @@ namespace QuantConnect.Securities
         /// Configurable minimum order size to ignore bad orders, or orders with unrealistic sizes
         /// </summary>
         /// <remarks>Default minimum order size is 0 shares</remarks>
-        public int MinimumOrderQuantity 
+        public int MinimumOrderQuantity
         {
-            get 
+            get
             {
                 return _minimumOrderQuantity;
             }
@@ -129,6 +134,11 @@ namespace QuantConnect.Securities
         /// <returns>The order ticket for the request</returns>
         public OrderTicket ProcessRequest(OrderRequest request)
         {
+            if (_algorithm != null && _algorithm.IsWarmingUp)
+            {
+                throw new Exception(OrderResponse.WarmingUp(request).ToString());
+            }
+
             var submit = request as SubmitOrderRequest;
             if (submit != null)
             {
@@ -158,7 +168,7 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Added alias for RemoveOrder - 
+        /// Added alias for RemoveOrder -
         /// </summary>
         /// <param name="orderId">Order id we wish to cancel</param>
         /// <param name="orderTag">Tag to indicate from where this method was called</param>
@@ -171,13 +181,19 @@ namespace QuantConnect.Securities
         /// Cancels all open orders for the specified symbol
         /// </summary>
         /// <param name="symbol">The symbol whose orders are to be cancelled</param>
+        /// <param name="tag">Custom order tag</param>
         /// <returns>List containing the cancelled order tickets</returns>
-        public List<OrderTicket> CancelOpenOrders(Symbol symbol)
+        public List<OrderTicket> CancelOpenOrders(Symbol symbol, string tag = null)
         {
-            var cancelledOrders = new List<OrderTicket>();
-            foreach (var ticket in GetOrderTickets(x => x.Symbol == symbol && x.Status.IsOpen()))
+            if (_algorithm != null && _algorithm.IsWarmingUp)
             {
-                ticket.Cancel();
+                throw new Exception("This operation is not allowed in Initialize or during warm up: CancelOpenOrders. Please move this code to the OnWarmupFinished() method.");
+            }
+
+            var cancelledOrders = new List<OrderTicket>();
+            foreach (var ticket in GetOpenOrderTickets(x => x.Symbol == symbol))
+            {
+                ticket.Cancel(tag);
                 cancelledOrders.Add(ticket);
             }
             return cancelledOrders;
@@ -201,6 +217,16 @@ namespace QuantConnect.Securities
         public IEnumerable<OrderTicket> GetOrderTickets(Func<OrderTicket, bool> filter = null)
         {
             return _orderProcessor.GetOrderTickets(filter ?? (x => true));
+        }
+
+        /// <summary>
+        /// Gets and enumerable of opened <see cref="OrderTicket"/> matching the specified <paramref name="filter"/>
+        /// </summary>
+        /// <param name="filter">The filter predicate used to find the required order tickets</param>
+        /// <returns>An enumerable of opened <see cref="OrderTicket"/> matching the specified <paramref name="filter"/></returns>
+        public IEnumerable<OrderTicket> GetOpenOrderTickets(Func<OrderTicket, bool> filter = null)
+        {
+            return _orderProcessor.GetOpenOrderTickets(filter ?? (x => true));
         }
 
         /// <summary>
@@ -239,22 +265,25 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Get a list of all open orders.
-        /// </summary>
-        /// <returns>List of open orders.</returns>
-        public List<Order> GetOpenOrders()
-        {
-            return _orderProcessor.GetOrders(x => x.Status.IsOpen()).ToList();
-        }
-
-        /// <summary>
         /// Get a list of all open orders for a symbol.
         /// </summary>
         /// <param name="symbol">The symbol for which to return the orders</param>
         /// <returns>List of open orders.</returns>
         public List<Order> GetOpenOrders(Symbol symbol)
         {
-            return _orderProcessor.GetOrders(x => x.Symbol == symbol && x.Status.IsOpen()).ToList();
+            return GetOpenOrders(x => x.Symbol == symbol).ToList();
+        }
+
+        /// <summary>
+        /// Gets open orders matching the specified filter. Specifying null will return an enumerable
+        /// of all open orders.
+        /// </summary>
+        /// <param name="filter">Delegate used to filter the orders</param>
+        /// <returns>All filtered open orders this order provider currently holds</returns>
+        public List<Order> GetOpenOrders(Func<Order, bool> filter = null)
+        {
+            filter = filter ?? (x => true);
+            return _orderProcessor.GetOpenOrders(x => filter(x));
         }
 
         /// <summary>
@@ -286,77 +315,14 @@ namespace QuantConnect.Securities
         }
 
         /// <summary>
-        /// Gets all orders matching the specified filter
+        /// Gets all orders matching the specified filter. Specifying null will return an enumerable
+        /// of all orders.
         /// </summary>
         /// <param name="filter">Delegate used to filter the orders</param>
-        /// <returns>All open orders this order provider currently holds</returns>
+        /// <returns>All orders this order provider currently holds by the specified filter</returns>
         public IEnumerable<Order> GetOrders(Func<Order, bool> filter)
         {
             return _orderProcessor.GetOrders(filter);
-        }
-
-        /// <summary>
-        /// Check if there is sufficient capital to execute this order.
-        /// </summary>
-        /// <param name="portfolio">Our portfolio</param>
-        /// <param name="order">Order we're checking</param>
-        /// <returns>True if sufficient capital.</returns>
-        public bool GetSufficientCapitalForOrder(SecurityPortfolioManager portfolio, Order order)
-        {
-            // short circuit the div 0 case
-            if (order.Quantity == 0) return true;
-
-            var security = _securities[order.Symbol];
-
-            var ticket = GetOrderTicket(order.Id);
-            if (ticket == null)
-            {
-                Log.Error("SecurityTransactionManager.GetSufficientCapitalForOrder(): Null order ticket for id: " + order.Id);
-                return false;
-            }
-
-            if (order.Type == OrderType.OptionExercise)
-            {
-                // for option assignment and exercise orders we look into the requirements to process the underlying security transaction
-                var option = (Option.Option)security;
-                var underlying = option.Underlying;
-
-                if (option.IsAutoExercised(underlying.Close))
-                {
-                    var quantity = option.GetExerciseQuantity(order.Quantity);
-
-                    var newOrder = new LimitOrder
-                    {
-                        Id = order.Id,
-                        Time = order.Time,
-                        LimitPrice = option.StrikePrice,
-                        Symbol = underlying.Symbol,
-                        Quantity = option.Symbol.ID.OptionRight == OptionRight.Call ? quantity : -quantity
-                    };
-
-                    // we continue with this call for underlying 
-                    return GetSufficientCapitalForOrder(portfolio, newOrder);
-                }
-
-                return true;
-            }
-
-            // When order only reduces or closes a security position, capital is always sufficient
-            if (security.Holdings.Quantity * order.Quantity < 0 && Math.Abs(security.Holdings.Quantity) >= Math.Abs(order.Quantity)) return true;
-
-            var freeMargin = security.MarginModel.GetMarginRemaining(portfolio, security, order.Direction);
-            var initialMarginRequiredForOrder = security.MarginModel.GetInitialMarginRequiredForOrder(security, order);
-
-            // pro-rate the initial margin required for order based on how much has already been filled
-            var percentUnfilled = (Math.Abs(order.Quantity) - Math.Abs(ticket.QuantityFilled))/Math.Abs(order.Quantity);
-            var initialMarginRequiredForRemainderOfOrder = percentUnfilled*initialMarginRequiredForOrder;
-
-            if (Math.Abs(initialMarginRequiredForRemainderOfOrder) > freeMargin)
-            {
-                Log.Error(string.Format("SecurityTransactionManager.GetSufficientCapitalForOrder(): Id: {0}, Initial Margin: {1}, Free Margin: {2}", order.Id, initialMarginRequiredForOrder, freeMargin));
-                return false;
-            }
-            return true;
         }
 
         /// <summary>
@@ -375,6 +341,29 @@ namespace QuantConnect.Securities
         public void SetOrderProcessor(IOrderProcessor orderProvider)
         {
             _orderProcessor = orderProvider;
+        }
+
+
+        /// <summary>
+        /// Record the transaction value and time in a list to later be processed for statistics creation.
+        /// </summary>
+        /// <remarks>
+        /// Bit of a hack -- but using datetime as dictionary key is dangerous as you can process multiple orders within a second.
+        /// For the accounting / statistics generating purposes its not really critical to know the precise time, so just add a millisecond while there's an identical key.
+        /// </remarks>
+        /// <param name="time">Time of order processed </param>
+        /// <param name="transactionProfitLoss">Profit Loss.</param>
+        public void AddTransactionRecord(DateTime time, decimal transactionProfitLoss)
+        {
+            lock (_transactionRecord)
+            {
+                var clone = time;
+                while (_transactionRecord.ContainsKey(clone))
+                {
+                    clone = clone.AddMilliseconds(1);
+                }
+                _transactionRecord.Add(clone, transactionProfitLoss);
+            }
         }
 
         /// <summary>

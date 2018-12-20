@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using QuantConnect.Lean.Engine.DataFeeds;
 
 namespace QuantConnect.Lean.Engine.Results
 {
@@ -9,6 +10,13 @@ namespace QuantConnect.Lean.Engine.Results
     /// </summary>
     public class BaseResultsHandler
     {
+        protected IDataFeedSubscriptionManager DataManager;
+
+        /// <summary>
+        /// Gets or sets the current alpha runtime statistics
+        /// </summary>
+        protected AlphaRuntimeStatistics AlphaRuntimeStatistics { get; set; }
+
         /// <summary>
         /// Returns the location of the logs
         /// </summary>
@@ -29,7 +37,24 @@ namespace QuantConnect.Lean.Engine.Results
         /// <param name="result">The results to save</param>
         public virtual void SaveResults(string name, Result result)
         {
-            File.WriteAllText(Path.Combine(Directory.GetCurrentDirectory(), name), JsonConvert.SerializeObject(result));
+            File.WriteAllText(Path.Combine(Directory.GetCurrentDirectory(), name), JsonConvert.SerializeObject(result, Formatting.Indented));
+        }
+
+        /// <summary>
+        /// Sets the current alpha runtime statistics
+        /// </summary>
+        /// <param name="statistics">The current alpha runtime statistics</param>
+        public virtual void SetAlphaRuntimeStatistics(AlphaRuntimeStatistics statistics)
+        {
+            AlphaRuntimeStatistics = statistics;
+        }
+
+        /// <summary>
+        /// Sets the current Data Manager instance
+        /// </summary>
+        public virtual void SetDataManager(IDataFeedSubscriptionManager dataManager)
+        {
+            DataManager = dataManager;
         }
     }
 }

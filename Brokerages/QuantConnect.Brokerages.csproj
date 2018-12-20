@@ -134,6 +134,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\IKVM-WithExes.7.3.4830.1\tools\IKVM.Runtime.JNI.dll</HintPath>
     </Reference>
+    <Reference Include="NATS.Client, Version=0.8.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\NATS.Client.0.8.1\lib\net45\NATS.Client.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
@@ -152,6 +155,7 @@
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -166,11 +170,109 @@
     <Compile Include="..\Common\Properties\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="Alpaca\AlpacaBrokerage.Utility.cs" />
+    <Compile Include="Alpaca\AlpacaBrokerage.DataQueueHandler.cs" />
+    <Compile Include="Alpaca\AlpacaBrokerage.cs" />
+    <Compile Include="Alpaca\AlpacaBrokerageFactory.cs" />
+    <Compile Include="Alpaca\Markets\Enums\AccountStatus.cs" />
+    <Compile Include="Alpaca\Markets\Enums\AggregationType.cs" />
+    <Compile Include="Alpaca\Markets\Enums\AssetClass.cs" />
+    <Compile Include="Alpaca\Markets\Enums\AssetStatus.cs" />
+    <Compile Include="Alpaca\Markets\Enums\AuthStatus.cs" />
+    <Compile Include="Alpaca\Markets\Enums\BarDuration.cs" />
+    <Compile Include="Alpaca\Markets\Enums\Exchange.cs" />
+    <Compile Include="Alpaca\Markets\Enums\ExchangeType.cs" />
+    <Compile Include="Alpaca\Markets\Enums\JsonAction.cs" />
+    <Compile Include="Alpaca\Markets\Enums\MarketDataType.cs" />
+    <Compile Include="Alpaca\Markets\Enums\OrderSide.cs" />
+    <Compile Include="Alpaca\Markets\Enums\OrderStatus.cs" />
+    <Compile Include="Alpaca\Markets\Enums\OrderStatusFilter.cs" />
+    <Compile Include="Alpaca\Markets\Enums\OrderType.cs" />
+    <Compile Include="Alpaca\Markets\Enums\PositionSide.cs" />
+    <Compile Include="Alpaca\Markets\Enums\TickType.cs" />
+    <Compile Include="Alpaca\Markets\Enums\TimeInForce.cs" />
+    <Compile Include="Alpaca\Markets\FakeThrottler.cs" />
+    <Compile Include="Alpaca\Markets\Helpers\CustomTimeZone.cs" />
+    <Compile Include="Alpaca\Markets\Helpers\DateConverter.cs" />
+    <Compile Include="Alpaca\Markets\Helpers\DateTimeHelper.cs" />
+    <Compile Include="Alpaca\Markets\Helpers\EnumExtensions.cs" />
+    <Compile Include="Alpaca\Markets\Helpers\QueryBuilder.cs" />
+    <Compile Include="Alpaca\Markets\Helpers\TimeConverter.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IAccount.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IAccountUpdate.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IAggHistoricalItems.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IAsset.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IAssetBars.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IBar.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\ICalendar.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IClock.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IDayHistoricalItems.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IExchange.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IFundamental.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IHistoricalItems.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IHistoricalQuote.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IHistoricalTrade.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\ILastQuote.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\ILastTrade.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IOrder.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IPosition.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IQuote.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IStreamBar.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IStreamQuote.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\IStreamTrade.cs" />
+    <Compile Include="Alpaca\Markets\Interfaces\ITradeUpdate.cs" />
+    <Compile Include="Alpaca\Markets\IThrottler.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAccount.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAccountUpdate.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAggHistoricalItems.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAsset.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAssetBars.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAuthRequest.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonAuthResponse.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonBar.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonCalendar.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonClock.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonDayBar.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonDayHistoricalItems.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonError.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonExchange.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonFundamental.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonHistoricalItems.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonHistoricalQuote.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonHistoricalTrade.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonLastQuote.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonLastTrade.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonListenRequest.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonMinuteBar.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonNewOrder.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonOrder.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonPosition.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonQuote.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonStreamBar.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonStreamQuote.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonStreamTrade.cs" />
+    <Compile Include="Alpaca\Markets\Messages\JsonTradeUpdate.cs" />
+    <Compile Include="Alpaca\Markets\NatsClient.cs" />
+    <Compile Include="Alpaca\Markets\RateThrottler.cs" />
+    <Compile Include="Alpaca\Markets\RestClient.cs" />
+    <Compile Include="Alpaca\Markets\RestClient.General.cs" />
+    <Compile Include="Alpaca\Markets\RestClient.Market.cs" />
+    <Compile Include="Alpaca\Markets\RestClient.Polygon.cs" />
+    <Compile Include="Alpaca\Markets\RestClientErrorException.cs" />
+    <Compile Include="Alpaca\Markets\SockClient.cs" />
     <Compile Include="Backtesting\BacktestingBrokerage.cs" />
     <Compile Include="Backtesting\BacktestingBrokerageFactory.cs" />
     <Compile Include="Backtesting\BasicOptionAssignmentSimulation.cs" />
     <Compile Include="Backtesting\IBacktestingMarketSimulation.cs" />
     <Compile Include="BaseWebsocketsBrokerage.cs" />
+    <Compile Include="Bitfinex\BestBidAskUpdatedEventArgs.cs" />
+    <Compile Include="Bitfinex\BitfinexBrokerage.Messaging.cs" />
+    <Compile Include="Bitfinex\BitfinexBrokerage.cs" />
+    <Compile Include="Bitfinex\BitfinexBrokerageFactory.cs" />
+    <Compile Include="Bitfinex\BitfinexBrokerage.Utility.cs" />
+    <Compile Include="Bitfinex\Messages.cs" />
+    <Compile Include="Bitfinex\BitfinexSymbolMapper.cs" />
+    <Compile Include="Bitfinex\OrderBook.cs" />
     <Compile Include="Brokerage.cs" />
     <Compile Include="BrokerageException.cs" />
     <Compile Include="BrokerageFactory.cs" />
@@ -181,13 +283,17 @@
     <Compile Include="Fxcm\FxcmBrokerageFactory.cs" />
     <Compile Include="Fxcm\FxcmSymbolMapper.cs" />
     <Compile Include="GDAX\AuthenticationToken.cs" />
+    <Compile Include="GDAX\BestBidAskUpdatedEventArgs.cs" />
     <Compile Include="GDAX\GDAXBrokerage.Utility.cs" />
     <Compile Include="GDAX\GDAXBrokerage.cs" />
     <Compile Include="GDAX\GDAXBrokerageFactory.cs" />
+    <Compile Include="GDAX\GDAXDataQueueHandler.cs" />
     <Compile Include="GDAX\GDAXFill.cs" />
     <Compile Include="GDAX\GDAXBrokerage.Messaging.cs" />
+    <Compile Include="GDAX\OrderBook.cs" />
     <Compile Include="IWebSocket.cs" />
     <Compile Include="GDAX\Messages.cs" />
+    <Compile Include="ApiPriceProvider.cs" />
     <Compile Include="WebSocketError.cs" />
     <Compile Include="WebSocketMessage.cs" />
     <Compile Include="WebSocketWrapper.cs" />
@@ -263,7 +369,13 @@
     <Compile Include="InteractiveBrokers\Client\ScannerParametersEventArgs.cs" />
     <Compile Include="InteractiveBrokers\Client\ScannerDataEventArgs.cs" />
     <Compile Include="InteractiveBrokers\Client\UpdatePortfolioEventArgs.cs" />
+    <Compile Include="InteractiveBrokers\FinancialAdvisor\Allocation.cs" />
+    <Compile Include="InteractiveBrokers\FinancialAdvisor\AllocationProfile.cs" />
+    <Compile Include="InteractiveBrokers\FinancialAdvisor\Group.cs" />
+    <Compile Include="InteractiveBrokers\FinancialAdvisor\AccountAlias.cs" />
+    <Compile Include="InteractiveBrokers\FinancialAdvisor\FinancialAdvisorConfiguration.cs" />
     <Compile Include="InteractiveBrokers\HistoricalDataType.cs" />
+    <Compile Include="InteractiveBrokers\InteractiveBrokersAccountData.cs" />
     <Compile Include="InteractiveBrokers\InteractiveBrokersBrokerage.cs" />
     <Compile Include="InteractiveBrokers\InteractiveBrokersBrokerageFactory.cs" />
     <Compile Include="InteractiveBrokers\Client\InteractiveBrokersClient.cs" />
@@ -543,6 +655,10 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Api\QuantConnect.Api.csproj">
+      <Project>{C5D44209-49A0-4505-A870-043C5EF5FDDF}</Project>
+      <Name>QuantConnect.Api</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Common\QuantConnect.csproj">
       <Project>{2545c0b4-fabb-49c9-8dd1-9ad7ee23f86b}</Project>
       <Name>QuantConnect</Name>

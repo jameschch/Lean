@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,9 +16,7 @@
 
 using System;
 using NodaTime;
-using QuantConnect.Data.Market;
 using QuantConnect.Securities;
-using QuantConnect.Util;
 
 namespace QuantConnect.Data
 {
@@ -27,13 +25,15 @@ namespace QuantConnect.Data
     /// </summary>
     public class HistoryRequest
     {
+        private Resolution? _fillForwardResolution;
+
         /// <summary>
         /// Gets the start time of the request.
         /// </summary>
         public DateTime StartTimeUtc { get; set; }
 
         /// <summary>
-        /// Gets the end time of the request. 
+        /// Gets the end time of the request.
         /// </summary>
         public DateTime EndTimeUtc { get; set; }
 
@@ -53,9 +53,20 @@ namespace QuantConnect.Data
         public Resolution Resolution { get; set; }
 
         /// <summary>
-        /// Gets the requested fill forward resolution, set to null for no fill forward behavior
+        /// Gets the requested fill forward resolution, set to null for no fill forward behavior.
+        /// Will always return null when Resolution is set to Tick.
         /// </summary>
-        public Resolution? FillForwardResolution { get; set; }
+        public Resolution? FillForwardResolution
+        {
+            get
+            {
+                return Resolution == Resolution.Tick ? null : _fillForwardResolution;
+            }
+            set
+            {
+                _fillForwardResolution = value;
+            }
+        }
 
         /// <summary>
         /// Gets whether or not to include extended market hours data, set to false for only normal market hours
@@ -73,7 +84,7 @@ namespace QuantConnect.Data
         public DateTimeZone DataTimeZone { get; set; }
 
         /// <summary>
-        /// Gets the time zone of the time stamps on the raw input data
+        /// TickType of the history request
         /// </summary>
         public TickType TickType { get; set; }
 
@@ -103,7 +114,7 @@ namespace QuantConnect.Data
         /// <param name="isCustomData">True for custom user data, false for normal QC data</param>
         /// <param name="dataNormalizationMode">Specifies normalization mode used for this subscription</param>
         /// <param name="tickType">The tick type used to created the <see cref="SubscriptionDataConfig"/> for the retrieval of history data</param>
-        public HistoryRequest(DateTime startTimeUtc, 
+        public HistoryRequest(DateTime startTimeUtc,
             DateTime endTimeUtc,
             Type dataType,
             Symbol symbol,

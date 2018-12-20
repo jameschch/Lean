@@ -16,21 +16,23 @@
 
 using System;
 using System.Collections.Generic;
-using NodaTime;
+using System.Linq;
 using QuantConnect.Data.UniverseSelection;
-using QuantConnect.Securities;
 
 namespace QuantConnect.Lean.Engine.DataFeeds
 {
     /// <summary>
     /// Provides the ability to synchronize subscriptions into time slices
     /// </summary>
-    public class SubscriptionSynchronizer
+    public class SubscriptionSynchronizer : ISubscriptionSynchronizer, ITimeProvider
     {
         private readonly UniverseSelection _universeSelection;
+        private TimeSliceFactory _timeSliceFactory;
+        private ITimeProvider _timeProvider;
+        private ManualTimeProvider _frontierTimeProvider;
 
         /// <summary>
-        /// Event fired when a subscription is finished
+        /// Event fired when a <see cref="Subscription"/> is finished
         /// </summary>
         public event EventHandler<Subscription> SubscriptionFinished;
 
@@ -39,34 +41,59 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// </summary>
         /// <param name="universeSelection">The universe selection instance used to handle universe
         /// selection subscription output</param>
+        /// <returns>A time slice for the specified frontier time</returns>
         public SubscriptionSynchronizer(UniverseSelection universeSelection)
         {
             _universeSelection = universeSelection;
         }
 
         /// <summary>
-        /// Syncs the specifies subscriptions at the frontier time
+        /// Sets the time provider. If already set will throw.
         /// </summary>
-        /// <param name="frontier">The time used for syncing, data in the future won't be included in this time slice</param>
-        /// <param name="subscriptions">The subscriptions to sync</param>
-        /// <param name="sliceTimeZone">The time zone of the created slice object</param>
-        /// <param name="cashBook">The cash book, used for creating the cash book updates</param>
-        /// <param name="nextFrontier">The next frontier time as determined by the first piece of data in the future ahead of the frontier.
-        /// This value will equal DateTime.MaxValue when the subscriptions are all finished</param>
-        /// <returns>A time slice for the specified frontier time</returns>
-        public TimeSlice Sync(DateTime frontier, IEnumerable<Subscription> subscriptions, DateTimeZone sliceTimeZone, CashBook cashBook, out DateTime nextFrontier)
+        /// <param name="timeProvider">The time provider, used to obtain the current frontier UTC value</param>
+        public void SetTimeProvider(ITimeProvider timeProvider)
         {
+            if (_timeProvider != null)
+            {
+                throw new Exception("SubscriptionSynchronizer.SetTimeProvider(): can only be called once");
+            }
+            _timeProvider = timeProvider;
+            _frontierTimeProvider = new ManualTimeProvider(_timeProvider.GetUtcNow());
+        }
+
+        /// <summary>
+        /// Sets the <see cref="TimeSliceFactory"/> instance to use
+        /// </summary>
+        /// <param name="timeSliceFactory">Used to create the new <see cref="TimeSlice"/></param>
+        public void SetTimeSliceFactory(TimeSliceFactory timeSliceFactory)
+        {
+            if (_timeSliceFactory != null)
+            {
+                throw new Exception("SubscriptionSynchronizer.SetTimeSliceFactory(): can only be called once");
+            }
+            _timeSliceFactory = timeSliceFactory;
+        }
+
+        /// <summary>
+        /// Syncs the specified subscriptions. The frontier time used for synchronization is
+        /// managed internally and dependent upon previous synchronization operations.
+        /// </summary>
+        /// <param name="subscriptions">The subscriptions to sync</param>
+        public TimeSlice Sync(IEnumerable<Subscription> subscriptions)
+        {
+            var delayedSubscriptionFinished = false;
             var changes = SecurityChanges.None;
-            nextFrontier = DateTime.MaxValue;
-            var earlyBirdTicks = nextFrontier.Ticks;
             var data = new List<DataFeedPacket>();
+            // NOTE: Tight coupling in UniverseSelection.ApplyUniverseSelection
             var universeData = new Dictionary<Universe, BaseDataCollection>();
+            var universeDataForTimeSliceCreate = new Dictionary<Universe, BaseDataCollection>();
+
+            _frontierTimeProvider.SetCurrentTimeUtc(_timeProvider.GetUtcNow());
+            var frontierUtc = _frontierTimeProvider.GetUtcNow();
 
             SecurityChanges newChanges;
             do
             {
-
-                universeData.Clear();
                 newChanges = SecurityChanges.None;
                 foreach (var subscription in subscriptions)
                 {
@@ -86,69 +113,68 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         }
                     }
 
-                    var packet = new DataFeedPacket(subscription.Security, subscription.Configuration);
-                    data.Add(packet);
+                    var packet = new DataFeedPacket(subscription.Security, subscription.Configuration, subscription.RemovedFromUniverse);
 
-                    var configuration = subscription.Configuration;
-                    var offsetProvider = subscription.OffsetProvider;
-                    var currentOffsetTicks = offsetProvider.GetOffsetTicks(frontier);
-                    while (subscription.Current.EndTime.Ticks - currentOffsetTicks <= frontier.Ticks)
+                    while (subscription.Current != null && subscription.Current.EmitTimeUtc <= frontierUtc)
                     {
-                        // we want bars rounded using their subscription times, we make a clone
-                        // so we don't interfere with the enumerator's internal logic
-                        var clone = subscription.Current.Clone(subscription.Current.IsFillForward);
-                        clone.Time = clone.Time.ExchangeRoundDownInTimeZone(configuration.Increment, subscription.Security.Exchange.Hours, configuration.DataTimeZone, configuration.ExtendedMarketHours);
-
-                        packet.Add(clone);
+                        packet.Add(subscription.Current.Data);
 
                         if (!subscription.MoveNext())
                         {
-                            OnSubscriptionFinished(subscription);
+                            delayedSubscriptionFinished = true;
                             break;
                         }
                     }
 
-                    // we have new universe data to select based on, store the subscription data until the end
-                    if (subscription.IsUniverseSelectionSubscription && packet.Count > 0)
+                    if (packet.Count > 0)
                     {
-                        // assume that if the first item is a base data collection then the enumerator handled the aggregation,
-                        // otherwise, load all the the data into a new collection instance
-                        var packetBaseDataCollection = packet.Data[0] as BaseDataCollection;
-                        var packetData = packetBaseDataCollection == null
-                            ? packet.Data
-                            : packetBaseDataCollection.Data;
-
-                        BaseDataCollection collection;
-                        if (!universeData.TryGetValue(subscription.Universe, out collection))
+                        // we have new universe data to select based on, store the subscription data until the end
+                        if (!subscription.IsUniverseSelectionSubscription)
                         {
-                            if (packetBaseDataCollection is OptionChainUniverseDataCollection)
-                            {
-                                var current = subscription.Current as OptionChainUniverseDataCollection;
-                                var underlying = current != null ? current.Underlying : null;
-                                collection = new OptionChainUniverseDataCollection(frontier, subscription.Configuration.Symbol, packetData, underlying);
-                            }
-                            else if (packetBaseDataCollection is FuturesChainUniverseDataCollection)
-                            {
-                                var current = subscription.Current as FuturesChainUniverseDataCollection;
-                                collection = new FuturesChainUniverseDataCollection(frontier, subscription.Configuration.Symbol, packetData);
-                            }
-                            else
-                            {
-                                collection = new BaseDataCollection(frontier, subscription.Configuration.Symbol, packetData);
-                            }
-
-                            universeData[subscription.Universe] = collection;
+                            data.Add(packet);
                         }
                         else
                         {
-                            collection.Data.AddRange(packetData);
+                            // assume that if the first item is a base data collection then the enumerator handled the aggregation,
+                            // otherwise, load all the the data into a new collection instance
+                            var packetBaseDataCollection = packet.Data[0] as BaseDataCollection;
+                            var packetData = packetBaseDataCollection == null
+                                ? packet.Data
+                                : packetBaseDataCollection.Data;
+
+                            BaseDataCollection collection;
+                            if (universeData.TryGetValue(subscription.Universes.Single(), out collection))
+                            {
+                                collection.Data.AddRange(packetData);
+                            }
+                            else
+                            {
+                                if (packetBaseDataCollection is OptionChainUniverseDataCollection)
+                                {
+                                    var current = packetBaseDataCollection as OptionChainUniverseDataCollection;
+                                    collection = new OptionChainUniverseDataCollection(frontierUtc, subscription.Configuration.Symbol, packetData, current?.Underlying);
+                                }
+                                else if (packetBaseDataCollection is FuturesChainUniverseDataCollection)
+                                {
+                                    collection = new FuturesChainUniverseDataCollection(frontierUtc, subscription.Configuration.Symbol, packetData);
+                                }
+                                else
+                                {
+                                    collection = new BaseDataCollection(frontierUtc, subscription.Configuration.Symbol, packetData);
+                                }
+
+                                universeData[subscription.Universes.Single()] = collection;
+                            }
                         }
                     }
 
-                    if (subscription.Current != null)
+                    if (subscription.IsUniverseSelectionSubscription
+                        && subscription.Universes.Single().DisposeRequested
+                        || delayedSubscriptionFinished)
                     {
-                        // take the earliest between the next piece of data or the next tz discontinuity
-                        earlyBirdTicks = Math.Min(earlyBirdTicks, Math.Min(subscription.Current.EndTime.Ticks - currentOffsetTicks, offsetProvider.GetNextDiscontinuity()));
+                        delayedSubscriptionFinished = false;
+                        // we need to do this after all usages of subscription.Universes
+                        OnSubscriptionFinished(subscription);
                     }
                 }
 
@@ -156,16 +182,18 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 {
                     var universe = kvp.Key;
                     var baseDataCollection = kvp.Value;
-                    newChanges += _universeSelection.ApplyUniverseSelection(universe, frontier, baseDataCollection);
+                    universeDataForTimeSliceCreate[universe] = baseDataCollection;
+                    newChanges += _universeSelection.ApplyUniverseSelection(universe, frontierUtc, baseDataCollection);
                 }
+                universeData.Clear();
 
                 changes += newChanges;
             }
             while (newChanges != SecurityChanges.None);
 
-            nextFrontier = new DateTime(Math.Max(earlyBirdTicks, frontier.Ticks), DateTimeKind.Utc);
+            var timeSlice = _timeSliceFactory.Create(frontierUtc, data, changes, universeDataForTimeSliceCreate);
 
-            return TimeSlice.Create(frontier, sliceTimeZone, cashBook, data, changes);
+            return timeSlice;
         }
 
         /// <summary>
@@ -175,6 +203,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         {
             var handler = SubscriptionFinished;
             if (handler != null) handler(this, subscription);
+        }
+
+        /// <summary>
+        /// Returns the current UTC frontier time
+        /// </summary>
+        public DateTime GetUtcNow()
+        {
+            return _frontierTimeProvider.GetUtcNow();
         }
     }
 }

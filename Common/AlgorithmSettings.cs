@@ -20,7 +20,7 @@ namespace QuantConnect
     /// <summary>
     /// This class includes user settings for the algorithm which can be changed in the <see cref="IAlgorithm.Initialize"/> method
     /// </summary>
-    public class AlgorithmSettings
+    public class AlgorithmSettings : IAlgorithmSettings
     {
         /// <summary>
         /// Gets/sets the maximum number of concurrent market data subscriptions available
@@ -32,12 +32,25 @@ namespace QuantConnect
         public int DataSubscriptionLimit { get; set; }
 
         /// <summary>
+        /// Gets/sets the SetHoldings buffers value.
+        /// The buffer is used for orders not to be rejected due to volatility when using SetHoldings and CalculateOrderQuantity
+        /// </summary>
+        public decimal FreePortfolioValuePercentage { get; set; }
+
+        /// <summary>
+        /// Gets/sets if Liquidate() is enabled
+        /// </summary>
+        public bool LiquidateEnabled { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="AlgorithmSettings"/> class
         /// </summary>
         public AlgorithmSettings()
         {
             // default is unlimited
             DataSubscriptionLimit = int.MaxValue;
+            LiquidateEnabled = true;
+            FreePortfolioValuePercentage = 0.0025m;
         }
     }
 }

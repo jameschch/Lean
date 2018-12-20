@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,6 +22,8 @@ using System.Linq;
 using System.Threading;
 using QuantConnect.Brokerages;
 using QuantConnect.Configuration;
+using QuantConnect.Data;
+using QuantConnect.Exceptions;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.HistoricalData;
@@ -32,12 +34,12 @@ using QuantConnect.Securities;
 using QuantConnect.Statistics;
 using QuantConnect.Util;
 
-namespace QuantConnect.Lean.Engine 
+namespace QuantConnect.Lean.Engine
 {
     /// <summary>
     /// LEAN ALGORITHMIC TRADING ENGINE: ENTRY POINT.
-    /// 
-    /// The engine loads new tasks, create the algorithms and threads, and sends them 
+    ///
+    /// The engine loads new tasks, create the algorithms and threads, and sends them
     /// to Algorithm Manager to be executed. It is the primary operating loop.
     /// </summary>
     public class Engine
@@ -45,6 +47,7 @@ namespace QuantConnect.Lean.Engine
         private readonly bool _liveMode;
         private readonly LeanEngineSystemHandlers _systemHandlers;
         private readonly LeanEngineAlgorithmHandlers _algorithmHandlers;
+        private readonly StackExceptionInterpreter _exceptionInterpreter = StackExceptionInterpreter.CreateFromAssemblies(AppDomain.CurrentDomain.GetAssemblies());
 
         /// <summary>
         /// Gets the configured system handlers for this engine instance
@@ -90,21 +93,23 @@ namespace QuantConnect.Lean.Engine
             {
                 //Reset thread holders.
                 var initializeComplete = false;
-                Thread threadFeed = null;
                 Thread threadTransactions = null;
                 Thread threadResults = null;
                 Thread threadRealTime = null;
+                Thread threadAlphas = null;
 
                 //-> Initialize messaging system
                 _systemHandlers.Notify.SetAuthentication(job);
 
                 //-> Set the result handler type for this algorithm job, and launch the associated result thread.
-                _algorithmHandlers.Results.Initialize(job, _systemHandlers.Notify, _systemHandlers.Api, _algorithmHandlers.DataFeed, _algorithmHandlers.Setup, _algorithmHandlers.Transactions);
+                _algorithmHandlers.Results.Initialize(job, _systemHandlers.Notify, _systemHandlers.Api, _algorithmHandlers.Setup, _algorithmHandlers.Transactions);
 
                 threadResults = new Thread(_algorithmHandlers.Results.Run, 0) { IsBackground = true, Name = "Result Thread" };
                 threadResults.Start();
 
                 IBrokerage brokerage = null;
+                DataManager dataManager = null;
+                var synchronizer = new Synchronizer();
                 try
                 {
                     // Save algorithm to cache, load algorithm instance:
@@ -113,12 +118,49 @@ namespace QuantConnect.Lean.Engine
                     // Set algorithm in ILeanManager
                     _systemHandlers.LeanManager.SetAlgorithm(algorithm);
 
+                    // initialize the alphas handler with the algorithm instance
+                    _algorithmHandlers.Alphas.Initialize(job, algorithm, _systemHandlers.Notify, _systemHandlers.Api);
+
                     // Initialize the brokerage
                     IBrokerageFactory factory;
                     brokerage = _algorithmHandlers.Setup.CreateBrokerage(job, algorithm, out factory);
 
+                    var marketHoursDatabase = MarketHoursDatabase.FromDataFolder();
+                    var symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
+
+                    var securityService = new SecurityService(algorithm.Portfolio.CashBook,
+                        marketHoursDatabase,
+                        symbolPropertiesDatabase,
+                        (ISecurityInitializerProvider)algorithm);
+
+                    algorithm.Securities.SetSecurityService(securityService);
+
+                    dataManager = new DataManager(_algorithmHandlers.DataFeed,
+                        new UniverseSelection(
+                            algorithm,
+                            securityService),
+                        algorithm,
+                        algorithm.TimeKeeper,
+                        marketHoursDatabase);
+
+                    _algorithmHandlers.Results.SetDataManager(dataManager);
+                    algorithm.SubscriptionManager.SetDataManager(dataManager);
+
+                    synchronizer.Initialize(
+                        algorithm,
+                        dataManager,
+                        _liveMode);
+
                     // Initialize the data feed before we initialize so he can intercept added securities/universes via events
-                    _algorithmHandlers.DataFeed.Initialize(algorithm, job, _algorithmHandlers.Results, _algorithmHandlers.MapFileProvider, _algorithmHandlers.FactorFileProvider, _algorithmHandlers.DataProvider);
+                    _algorithmHandlers.DataFeed.Initialize(
+                        algorithm,
+                        job,
+                        _algorithmHandlers.Results,
+                        _algorithmHandlers.MapFileProvider,
+                        _algorithmHandlers.FactorFileProvider,
+                        _algorithmHandlers.DataProvider,
+                        dataManager,
+                        (IDataFeedTimeProvider) synchronizer);
 
                     // set the order processor on the transaction manager (needs to be done before initializing BrokerageHistoryProvider)
                     algorithm.Transactions.SetOrderProcessor(_algorithmHandlers.Transactions);
@@ -131,26 +173,43 @@ namespace QuantConnect.Lean.Engine
                     }
 
                     var historyDataCacheProvider = new ZipDataCacheProvider(_algorithmHandlers.DataProvider);
-                    historyProvider.Initialize(job, _algorithmHandlers.DataProvider, historyDataCacheProvider, _algorithmHandlers.MapFileProvider, _algorithmHandlers.FactorFileProvider, progress =>
-                    {
-                        // send progress updates to the result handler only during initialization
-                        if (!algorithm.GetLocked() || algorithm.IsWarmingUp)
-                        {
-                            _algorithmHandlers.Results.SendStatusUpdate(AlgorithmStatus.History, 
-                                string.Format("Processing history {0}%...", progress));
-                        }
-                    });
+                    historyProvider.Initialize(
+                        new HistoryProviderInitializeParameters(
+                            job,
+                            _systemHandlers.Api,
+                            _algorithmHandlers.DataProvider,
+                            historyDataCacheProvider,
+                            _algorithmHandlers.MapFileProvider,
+                            _algorithmHandlers.FactorFileProvider,
+                            progress =>
+                            {
+                                // send progress updates to the result handler only during initialization
+                                if (!algorithm.GetLocked() || algorithm.IsWarmingUp)
+                                {
+                                    _algorithmHandlers.Results.SendStatusUpdate(AlgorithmStatus.History,
+                                        string.Format("Processing history {0}%...", progress));
+                                }
+                            }
+                        )
+                    );
+
+                    historyProvider.InvalidConfigurationDetected += (sender, args) => { _algorithmHandlers.Results.ErrorMessage(args.Message); };
+                    historyProvider.NumericalPrecisionLimited += (sender, args) => { _algorithmHandlers.Results.DebugMessage(args.Message); };
+                    historyProvider.DownloadFailed += (sender, args) => { _algorithmHandlers.Results.ErrorMessage(args.Message, args.StackTrace); };
+                    historyProvider.ReaderErrorDetected += (sender, args) => { _algorithmHandlers.Results.RuntimeError(args.Message, args.StackTrace); };
 
                     algorithm.HistoryProvider = historyProvider;
 
                     // initialize the default brokerage message handler
                     algorithm.BrokerageMessageHandler = factory.CreateBrokerageMessageHandler(algorithm, job, _systemHandlers.Api);
-                    
+
                     //Initialize the internal state of algorithm and job: executes the algorithm.Initialize() method.
                     initializeComplete = _algorithmHandlers.Setup.Setup(algorithm, brokerage, job, _algorithmHandlers.Results, _algorithmHandlers.Transactions, _algorithmHandlers.RealTime);
 
                     // set this again now that we've actually added securities
                     _algorithmHandlers.Results.SetAlgorithm(algorithm);
+                    // alpha handler needs start/end dates to determine sample step sizes
+                    _algorithmHandlers.Alphas.OnAfterAlgorithmInitialized(algorithm);
 
                     //If there are any reasons it failed, pass these back to the IDE.
                     if (!initializeComplete || algorithm.ErrorMessages.Count > 0 || _algorithmHandlers.Setup.Errors.Count > 0)
@@ -158,7 +217,16 @@ namespace QuantConnect.Lean.Engine
                         initializeComplete = false;
                         //Get all the error messages: internal in algorithm and external in setup handler.
                         var errorMessage = String.Join(",", algorithm.ErrorMessages);
-                        errorMessage += String.Join(",", _algorithmHandlers.Setup.Errors);
+                        errorMessage += String.Join(",", _algorithmHandlers.Setup.Errors.Select(e =>
+                        {
+                            var message = e.Message;
+                            if (e.InnerException != null)
+                            {
+                                var err = _exceptionInterpreter.Interpret(e.InnerException, _exceptionInterpreter);
+                                message += _exceptionInterpreter.GetExceptionMessageHeader(err);
+                            }
+                            return message;
+                        }));
                         Log.Error("Engine.Run(): " + errorMessage);
                         _algorithmHandlers.Results.RuntimeError(errorMessage);
                         _systemHandlers.Api.SetAlgorithmStatus(job.AlgorithmId, AlgorithmStatus.RuntimeError, errorMessage);
@@ -167,8 +235,8 @@ namespace QuantConnect.Lean.Engine
                 catch (Exception err)
                 {
                     Log.Error(err);
-                    var runtimeMessage = "Algorithm.Initialize() Error: " + err.Message + " Stack Trace: " + err.StackTrace;
-                    _algorithmHandlers.Results.RuntimeError(runtimeMessage, err.StackTrace);
+                    var runtimeMessage = "Algorithm.Initialize() Error: " + err.Message + " Stack Trace: " + err;
+                    _algorithmHandlers.Results.RuntimeError(runtimeMessage, err.ToString());
                     _systemHandlers.Api.SetAlgorithmStatus(job.AlgorithmId, AlgorithmStatus.RuntimeError, runtimeMessage);
                 }
 
@@ -180,15 +248,19 @@ namespace QuantConnect.Lean.Engine
                 Log.Trace("         RealTime:     " + _algorithmHandlers.RealTime.GetType().FullName);
                 Log.Trace("         Results:      " + _algorithmHandlers.Results.GetType().FullName);
                 Log.Trace("         Transactions: " + _algorithmHandlers.Transactions.GetType().FullName);
-                if (algorithm != null && algorithm.HistoryProvider != null)
+                Log.Trace("         Alpha:        " + _algorithmHandlers.Alphas.GetType().FullName);
+                if (algorithm?.HistoryProvider != null)
                 {
                     Log.Trace("         History Provider:     " + algorithm.HistoryProvider.GetType().FullName);
                 }
-                if (job is LiveNodePacket) Log.Trace("         Brokerage:      " + brokerage.GetType().FullName);
+                if (job is LiveNodePacket) Log.Trace("         Brokerage:      " + brokerage?.GetType().FullName);
 
                 //-> Using the job + initialization: load the designated handlers:
                 if (initializeComplete)
                 {
+                    // notify the LEAN manager that the algorithm is initialized and starting
+                    _systemHandlers.LeanManager.OnAlgorithmStart();
+
                     //-> Reset the backtest stopwatch; we're now running the algorithm.
                     var startTime = DateTime.Now;
 
@@ -222,21 +294,21 @@ namespace QuantConnect.Lean.Engine
                     _algorithmHandlers.Results.SendStatusUpdate(AlgorithmStatus.Running);
 
                     //Launch the data, transaction and realtime handlers into dedicated threads
-                    threadFeed = new Thread(_algorithmHandlers.DataFeed.Run) { IsBackground = true, Name = "DataFeed Thread" };
                     threadTransactions = new Thread(_algorithmHandlers.Transactions.Run) { IsBackground = true, Name = "Transaction Thread" };
                     threadRealTime = new Thread(_algorithmHandlers.RealTime.Run) { IsBackground = true, Name = "RealTime Thread" };
+                    threadAlphas = new Thread(() => _algorithmHandlers.Alphas.Run()) {IsBackground = true, Name = "Alpha Thread" };
 
                     //Launch the data feed, result sending, and transaction models/handlers in separate threads.
-                    threadFeed.Start(); // Data feed pushing data packets into thread bridge; 
                     threadTransactions.Start(); // Transaction modeller scanning new order requests
                     threadRealTime.Start(); // RealTime scan time for time based events:
+                    threadAlphas.Start(); // Alpha thread for processing algorithm alpha insights
 
                     // Result manager scanning message queue: (started earlier)
                     _algorithmHandlers.Results.DebugMessage(string.Format("Launching analysis for {0} with LEAN Engine v{1}", job.AlgorithmId, Globals.Version));
 
                     try
                     {
-                        //Create a new engine isolator class 
+                        //Create a new engine isolator class
                         var isolator = new Isolator();
 
                         // Execute the Algorithm Code:
@@ -245,10 +317,10 @@ namespace QuantConnect.Lean.Engine
                             try
                             {
                                 //Run Algorithm Job:
-                                // -> Using this Data Feed, 
-                                // -> Send Orders to this TransactionHandler, 
+                                // -> Using this Data Feed,
+                                // -> Send Orders to this TransactionHandler,
                                 // -> Send Results to ResultHandler.
-                                algorithmManager.Run(job, algorithm, _algorithmHandlers.DataFeed, _algorithmHandlers.Transactions, _algorithmHandlers.Results, _algorithmHandlers.RealTime, _systemHandlers.LeanManager, isolator.CancellationToken);
+                                algorithmManager.Run(job, algorithm, dataManager, synchronizer, _algorithmHandlers.Transactions, _algorithmHandlers.Results, _algorithmHandlers.RealTime, _systemHandlers.LeanManager, _algorithmHandlers.Alphas, isolator.CancellationToken);
                             }
                             catch (Exception err)
                             {
@@ -280,6 +352,9 @@ namespace QuantConnect.Lean.Engine
                         //Error running the user algorithm: purge datafeed, send error messages, set algorithm status to failed.
                         HandleAlgorithmError(job, err);
                     }
+
+                    // notify the LEAN manager that the algorithm has finished
+                    _systemHandlers.LeanManager.OnAlgorithmEnd();
 
                     try
                     {
@@ -342,12 +417,14 @@ namespace QuantConnect.Lean.Engine
                         //Diagnostics Completed, Send Result Packet:
                         var totalSeconds = (DateTime.Now - startTime).TotalSeconds;
                         var dataPoints = algorithmManager.DataPoints + algorithm.HistoryProvider.DataPointCount;
-                        _algorithmHandlers.Results.DebugMessage(
-                            string.Format("Algorithm Id:({0}) completed in {1} seconds at {2}k data points per second. Processing total of {3} data points.",
-                                job.AlgorithmId, totalSeconds.ToString("F2"), ((dataPoints/(double) 1000)/totalSeconds).ToString("F0"),
-                                dataPoints.ToString("N0")));
 
-                        _algorithmHandlers.Results.SendFinalResult(job, orders, algorithm.Transactions.TransactionRecord, holdings, statisticsResults, banner);
+                        if (!_liveMode)
+                        {
+                            var kps = dataPoints / (double) 1000 / totalSeconds;
+                            _algorithmHandlers.Results.DebugMessage($"Algorithm Id:({job.AlgorithmId}) completed in {totalSeconds:F2} seconds at {kps:F0}k data points per second. Processing total of {dataPoints:N0} data points.");
+                        }
+
+                        _algorithmHandlers.Results.SendFinalResult(job, orders, algorithm.Transactions.TransactionRecord, holdings, algorithm.Portfolio.CashBook, statisticsResults, banner);
                     }
                     catch (Exception err)
                     {
@@ -358,6 +435,8 @@ namespace QuantConnect.Lean.Engine
                     _algorithmHandlers.Transactions.Exit();
                     _algorithmHandlers.DataFeed.Exit();
                     _algorithmHandlers.RealTime.Exit();
+                    _algorithmHandlers.Alphas.Exit();
+                    dataManager?.RemoveAllSubscriptions();
                 }
 
                 //Close result handler:
@@ -365,10 +444,11 @@ namespace QuantConnect.Lean.Engine
 
                 //Wait for the threads to complete:
                 var ts = Stopwatch.StartNew();
-                while ((_algorithmHandlers.Results.IsActive 
-                    || (_algorithmHandlers.Transactions != null && _algorithmHandlers.Transactions.IsActive) 
+                while ((_algorithmHandlers.Results.IsActive
+                    || (_algorithmHandlers.Transactions != null && _algorithmHandlers.Transactions.IsActive)
                     || (_algorithmHandlers.DataFeed != null && _algorithmHandlers.DataFeed.IsActive)
-                    || (_algorithmHandlers.RealTime != null && _algorithmHandlers.RealTime.IsActive))
+                    || (_algorithmHandlers.RealTime != null && _algorithmHandlers.RealTime.IsActive)
+                    || (_algorithmHandlers.Alphas != null && _algorithmHandlers.Alphas.IsActive))
                     && ts.ElapsedMilliseconds < 30*1000)
                 {
                     Thread.Sleep(100);
@@ -376,9 +456,9 @@ namespace QuantConnect.Lean.Engine
                 }
 
                 //Terminate threads still in active state.
-                if (threadFeed != null && threadFeed.IsAlive) threadFeed.Abort();
                 if (threadTransactions != null && threadTransactions.IsAlive) threadTransactions.Abort();
                 if (threadResults != null && threadResults.IsAlive) threadResults.Abort();
+                if (threadAlphas != null && threadAlphas.IsAlive) threadAlphas.Abort();
 
                 if (brokerage != null)
                 {
@@ -421,10 +501,13 @@ namespace QuantConnect.Lean.Engine
             if (_algorithmHandlers.DataFeed != null) _algorithmHandlers.DataFeed.Exit();
             if (_algorithmHandlers.Results != null)
             {
-                var message = "Runtime Error: " + err;
+                // perform exception interpretation
+                err = _exceptionInterpreter.Interpret(err, _exceptionInterpreter);
+
+                var message = "Runtime Error: " + _exceptionInterpreter.GetExceptionMessageHeader(err);
                 Log.Trace("Engine.Run(): Sending runtime error to user...");
                 _algorithmHandlers.Results.LogMessage(message);
-                _algorithmHandlers.Results.RuntimeError(message, err.StackTrace);
+                _algorithmHandlers.Results.RuntimeError(message, err.ToString());
                 _systemHandlers.Api.SetAlgorithmStatus(job.AlgorithmId, AlgorithmStatus.RuntimeError, message + " Stack Trace: " + err);
             }
         }
@@ -468,7 +551,5 @@ namespace QuantConnect.Lean.Engine
                 }
             }
         }
-
-
     } // End Algorithm Node Core Thread
 } // End Namespace

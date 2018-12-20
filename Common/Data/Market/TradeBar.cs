@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,7 +22,7 @@ using QuantConnect.Util;
 namespace QuantConnect.Data.Market
 {
     /// <summary>
-    /// TradeBar class for second and minute resolution data: 
+    /// TradeBar class for second and minute resolution data:
     /// An OHLC implementation of the QuantConnect BaseData class with parameters for candles.
     /// </summary>
     public class TradeBar : BaseData, IBaseDataBar
@@ -38,12 +38,12 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Volume:
         /// </summary>
-        public decimal Volume { get; set; }
+        public virtual decimal Volume { get; set; }
 
         /// <summary>
         /// Opening price of the bar: Defined as the price at the start of the time period.
         /// </summary>
-        public decimal Open
+        public virtual decimal Open
         {
             get { return _open; }
             set
@@ -56,7 +56,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// High price of the TradeBar during the time period.
         /// </summary>
-        public decimal High
+        public virtual decimal High
         {
             get { return _high; }
             set
@@ -69,7 +69,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Low price of the TradeBar during the time period.
         /// </summary>
-        public decimal Low
+        public virtual decimal Low
         {
             get { return _low; }
             set
@@ -82,7 +82,7 @@ namespace QuantConnect.Data.Market
         /// <summary>
         /// Closing price of the TradeBar. Defined as the price at Start Time + TimeSpan.
         /// </summary>
-        public decimal Close
+        public virtual decimal Close
         {
             get { return Value; }
             set
@@ -98,13 +98,13 @@ namespace QuantConnect.Data.Market
         public override DateTime EndTime
         {
             get { return Time + Period; }
-            set { Period = value - Time; } 
+            set { Period = value - Time; }
         }
 
         /// <summary>
         /// The period of this trade bar, (second, minute, daily, ect...)
         /// </summary>
-        public TimeSpan Period { get; set; }
+        public virtual TimeSpan Period { get; set; }
 
         //In Base Class: Alias of Closing:
         //public decimal Price;
@@ -126,7 +126,7 @@ namespace QuantConnect.Data.Market
         }
 
         /// <summary>
-        /// Cloner constructor for implementing fill forward. 
+        /// Cloner constructor for implementing fill forward.
         /// Return a new instance with the same values as this original.
         /// </summary>
         /// <param name="original">Original tradebar object we seek to clone</param>
@@ -179,7 +179,7 @@ namespace QuantConnect.Data.Market
         /// <param name="date">Date of this reader request</param>
         /// <param name="isLiveMode">true if we're in live mode, false for backtesting mode</param>
         /// <returns>Enumerable iterator for returning each line of the required data.</returns>
-        public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode) 
+        public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode)
         {
             //Handle end of file:
             if (line == null)
@@ -202,8 +202,10 @@ namespace QuantConnect.Data.Market
 
                     //FOREX has a different data file format:
                     case SecurityType.Forex:
-                    case SecurityType.Crypto:
                         return ParseForex<TradeBar>(config, line, date);
+
+                    case SecurityType.Crypto:
+                        return ParseCrypto<TradeBar>(config, line, date);
 
                     case SecurityType.Cfd:
                         return ParseCfd<TradeBar>(config, line, date);
@@ -330,6 +332,43 @@ namespace QuantConnect.Data.Market
             tradeBar.High = csv[2].ToDecimal();
             tradeBar.Low = csv[3].ToDecimal();
             tradeBar.Close = csv[4].ToDecimal();
+
+            return tradeBar;
+        }
+
+        /// <summary>
+        /// Parses crypto trade bar data into the specified tradebar type, useful for custom types with OHLCV data deriving from TradeBar
+        /// </summary>
+        /// <typeparam name="T">The requested output type, must derive from TradeBar</typeparam>
+        /// <param name="config">Symbols, Resolution, DataType, </param>
+        /// <param name="line">Line from the data file requested</param>
+        /// <param name="date">The base data used to compute the time of the bar since the line specifies a milliseconds since midnight</param>
+        public static T ParseCrypto<T>(SubscriptionDataConfig config, string line, DateTime date)
+            where T : TradeBar, new()
+        {
+            var tradeBar = new T
+            {
+                Symbol = config.Symbol,
+                Period = config.Increment
+            };
+
+            var csv = line.ToCsv(6);
+            if (config.Resolution == Resolution.Daily || config.Resolution == Resolution.Hour)
+            {
+                // hourly and daily have different time format, and can use slow, robust c# parser.
+                tradeBar.Time = DateTime.ParseExact(csv[0], DateFormat.TwelveCharacter, CultureInfo.InvariantCulture).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+            }
+            else
+            {
+                //Fast decimal conversion
+                tradeBar.Time = date.Date.AddMilliseconds(csv[0].ToInt32()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+            }
+
+            tradeBar.Open = csv[1].ToDecimal();
+            tradeBar.High = csv[2].ToDecimal();
+            tradeBar.Low = csv[3].ToDecimal();
+            tradeBar.Close = csv[4].ToDecimal();
+            tradeBar.Volume = csv[5].ToDecimal();
 
             return tradeBar;
         }
@@ -517,6 +556,24 @@ namespace QuantConnect.Data.Market
                 source += "#" + LeanData.GenerateZipEntryName(config.Symbol, date, config.Resolution, config.TickType);
             }
             return new SubscriptionDataSource(source, SubscriptionTransportMedium.LocalFile, FileFormat.Csv);
+        }
+
+        /// <summary>
+        /// Return a new instance clone of this object, used in fill forward
+        /// </summary>
+        /// <param name="fillForward">True if this is a fill forward clone</param>
+        /// <returns>A clone of the current object</returns>
+        public override BaseData Clone(bool fillForward)
+        {
+            var clone = base.Clone(fillForward);
+
+            if (fillForward)
+            {
+                // zero volume out, since it would skew calculations in volume-based indicators
+                ((TradeBar) clone).Volume = 0;
+            }
+
+            return clone;
         }
 
         /// <summary>

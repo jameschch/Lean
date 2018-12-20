@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using System;
 using System.Collections.Generic;
 using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
@@ -43,16 +44,13 @@ namespace QuantConnect.Brokerages
         /// <summary>
         /// Gets a map of the default markets to be used for each security type
         /// </summary>
-        public override IReadOnlyDictionary<SecurityType, string> DefaultMarkets
-        {
-            get { return DefaultMarketMap; }
-        }
+        public override IReadOnlyDictionary<SecurityType, string> DefaultMarkets => DefaultMarketMap;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DefaultBrokerageModel"/> class
         /// </summary>
-        /// <param name="accountType">The type of account to be modelled, defaults to 
-        /// <see cref="QuantConnect.AccountType.Margin"/></param>
+        /// <param name="accountType">The type of account to be modelled, defaults to
+        /// <see cref="AccountType.Margin"/></param>
         public FxcmBrokerageModel(AccountType accountType = AccountType.Margin)
             : base(accountType)
         {
@@ -77,8 +75,8 @@ namespace QuantConnect.Brokerages
             if (security.Type != SecurityType.Forex && security.Type != SecurityType.Cfd)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    "This model does not support " + security.Type + " security type."
-                    );
+                    $"The {nameof(FxcmBrokerageModel)} does not support {security.Type} security type."
+                );
 
                 return false;
             }
@@ -87,23 +85,23 @@ namespace QuantConnect.Brokerages
             if (order.Type != OrderType.Limit && order.Type != OrderType.Market && order.Type != OrderType.StopMarket)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    "This model does not support " + order.Type + " order type."
-                    );
+                    $"The {nameof(FxcmBrokerageModel)} does not support {order.Type} order type."
+                );
 
                 return false;
             }
 
             // validate order quantity
-            if (order.Quantity % 1000 != 0)
+            if (order.Quantity % security.SymbolProperties.LotSize != 0)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    "The order quantity must be a multiple of 1000."
-                    );
+                    $"The order quantity must be a multiple of LotSize: [{security.SymbolProperties.LotSize}]."
+                );
 
                 return false;
             }
 
-            // validate stop/limit orders= prices
+            // validate stop/limit orders prices
             var limit = order as LimitOrder;
             if (limit != null)
             {
@@ -116,10 +114,14 @@ namespace QuantConnect.Brokerages
                 return IsValidOrderPrices(security, OrderType.StopMarket, stopMarket.Direction, stopMarket.StopPrice, security.Price, ref message);
             }
 
-            var stopLimit = order as StopLimitOrder;
-            if (stopLimit != null)
+            // validate time in force
+            if (order.TimeInForce != TimeInForce.GoodTilCanceled)
             {
-                return IsValidOrderPrices(security, OrderType.StopLimit, stopLimit.Direction, stopLimit.StopPrice, stopLimit.LimitPrice, ref message);
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                    $"The {nameof(FxcmBrokerageModel)} does not support {order.TimeInForce.GetType().Name} time in force."
+                );
+
+                return false;
             }
 
             return true;
@@ -138,15 +140,15 @@ namespace QuantConnect.Brokerages
             message = null;
 
             // validate order quantity
-            if (request.Quantity != null && request.Quantity % 1000 != 0)
+            if (request.Quantity != null && request.Quantity % security.SymbolProperties.LotSize != 0)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    "The order quantity must be a multiple of 1000."
-                    );
+                    $"The order quantity must be a multiple of LotSize: [{security.SymbolProperties.LotSize}]."
+                );
 
                 return false;
             }
-            
+
             // determine direction via the new, updated quantity
             var newQuantity = request.Quantity ?? order.Quantity;
             var direction = newQuantity > 0 ? OrderDirection.Buy : OrderDirection.Sell;
@@ -204,6 +206,33 @@ namespace QuantConnect.Brokerages
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
                     "Limit Buy orders and Stop Sell orders must be below market, Limit Sell orders and Stop Buy orders must be above market."
                     );
+
+                return false;
+            }
+
+            // Validate FXCM maximum distance for limit and stop orders:
+            // there are two different Max Limits, 15000 pips and 50% rule,
+            // whichever comes first (for most pairs, 50% rule comes first)
+            var maxDistance = Math.Min(
+                // MinimumPriceVariation is 1/10th of a pip
+                security.SymbolProperties.MinimumPriceVariation * 10 * 15000,
+                security.Price / 2);
+            var currentPrice = security.Price;
+            var minPrice = currentPrice - maxDistance;
+            var maxPrice = currentPrice + maxDistance;
+
+            var outOfRangePrice = orderType == OrderType.Limit && orderDirection == OrderDirection.Buy && limitPrice < minPrice ||
+                                  orderType == OrderType.Limit && orderDirection == OrderDirection.Sell && limitPrice > maxPrice ||
+                                  orderType == OrderType.StopMarket && orderDirection == OrderDirection.Buy && stopPrice > maxPrice ||
+                                  orderType == OrderType.StopMarket && orderDirection == OrderDirection.Sell && stopPrice < minPrice;
+
+            if (outOfRangePrice)
+            {
+                var orderPrice = orderType == OrderType.Limit ? limitPrice : stopPrice;
+
+                message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
+                    $"The {orderType} {orderDirection} order price ({orderPrice}) is too far from the current market price ({currentPrice})."
+                );
 
                 return false;
             }

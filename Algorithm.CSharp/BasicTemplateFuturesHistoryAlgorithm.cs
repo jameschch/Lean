@@ -43,8 +43,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2016, 08, 17);
-            SetEndDate(2016, 08, 20);
+            SetStartDate(2013, 10, 8);
+            SetEndDate(2013, 10, 9);
             SetCash(1000000);
 
             foreach (var root in roots)
@@ -53,8 +53,7 @@ namespace QuantConnect.Algorithm.CSharp
                 AddFuture(root, Resolution.Minute).SetFilter(TimeSpan.Zero, TimeSpan.FromDays(182));
             }
 
-            var benchmark = AddEquity("SPY");
-            SetBenchmark(benchmark.Symbol);
+            SetBenchmark(d => 1000000);
         }
 
         /// <summary>
@@ -65,9 +64,9 @@ namespace QuantConnect.Algorithm.CSharp
         {
             if (!Portfolio.Invested)
             {
-                foreach(var chain in slice.FutureChains)
+                foreach (var chain in slice.FutureChains)
                 {
-                    foreach(var contract in chain.Value)
+                    foreach (var contract in chain.Value)
                     {
                         Log(String.Format("{0},Bid={1} Ask={2} Last={3} OI={4}",
                              contract.Symbol.Value,
@@ -83,7 +82,7 @@ namespace QuantConnect.Algorithm.CSharp
         {
             foreach (var change in changes.AddedSecurities)
             {
-                var history = History(change.Symbol, 10, Resolution.Daily);
+                var history = History(change.Symbol, 10, Resolution.Minute);
 
                 foreach (var data in history.OrderByDescending(x => x.Time).Take(3))
                 {

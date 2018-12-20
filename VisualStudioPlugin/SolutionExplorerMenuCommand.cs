@@ -24,6 +24,7 @@ using System.Linq;
 using System.IO;
 using System.Threading;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace QuantConnect.VisualStudioPlugin
 {
@@ -35,76 +36,32 @@ namespace QuantConnect.VisualStudioPlugin
         /// <summary>
         /// Command IDs for Solution Explorer menu buttons
         /// </summary>
-        public const int SendForBacktestingCommandId = 0x0100;
-        public const int SaveToQuantConnectCommandId = 0x0110;
+        private const int _sendForBacktestingCommandId = 0x0100;
+        private const int _saveToQuantConnectCommandId = 0x0110;
 
         /// <summary>
         /// Command menu group (command set GUID).
         /// </summary>
-        public static readonly Guid CommandSet = new Guid("00ce2ccb-74c7-42f4-bf63-52c573fc1532");
+        private static readonly Guid _commandSet = new Guid("00ce2ccb-74c7-42f4-bf63-52c573fc1532");
 
         /// <summary>
         /// VS Package that provides this command, not null.
         /// </summary>
         private readonly QuantConnectPackage _package;
 
-        private DTE2 _dte2;
+        private readonly DTE2 _dte2;
 
         private ProjectFinder _projectFinder;
 
-        private LogInCommand _logInCommand;
-
         /// <summary>
-        /// Initializes a new instance of the <see cref="SolutionExplorerMenuCommand"/> class.
-        /// Adds our command handlers for menu (commands must exist in the command table file)
+        /// Observer for the status of backtests launched from the plugin
         /// </summary>
-        /// <param name="package">Owner package, not null.</param>
-        private SolutionExplorerMenuCommand(Package package)
-        {
-            if (package == null)
-            {
-                throw new ArgumentNullException("package");
-            }
+        private readonly IBacktestObserver _backtestObserver;
 
-            _package = package as QuantConnectPackage;
-            _dte2 = ServiceProvider.GetService(typeof(SDTE)) as DTE2;
-            _logInCommand = CreateLogInCommand();
-
-            var commandService = this.ServiceProvider.GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
-            if (commandService != null)
-            {
-                RegisterSendForBacktesting(commandService);
-                RegisterSaveToQuantConnect(commandService);
-            }
-        }
-
-
-        private ProjectFinder CreateProjectFinder()
-        {
-            return new ProjectFinder(PathUtils.GetSolutionFolder(_dte2));
-        }
-
-        private LogInCommand CreateLogInCommand()
-        {
-            return new LogInCommand();
-        }
-
-        private void RegisterSendForBacktesting(OleMenuCommandService commandService)
-        {
-            var menuCommandID = new CommandID(CommandSet, SendForBacktestingCommandId);
-            var oleMenuItem = new OleMenuCommand(new EventHandler(SendForBacktestingCallback), menuCommandID);
-            commandService.AddCommand(oleMenuItem);
-        }
-
-        private void RegisterSaveToQuantConnect(OleMenuCommandService commandService)
-        {
-            var menuCommandID = new CommandID(CommandSet, SaveToQuantConnectCommandId);
-            var oleMenuItem = new OleMenuCommand(new EventHandler(SaveToQuantConnectCallback), menuCommandID);
-            commandService.AddCommand(oleMenuItem);
-        }
+        private readonly AuthenticationCommand _authenticationCommand;
 
         /// <summary>
-        /// Gets the instance of the command.
+        /// Instance of the solution explorer menu command.
         /// </summary>
         public static SolutionExplorerMenuCommand Instance
         {
@@ -115,148 +72,280 @@ namespace QuantConnect.VisualStudioPlugin
         /// <summary>
         /// Gets the service provider from the owner package.
         /// </summary>
-        private IServiceProvider ServiceProvider
+        private IServiceProvider _serviceProvider => _package;
+
+        // Lazily create _projectFinder only when we have an opened solution
+        private ProjectFinder _lazyProjectFinder => _projectFinder ?? (_projectFinder = CreateProjectFinder());
+
+        private ProjectFinder CreateProjectFinder()
         {
-            get
+            return new ProjectFinder(PathUtils.GetSolutionFolder(_dte2));
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SolutionExplorerMenuCommand"/> class.
+        /// Adds our command handlers for menu (commands must exist in the command table file)
+        /// </summary>
+        /// <param name="package">Owner package, not null.</param>
+        private SolutionExplorerMenuCommand(Package package, IBacktestObserver backtestObserver)
+        {
+            if (package == null)
             {
-                return _package;
+                throw new ArgumentNullException(nameof(package));
+            }
+
+            _backtestObserver = backtestObserver;
+            _package = package as QuantConnectPackage;
+            _dte2 = _serviceProvider.GetService(typeof(SDTE)) as DTE2;
+            _authenticationCommand = new AuthenticationCommand();
+
+            var commandService = _serviceProvider.GetService(typeof(IMenuCommandService)) as OleMenuCommandService;
+            if (commandService != null)
+            {
+                RegisterSendForBacktesting(commandService);
+                RegisterSaveToQuantConnect(commandService);
             }
         }
 
-        // Lazily create ProjectFinder only when we have an opened solution
-        private ProjectFinder ProjectFinder
+        private void RegisterSendForBacktesting(OleMenuCommandService commandService)
         {
-            get {
-                if (_projectFinder == null)
-                {
-                    _projectFinder = CreateProjectFinder();
-                }
-                return _projectFinder;
-            }
+            var menuCommandId = new CommandID(_commandSet, _sendForBacktestingCommandId);
+            var oleMenuItem = new OleMenuCommand(SendForBacktestingCallback, menuCommandId);
+            commandService.AddCommand(oleMenuItem);
+        }
+
+        private void RegisterSaveToQuantConnect(OleMenuCommandService commandService)
+        {
+            var menuCommandId = new CommandID(_commandSet, _saveToQuantConnectCommandId);
+            var oleMenuItem = new OleMenuCommand(SaveToQuantConnectCallback, menuCommandId);
+            commandService.AddCommand(oleMenuItem);
         }
 
         /// <summary>
         /// Initializes the singleton instance of the command.
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        public static void Initialize(Package package)
+        public static void Initialize(Package package, IBacktestObserver backtestObserver)
         {
-            Instance = new SolutionExplorerMenuCommand(package);
+            Instance = new SolutionExplorerMenuCommand(package, backtestObserver);
         }
 
         private void SendForBacktestingCallback(object sender, EventArgs e)
         {
-            ExecuteOnProject(sender, (selectedProjectId, selectedProjectName, files) =>
+            try
             {
-                var fileNames = files.Select(f => f.FileName).ToList();
-
-                VsUtils.DisplayInStatusBar(this.ServiceProvider, "Uploading files to server ...");
-                UploadFilesToServer(selectedProjectId, files);
-
-                VsUtils.DisplayInStatusBar(this.ServiceProvider, "Compiling project ...");
-                var compileStatus = CompileProjectOnServer(selectedProjectId);
-                if (compileStatus.State == Api.CompileState.BuildError)
+                ExecuteOnProjectAsync(sender, async (selectedProjectId, selectedProjectName, files) =>
                 {
-                    VsUtils.DisplayInStatusBar(this.ServiceProvider, "Compile error.");
-                    VsUtils.ShowMessageBox(this.ServiceProvider, "Compile Error", "Error when compiling project.");
-                    return;
-                }
+                    var uploadResult = await System.Threading.Tasks.Task.Run(() =>
+                        UploadFilesToServer(selectedProjectId, files));
+                    if (!uploadResult)
+                    {
+                        return;
+                    }
 
-                VsUtils.DisplayInStatusBar(this.ServiceProvider, "Backtesting project ...");
-                Api.Backtest backtest = BacktestProjectOnServer(selectedProjectId, compileStatus.CompileId);
-                // Errors are not being transfered in response, so client can't tell if the backtest failed or not.
-                // This response error handling code will not work but should.
-                /* if (backtest.Errors.Count != 0) {
-                    VsUtils.DisplayInStatusBar(this.ServiceProvider, "Backtest error.");
-                    showMessageBox("Backtest Error", "Error when backtesting project.");
-                    return;
-                }*/
+                    var compilationResult = await CompileProjectOnServer(selectedProjectId);
+                    if (!compilationResult.Item1)
+                    {
+                        var errorDialog = new ErrorDialog("Compilation Error", compilationResult.Item2);
+                        VsUtils.DisplayDialogWindow(errorDialog);
+                        return;
+                    }
 
-                VsUtils.DisplayInStatusBar(this.ServiceProvider, "Backtest complete.");
-                var projectUrl = string.Format(
-                    CultureInfo.CurrentCulture, 
-                    "https://www.quantconnect.com/terminal/#open/{0}", 
-                    selectedProjectId
-                );
-                Process.Start(projectUrl);
-            });
+                    var backtestResult = await BacktestProjectOnServer(selectedProjectId, compilationResult.Item2);
+                    if (!backtestResult.Item1)
+                    {
+                        var errorDialog = new ErrorDialog("Backtest Failed", backtestResult.Item2.Error);
+                        VsUtils.DisplayDialogWindow(errorDialog);
+                        return;
+                    }
+
+                    var projectUrl = string.Format(
+                        CultureInfo.CurrentCulture,
+                        "https://www.quantconnect.com/terminal/#open/{0}/{1}",
+                        selectedProjectId,
+                        backtestResult.Item2.BacktestId
+                    );
+                    Process.Start(projectUrl);
+                });
+            }
+            catch (Exception exception)
+            {
+                VsUtils.ShowErrorMessageBox(_serviceProvider, "QuantConnect Exception", exception.ToString());
+            }
         }
 
         private void SaveToQuantConnectCallback(object sender, EventArgs e)
         {
-            ExecuteOnProject(sender, (selectedProjectId, selectedProjectName, files) =>
+            try
             {
-                var fileNames = files.Select(f => f.FileName).ToList();
-
-                VsUtils.DisplayInStatusBar(this.ServiceProvider, "Uploading files to server ...");
-                UploadFilesToServer(selectedProjectId, files);
-                VsUtils.DisplayInStatusBar(this.ServiceProvider, "Files upload complete.");
-            });
+                ExecuteOnProjectAsync(sender, (selectedProjectId, selectedProjectName, files) =>
+                {
+                    System.Threading.Tasks.Task.Factory.StartNew(() =>
+                    {
+                        UploadFilesToServer(selectedProjectId, files);
+                    }, CancellationToken.None, TaskCreationOptions.AttachedToParent, TaskScheduler.Default);
+                });
+            }
+            catch (Exception exception)
+            {
+                VsUtils.ShowErrorMessageBox(_serviceProvider, "QuantConnect Exception", exception.ToString());
+            }
         }
 
-        private void UploadFilesToServer(int selectedProjectId, List<SelectedItem> files)
+        /// <summary>
+        /// Uploads a list of files to a specific project at QuantConnect
+        /// </summary>
+        /// <param name="selectedProjectId">Target project Id</param>
+        /// <param name="files">List of files to upload</param>
+        /// <returns>Returns false if any file failed to be uploaded</returns>
+        private bool UploadFilesToServer(int selectedProjectId, IEnumerable<SelectedItem> files)
         {
+            VsUtils.DisplayInStatusBar(_serviceProvider, "Uploading files to server...");
             var api = AuthorizationManager.GetInstance().GetApi();
+            // Counters to keep track of files uploaded or not
+            var filesUploaded = 0;
+            var filesNotUploaded = 0;
             foreach (var file in files)
             {
                 api.DeleteProjectFile(selectedProjectId, file.FileName);
-                var fileContent = File.ReadAllText(file.FilePath);
-                api.AddProjectFile(selectedProjectId, file.FileName, fileContent);
+                try
+                {
+                    var fileContent = File.ReadAllText(file.FilePath);
+                    var response = api.AddProjectFile(selectedProjectId, file.FileName, fileContent);
+                    if (response.Success)
+                    {
+                        filesUploaded++;
+                    }
+                    else
+                    {
+                        VSActivityLog.Error("Failed to add project file " + file.FileName);
+                        filesNotUploaded++;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    VSActivityLog.Error("Exception adding project file " + file.FileName + ". Exception " + exception);
+                    filesNotUploaded++;
+                }
             }
+            // Update Status bar accordingly based on counters
+            var message = "Files upload complete";
+            message += (filesUploaded != 0) ? ". Uploaded " + filesUploaded : "";
+            message += (filesNotUploaded != 0) ? ". Failed to upload " + filesNotUploaded : "";
+            VsUtils.DisplayInStatusBar(_serviceProvider, message);
+
+            // Return false if any file failed to be uploaded
+            var result = filesNotUploaded == 0;
+            if (!result)
+            {
+                VsUtils.ShowErrorMessageBox(_serviceProvider, "Upload Files Failed", message);
+            }
+            return result;
         }
 
-        private Api.Compile CompileProjectOnServer(int projectId)
+        /// <summary>
+        /// Compiles specific projectId at QuantConnect
+        /// </summary>
+        /// <param name="projectId">Target project Id</param>
+        /// <returns>Tuple&lt;bool, string&gt;. Item1 is true if compilation succeeded.
+        /// Item2 is compile Id if compilation succeeded else error message.</returns>
+        private async Task<Tuple<bool, string>> CompileProjectOnServer(int projectId)
         {
+            VsUtils.DisplayInStatusBar(_serviceProvider, "Compiling project...");
             var api = AuthorizationManager.GetInstance().GetApi();
-            var compileStatus = api.CreateCompile(projectId);
+            var compileStatus = await System.Threading.Tasks.Task.Run(() => api.CreateCompile(projectId));
             var compileId = compileStatus.CompileId;
+
             while (compileStatus.State == Api.CompileState.InQueue)
             {
-                Thread.Sleep(5000);
-                compileStatus = api.ReadCompile(projectId, compileId);
+                compileStatus = await System.Threading.Tasks.Task.Delay(2000).
+                    ContinueWith(_ => api.ReadCompile(projectId, compileId));
             }
-            return compileStatus;
+
+            if (compileStatus.State == Api.CompileState.BuildError)
+            {
+                // Default to show Errors, now it is coming empty so use Logs. Will only show First Error || Log
+                var error = compileStatus.Errors.Count == 0 ?
+                    compileStatus.Logs.FirstOrDefault() : compileStatus.Errors.FirstOrDefault();
+                VsUtils.DisplayInStatusBar(_serviceProvider, "Error when compiling project");
+                return new Tuple<bool, string>(false, error);
+            }
+            VsUtils.DisplayInStatusBar(_serviceProvider, "Compilation completed successfully");
+            return new Tuple<bool, string>(true, compileStatus.CompileId);
         }
 
-        private Api.Backtest BacktestProjectOnServer(int projectId, string compileId)
+        /// <summary>
+        /// Backtests specific projectId and compileId at QuantConnect
+        /// </summary>
+        /// <param name="projectId">Target project Id</param>
+        /// <param name="compileId">Target compile Id</param>
+        /// <returns>Tuple&lt;bool, string&gt;. Item1 is true if backtest succeeded.
+        /// Item2 is the corresponding Api.Backtest instance</returns>
+        private async Task<Tuple<bool, Api.Backtest>> BacktestProjectOnServer(int projectId, string compileId)
         {
+            VsUtils.DisplayInStatusBar(_serviceProvider, "Backtesting project...");
             var api = AuthorizationManager.GetInstance().GetApi();
-            var backtestStatus = api.CreateBacktest(projectId, compileId, "My New Backtest");
+            var backtestName = BacktestNameProvider.GetNewName();
+            var backtestStatus = await System.Threading.Tasks.Task.Run(() => api.CreateBacktest(projectId, compileId, backtestName));
             var backtestId = backtestStatus.BacktestId;
-            while (!backtestStatus.Completed)
+
+            // Notify observer new backtest
+            _backtestObserver.BacktestCreated(projectId, backtestStatus);
+
+            var errorPresent = false;
+            while (backtestStatus.Progress < 1 && !errorPresent)
             {
-                Thread.Sleep(5000);
-                backtestStatus = api.ReadBacktest(projectId, backtestId);
+                backtestStatus = await System.Threading.Tasks.Task.Delay(4000).
+                    ContinueWith(_ => api.ReadBacktest(projectId, backtestId));
+
+                errorPresent = !string.IsNullOrEmpty(backtestStatus.Error) ||
+                               !string.IsNullOrEmpty(backtestStatus.StackTrace);
+                // Notify observer backtest status
+                _backtestObserver.BacktestStatusUpdated(projectId, backtestStatus);
             }
-            return backtestStatus;
+
+            // Notify observer backtest finished
+            _backtestObserver.BacktestFinished(projectId, backtestStatus);
+            if (errorPresent)
+            {
+                VsUtils.DisplayInStatusBar(_serviceProvider, "Error when backtesting project");
+                return new Tuple<bool, Api.Backtest>(false, backtestStatus);
+            }
+            var successMessage = "Backtest completed successfully";
+            VsUtils.DisplayInStatusBar(_serviceProvider, successMessage);
+            return new Tuple<bool, Api.Backtest>(true, backtestStatus);
         }
 
-        private void ExecuteOnProject(object sender, Action<int, string, List<SelectedItem>> onProject)
+        private async void ExecuteOnProjectAsync(object sender, Action<int, string, List<SelectedItem>> onProject)
         {
-            if (_logInCommand.DoLogIn(this.ServiceProvider, _package.DataPath, explicitLogin: false))
+            if (await _authenticationCommand.Login(_serviceProvider, false))
             {
-                var api = AuthorizationManager.GetInstance().GetApi();
-                var projects = api.ListProjects().Projects;
-                var projectNames = projects.Select(p => Tuple.Create(p.ProjectId, p.Name)).ToList();
+                var projects = await System.Threading.Tasks.Task.Run(() =>
+                {
+                    var api = AuthorizationManager.GetInstance().GetApi();
+                    return api.ListProjects().Projects;
+                });
+
+                var projectNames = projects.Select(p => Tuple.Create(p.ProjectId, p.Name, p.Language)).ToList();
 
                 var files = GetSelectedFiles(sender);
                 var fileNames = files.Select(tuple => tuple.FileName).ToList();
-                var suggestedProjectName = ProjectFinder.ProjectNameForFiles(fileNames);
+                var suggestedProjectName = _lazyProjectFinder.ProjectNameForFiles(fileNames);
                 var projectNameDialog = new ProjectNameDialog(projectNames, suggestedProjectName);
                 VsUtils.DisplayDialogWindow(projectNameDialog);
 
-                if (projectNameDialog.ProjectNameProvided())
+                if (projectNameDialog.ProjectNameProvided)
                 {
-                    var selectedProjectName = projectNameDialog.GetSelectedProjectName();
-                    var selectedProjectId = projectNameDialog.GetSelectedProjectId();
-                    ProjectFinder.AssociateProjectWith(selectedProjectName, fileNames);
+                    var selectedProjectName = projectNameDialog.SelectedProjectName;
+                    var selectedProjectId = projectNameDialog.SelectedProjectId;
+                    _lazyProjectFinder.AssociateProjectWith(selectedProjectName, fileNames);
 
                     if (!selectedProjectId.HasValue)
                     {
                         var newProjectLanguage = PathUtils.DetermineProjectLanguage(files.Select(f => f.FilePath).ToList());
                         if (!newProjectLanguage.HasValue)
                         {
-                            VsUtils.ShowMessageBox(this.ServiceProvider, "Failed to determine project language",
+                            VsUtils.ShowMessageBox(_serviceProvider, "Failed to determine project language",
                                 $"Failed to determine programming laguage for a project");
                             return;
                         }
@@ -264,7 +353,7 @@ namespace QuantConnect.VisualStudioPlugin
                         selectedProjectId = CreateQuantConnectProject(selectedProjectName, newProjectLanguage.Value);
                         if (!selectedProjectId.HasValue)
                         {
-                            VsUtils.ShowMessageBox(this.ServiceProvider, "Failed to create a project", $"Failed to create a project {selectedProjectName}");
+                            VsUtils.ShowMessageBox(_serviceProvider, "Failed to create a project", $"Failed to create a project {selectedProjectName}");
                         }
                         onProject.Invoke(selectedProjectId.Value, selectedProjectName, files);
                     }
@@ -289,8 +378,6 @@ namespace QuantConnect.VisualStudioPlugin
 
         private List<SelectedItem> GetSelectedFiles(object sender)
         {
-            var myCommand = sender as OleMenuCommand;
-
             var selectedFiles = new List<SelectedItem>();
             var selectedItems = (object[])_dte2.ToolWindows.SolutionExplorer.SelectedItems;
             foreach (EnvDTE.UIHierarchyItem selectedUIHierarchyItem in selectedItems)
@@ -325,18 +412,18 @@ namespace QuantConnect.VisualStudioPlugin
 
             return selectedFiles;
         }
-    }
 
-    class SelectedItem
-    {
-        public string FileName
+        private class SelectedItem
         {
-            get; set;
-        }
+            public string FileName
+            {
+                get; set;
+            }
 
-        public string FilePath
-        {
-            get; set;
+            public string FilePath
+            {
+                get; set;
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -15,10 +15,12 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -27,11 +29,9 @@ namespace QuantConnect.Algorithm.CSharp
     /// </summary>
     /// <meta name="tag" content="regression test" />
     /// <meta name="tag" content="options" />
-    public class OptionSplitRegressionAlgorithm : QCAlgorithm
+    public class OptionSplitRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private const string UnderlyingTicker = "AAPL";
-        public readonly Symbol Underlying = QuantConnect.Symbol.Create(UnderlyingTicker, SecurityType.Equity, Market.USA);
-        public readonly Symbol OptionSymbol = QuantConnect.Symbol.Create(UnderlyingTicker, SecurityType.Option, Market.USA);
+        private Symbol _optionSymbol;
 
         public override void Initialize()
         {
@@ -40,10 +40,8 @@ namespace QuantConnect.Algorithm.CSharp
             SetEndDate(2014, 06, 09);
             SetCash(1000000);
 
-            var equity = AddEquity(UnderlyingTicker);
-            var option = AddOption(UnderlyingTicker);
-
-            equity.SetDataNormalizationMode(DataNormalizationMode.Raw);
+            var option = AddOption("AAPL");
+            _optionSymbol = option.Symbol;
 
             // set our strike/expiry filter for this option chain
             option.SetFilter(u => u.IncludeWeeklys()
@@ -51,7 +49,7 @@ namespace QuantConnect.Algorithm.CSharp
                        .Expiration(TimeSpan.Zero, TimeSpan.FromDays(365 * 2)));
 
             // use the underlying equity as the benchmark
-            SetBenchmark(equity.Symbol);
+            SetBenchmark("AAPL");
         }
 
         /// <summary>
@@ -65,7 +63,7 @@ namespace QuantConnect.Algorithm.CSharp
                 if (Time.Hour > 9 && Time.Minute > 0)
                 {
                     OptionChain chain;
-                    if (slice.OptionChains.TryGetValue(OptionSymbol, out chain))
+                    if (slice.OptionChains.TryGetValue(_optionSymbol, out chain))
                     {
                         var contract =
                             chain.OrderBy(x => x.Expiry)
@@ -94,7 +92,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (Time.Day == 6 && holdings != 1)
                 {
-                        throw new Exception(string.Format("Expected position quantity of 1 but was {0}", holdings));
+                    throw new Exception(string.Format("Expected position quantity of 1 but was {0}", holdings));
                 }
                 if (Time.Day == 9 && holdings != 7)
                 {
@@ -112,8 +110,41 @@ namespace QuantConnect.Algorithm.CSharp
         {
             Log(orderEvent.ToString());
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
+        /// This is used by the regression test system to indicate which languages this algorithm is written in.
+        /// </summary>
+        public Language[] Languages { get; } = { Language.CSharp, Language.Python };
+
+        /// <summary>
+        /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
+        /// </summary>
+        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        {
+            {"Total Trades", "2"},
+            {"Average Win", "0%"},
+            {"Average Loss", "-0.02%"},
+            {"Compounding Annual Return", "-1.564%"},
+            {"Drawdown", "0.000%"},
+            {"Expectancy", "-1"},
+            {"Net Profit", "-0.017%"},
+            {"Sharpe Ratio", "-7.937"},
+            {"Loss Rate", "100%"},
+            {"Win Rate", "0%"},
+            {"Profit-Loss Ratio", "0"},
+            {"Alpha", "-0.014"},
+            {"Beta", "0"},
+            {"Annual Standard Deviation", "0.001"},
+            {"Annual Variance", "0"},
+            {"Information Ratio", "7.935"},
+            {"Tracking Error", "6.786"},
+            {"Treynor Ratio", "161.568"},
+            {"Total Fees", "$0.50"}
+        };
     }
 }
-
-
-

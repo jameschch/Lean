@@ -91,6 +91,10 @@ namespace QuantConnect.Securities
 
         /// <summary>
         /// Add a new market data point to the local security cache for the current market price.
+        /// Rules:
+        ///     Don't cache fill forward data.
+        ///     Always return the last observation.
+        ///     If two consecutive data has the same time stamp and one is Quotebars and the other Tradebar, prioritize the Quotebar.
         /// </summary>
         public void AddData(BaseData data)
         {
@@ -101,24 +105,48 @@ namespace QuantConnect.Securities
                 return;
             }
 
-            _lastData = data;
+            var tick = data as Tick;
+            if (tick?.TickType == TickType.OpenInterest)
+            {
+                OpenInterest = (long)tick.Value;
+                return;
+            }
+
+            // Only cache non fill-forward data.
+            if (data.IsFillForward) return;
+
+            // Always keep track of the last obesrvation
             _dataByType[data.GetType()] = data;
 
-            var tick = data as Tick;
+            // don't set _lastData if receive quotebar then tradebar w/ same end time. this
+            // was implemented to grant preference towards using quote data in the fill
+            // models and provide a level of determinism on the values exposed via the cache.
+            if (_lastData == null
+              || _lastQuoteBarUpdate != data.EndTime
+              || data.DataType != MarketDataType.TradeBar )
+            {
+                _lastData = data;
+            }
+
             if (tick != null)
             {
                 if (tick.Value != 0) Price = tick.Value;
 
-                if (tick.BidPrice != 0) BidPrice = tick.BidPrice;
-                if (tick.BidSize != 0) BidSize = tick.BidSize;
+                if (tick.TickType == TickType.Trade && tick.Quantity != 0)
+                {
+                    Volume = tick.Quantity;
+                }
+                if (tick.TickType == TickType.Quote)
+                {
+                    if (tick.BidPrice != 0) BidPrice = tick.BidPrice;
+                    if (tick.BidSize != 0) BidSize = tick.BidSize;
 
-                if (tick.AskPrice != 0) AskPrice = tick.AskPrice;
-                if (tick.AskSize != 0) AskSize = tick.AskSize;
-
-                if (tick.Quantity != 0) Volume = tick.Quantity;
-
+                    if (tick.AskPrice != 0) AskPrice = tick.AskPrice;
+                    if (tick.AskSize != 0) AskSize = tick.AskSize;
+                }
                 return;
             }
+
             var bar = data as IBar;
             if (bar != null)
             {
@@ -139,6 +167,7 @@ namespace QuantConnect.Securities
                 {
                     if (tradeBar.Volume != 0) Volume = tradeBar.Volume;
                 }
+
                 var quoteBar = bar as QuoteBar;
                 if (quoteBar != null)
                 {
@@ -149,10 +178,19 @@ namespace QuantConnect.Securities
                     if (quoteBar.LastAskSize != 0) AskSize = quoteBar.LastAskSize;
                 }
             }
-            else
+            else if (data.DataType != MarketDataType.Auxiliary)
             {
                 Price = data.Price;
             }
+        }
+
+        /// <summary>
+        /// Stores the specified data instance in the cache WITHOUT updating any of the cache properties, such as Price
+        /// </summary>
+        /// <param name="data"></param>
+        public void StoreData(BaseData data)
+        {
+            _dataByType[data.GetType()] = data;
         }
 
         /// <summary>
@@ -170,10 +208,10 @@ namespace QuantConnect.Securities
         /// <typeparam name="T">The data type</typeparam>
         /// <returns>The last data packet, null if none received of type</returns>
         public T GetData<T>()
-            where T:BaseData
+            where T : BaseData
         {
             BaseData data;
-            _dataByType.TryGetValue(typeof (T), out data);
+            _dataByType.TryGetValue(typeof(T), out data);
             return data as T;
         }
 

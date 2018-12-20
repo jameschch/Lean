@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,9 +21,6 @@ using QuantConnect.Data;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds;
-using QuantConnect.Packets;
-using QuantConnect.Securities;
-using HistoryRequest = QuantConnect.Data.HistoryRequest;
 
 namespace QuantConnect.Lean.Engine.HistoricalData
 {
@@ -31,37 +28,14 @@ namespace QuantConnect.Lean.Engine.HistoricalData
     /// Provides an abstract implementation of <see cref="IHistoryProvider"/>
     /// which provides synchronization of multiple history results
     /// </summary>
-    public abstract class SynchronizingHistoryProvider : IHistoryProvider
+    public abstract class SynchronizingHistoryProvider : HistoryProviderBase
     {
         private int _dataPointCount;
 
         /// <summary>
         /// Gets the total number of data points emitted by this history provider
         /// </summary>
-        public int DataPointCount
-        {
-            get { return _dataPointCount; }
-        }
-
-        /// <summary>
-        /// Initializes this history provider to work for the specified job
-        /// </summary>
-        /// <param name="job">The job</param>
-        /// <param name="dataProvider">Provider used to get data when it is not present on disk</param>
-        /// <param name="dataCacheProvider">Provider used to cache history data files</param>
-        /// <param name="mapFileProvider">Provider used to get a map file resolver to handle equity mapping</param>
-        /// <param name="factorFileProvider">Provider used to get factor files to handle equity price scaling</param>
-        /// <param name="statusUpdate">Function used to send status updates</param>
-        public abstract void Initialize(AlgorithmNodePacket job, IDataProvider dataProvider, IDataCacheProvider dataCacheProvider,
-            IMapFileProvider mapFileProvider, IFactorFileProvider factorFileProvider, Action<int> statusUpdate);
-
-        /// <summary>
-        /// Gets the history for the requested securities
-        /// </summary>
-        /// <param name="requests">The historical data requests</param>
-        /// <param name="sliceTimeZone">The time zone used when time stamping the slice instances</param>
-        /// <returns>An enumerable of the slices of data covering the span specified in each request</returns>
-        public abstract IEnumerable<Slice> GetHistory(IEnumerable<HistoryRequest> requests, DateTimeZone sliceTimeZone);
+        public override int DataPointCount => _dataPointCount;
 
         /// <summary>
         /// Enumerates the subscriptions into slices
@@ -69,9 +43,8 @@ namespace QuantConnect.Lean.Engine.HistoricalData
         protected IEnumerable<Slice> CreateSliceEnumerableFromSubscriptions(List<Subscription> subscriptions, DateTimeZone sliceTimeZone)
         {
             // required by TimeSlice.Create, but we don't need it's behavior
-            var cashBook = new CashBook();
-            cashBook.Clear();
             var frontier = DateTime.MinValue;
+            var timeSliceFactory = new TimeSliceFactory(sliceTimeZone);
             while (true)
             {
                 var earlyBirdTicks = long.MaxValue;
@@ -82,15 +55,9 @@ namespace QuantConnect.Lean.Engine.HistoricalData
 
                     var packet = new DataFeedPacket(subscription.Security, subscription.Configuration);
 
-                    var offsetProvider = subscription.OffsetProvider;
-                    var currentOffsetTicks = offsetProvider.GetOffsetTicks(frontier);
-                    while (subscription.Current.EndTime.Ticks - currentOffsetTicks <= frontier.Ticks)
+                    while (subscription.Current.EmitTimeUtc <= frontier)
                     {
-                        // we want bars rounded using their subscription times, we make a clone
-                        // so we don't interfere with the enumerator's internal logic
-                        var clone = subscription.Current.Clone(subscription.Current.IsFillForward);
-                        clone.Time = clone.Time.RoundDown(subscription.Configuration.Increment);
-                        packet.Add(clone);
+                        packet.Add(subscription.Current.Data);
                         Interlocked.Increment(ref _dataPointCount);
                         if (!subscription.MoveNext())
                         {
@@ -103,8 +70,7 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                     if (subscription.Current != null)
                     {
                         // take the earliest between the next piece of data or the next tz discontinuity
-                        var nextDataOrDiscontinuity = Math.Min(subscription.Current.EndTime.Ticks - currentOffsetTicks, offsetProvider.GetNextDiscontinuity());
-                        earlyBirdTicks = Math.Min(earlyBirdTicks, nextDataOrDiscontinuity);
+                        earlyBirdTicks = Math.Min(earlyBirdTicks, subscription.Current.EmitTimeUtc.Ticks);
                     }
                 }
 
@@ -114,7 +80,7 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 if (data.Count != 0)
                 {
                     // reuse the slice construction code from TimeSlice.Create
-                    yield return TimeSlice.Create(frontier, sliceTimeZone, cashBook, data, SecurityChanges.None).Slice;
+                    yield return timeSliceFactory.Create(frontier, data, SecurityChanges.None, new Dictionary<Universe, BaseDataCollection>()).Slice;
                 }
 
                 frontier = new DateTime(Math.Max(earlyBirdTicks, frontier.Ticks), DateTimeKind.Utc);

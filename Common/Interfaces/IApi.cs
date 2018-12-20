@@ -19,9 +19,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using QuantConnect.Api;
 using QuantConnect.API;
-using QuantConnect.Data;
-using QuantConnect.Packets;
-using QuantConnect.Securities;
+using QuantConnect.Data.Market;
 
 namespace QuantConnect.Interfaces
 {
@@ -206,6 +204,7 @@ namespace QuantConnect.Interfaces
         /// <param name="compileId">Id of the compilation on QuantConnect</param>
         /// <param name="serverType">Type of server instance that will run the algorithm</param>
         /// <param name="baseLiveAlgorithmSettings">Brokerage specific <see cref="BaseLiveAlgorithmSettings">BaseLiveAlgorithmSettings</see>.</param>
+        /// <param name="versionId">The version identifier</param>
         /// <returns>Information regarding the new algorithm <see cref="LiveAlgorithm"/></returns>
         LiveAlgorithm CreateLiveAlgorithm(int projectId, string compileId, string serverType, BaseLiveAlgorithmSettings baseLiveAlgorithmSettings, string versionId = "-1");
 
@@ -266,6 +265,13 @@ namespace QuantConnect.Interfaces
         void SetAlgorithmStatus(string algorithmId, AlgorithmStatus status, string message = "");
 
         /// <summary>
+        /// Will get the prices for requested symbols
+        /// </summary>
+        /// <param name="symbols">Symbols for which the price is requested</param>
+        /// <returns><see cref="Prices"/></returns>
+        PricesList ReadPrices(IEnumerable<Symbol> symbols);
+
+        /// <summary>
         /// Send the statistics to storage for performance tracking.
         /// </summary>
         /// <param name="algorithmId">Identifier for algorithm</param>
@@ -281,14 +287,6 @@ namespace QuantConnect.Interfaces
         void SendStatistics(string algorithmId, decimal unrealized, decimal fees, decimal netProfit, decimal holdings, decimal equity, decimal netReturn, decimal volume, int trades, double sharpe);
 
         /// <summary>
-        /// Market Status Today: REST call.
-        /// </summary>
-        /// <param name="time">The date we need market hours for</param>
-        /// <param name="symbol"></param>
-        /// <returns>Market open hours.</returns>
-        IEnumerable<MarketHoursSegment> MarketToday(DateTime time, Symbol symbol);
-
-        /// <summary>
         /// Send an email to the user associated with the specified algorithm id
         /// </summary>
         /// <param name="algorithmId">The algorithm id</param>
@@ -297,19 +295,19 @@ namespace QuantConnect.Interfaces
         void SendUserEmail(string algorithmId, string subject, string body);
 
         /// <summary>
-        /// Adds the specified symbols to the subscription
+        /// Gets all split events between the specified times. From and to are inclusive.
         /// </summary>
-        /// <param name="symbols">The symbols to be added keyed by SecurityType</param>
-        void LiveSubscribe(IEnumerable<Symbol> symbols);
+        /// <param name="from">The first date to get splits for</param>
+        /// <param name="to">The last date to get splits for</param>
+        /// <returns>A list of all splits in the specified range</returns>
+        List<Data.Market.Split> GetSplits(DateTime from, DateTime to);
+
         /// <summary>
-        /// Removes the specified symbols to the subscription
+        /// Gets all dividend events between the specified times. From and to are inclusive.
         /// </summary>
-        /// <param name="symbols">The symbols to be removed keyed by SecurityType</param>
-        void LiveUnsubscribe(IEnumerable<Symbol> symbols);
-        /// <summary>
-        /// Get next ticks if they have arrived from the server.
-        /// </summary>
-        /// <returns>Array of <see cref="BaseData"/></returns>
-        IEnumerable<BaseData> GetLiveData();
+        /// <param name="from">The first date to get dividend for</param>
+        /// <param name="to">The last date to get dividend for</param>
+        /// <returns>A list of all dividend in the specified range</returns>
+        List<Data.Market.Dividend> GetDividends(DateTime from, DateTime to);
     }
 }

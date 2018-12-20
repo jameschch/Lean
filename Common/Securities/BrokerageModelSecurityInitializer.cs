@@ -15,8 +15,6 @@
 */
 
 using QuantConnect.Brokerages;
-using QuantConnect.Data;
-using QuantConnect.Logging;
 
 namespace QuantConnect.Securities
 {
@@ -55,33 +53,17 @@ namespace QuantConnect.Securities
         /// Initializes the specified security by setting up the models
         /// </summary>
         /// <param name="security">The security to be initialized</param>
-        /// <param name="seedSecurity">True to seed the security, false otherwise</param>
-        public virtual void Initialize(Security security, bool seedSecurity)
+        public virtual void Initialize(Security security)
         {
             // set leverage and models
             security.SetLeverage(_brokerageModel.GetLeverage(security));
             security.FillModel = _brokerageModel.GetFillModel(security);
             security.FeeModel = _brokerageModel.GetFeeModel(security);
             security.SlippageModel = _brokerageModel.GetSlippageModel(security);
-            security.SettlementModel = _brokerageModel.GetSettlementModel(security, _brokerageModel.AccountType);
+            security.SettlementModel = _brokerageModel.GetSettlementModel(security);
+            security.BuyingPowerModel = _brokerageModel.GetBuyingPowerModel(security);
 
-            if (seedSecurity)
-            {
-                // Do not seed canonical symbols
-                if (!security.Symbol.IsCanonical())
-                {
-                    BaseData seedData = _securitySeeder.GetSeedData(security);
-                    if (seedData != null)
-                    {
-                        security.SetMarketPrice(seedData);
-                        Log.Trace("BrokerageModelSecurityInitializer.Initialize(): Seeded security: " + seedData.Symbol.Value + ": " + seedData.Value);
-                    }
-                    else
-                    {
-                        Log.Trace("BrokerageModelSecurityInitializer.Initialize(): Unable to seed security: " + security.Symbol.Value);
-                    }
-                }
-            }
+            _securitySeeder.SeedSecurity(security);
         }
     }
 }

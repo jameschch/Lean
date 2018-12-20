@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -64,10 +64,22 @@ namespace QuantConnect.Data.Fundamental
 		public ValuationRatios ValuationRatios { get; set; }
 
 		/// <summary>
+		/// The instance of the CompanyProfile class
+		/// </summary>
+		public CompanyProfile CompanyProfile { get; set; }
+
+		/// <summary>
+		/// The instance of the AssetClassification class
+		/// </summary>
+		public AssetClassification AssetClassification { get; set; }
+
+		/// <summary>
 		/// Creates an instance of the FineFundamental class
 		/// </summary>
 		public FineFundamental()
 		{
+			DataType = MarketDataType.Auxiliary;
+
 			CompanyReference = new CompanyReference();
 			SecurityReference = new SecurityReference();
 			FinancialStatements = new FinancialStatements();
@@ -75,24 +87,28 @@ namespace QuantConnect.Data.Fundamental
 			OperationRatios = new OperationRatios();
 			EarningRatios = new EarningRatios();
 			ValuationRatios = new ValuationRatios();
+			CompanyProfile = new CompanyProfile();
+			AssetClassification = new AssetClassification();
 		}
 
 		/// <summary>
-		/// Sets values for non existing periods from a previous instance
+		/// Applies updated values from <paramref name="update"/> to this instance
 		/// </summary>
-		/// <remarks>Used to fill-forward values from previous dates</remarks>
-		/// <param name="previous">The previous instance</param>
-		public void UpdateValues(FineFundamental previous)
+		/// <remarks>Used to apply data updates to the current instance. This WILL overwrite existing values. Default update values are ignored.</remarks>
+		/// <param name="update">The next data update for this instance</param>
+		public void UpdateValues(FineFundamental update)
 		{
-			if (previous == null) return;
+			if (update == null) return;
 
-			if (CompanyReference != null) CompanyReference.UpdateValues(previous.CompanyReference);
-			if (SecurityReference != null) SecurityReference.UpdateValues(previous.SecurityReference);
-			if (FinancialStatements != null) FinancialStatements.UpdateValues(previous.FinancialStatements);
-			if (EarningReports != null) EarningReports.UpdateValues(previous.EarningReports);
-			if (OperationRatios != null) OperationRatios.UpdateValues(previous.OperationRatios);
-			if (EarningRatios != null) EarningRatios.UpdateValues(previous.EarningRatios);
-			if (ValuationRatios != null) ValuationRatios.UpdateValues(previous.ValuationRatios);
+			CompanyReference?.UpdateValues(update.CompanyReference);
+			SecurityReference?.UpdateValues(update.SecurityReference);
+			FinancialStatements?.UpdateValues(update.FinancialStatements);
+			EarningReports?.UpdateValues(update.EarningReports);
+			OperationRatios?.UpdateValues(update.OperationRatios);
+			EarningRatios?.UpdateValues(update.EarningRatios);
+			ValuationRatios?.UpdateValues(update.ValuationRatios);
+			CompanyProfile?.UpdateValues(update.CompanyProfile);
+			AssetClassification?.UpdateValues(update.AssetClassification);
 		}
 	}
 }

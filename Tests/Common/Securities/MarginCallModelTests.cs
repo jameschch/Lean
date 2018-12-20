@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,13 +14,11 @@
 */
 
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
 using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Common.Securities
@@ -28,12 +26,29 @@ namespace QuantConnect.Tests.Common.Securities
     [TestFixture]
     public class MarginCallModelTests
     {
+        // Test class to enable calling protected methods
+        public class TestSecurityMarginModel : SecurityMarginModel
+        {
+            public TestSecurityMarginModel(decimal leverage) : base(leverage) {}
+
+            public new decimal GetInitialMarginRequiredForOrder(
+                InitialMarginRequiredForOrderParameters parameters)
+            {
+                return base.GetInitialMarginRequiredForOrder(parameters);
+            }
+
+            public new decimal GetMarginRemaining(SecurityPortfolioManager portfolio, Security security, OrderDirection direction)
+            {
+                return base.GetMarginRemaining(portfolio, security, direction);
+            }
+        }
+
         [Test]
         public void InitializationTest()
         {
             const decimal actual = 2;
             var security = GetSecurity(Symbols.AAPL);
-            security.MarginModel = new SecurityMarginModel(actual);
+            security.BuyingPowerModel = new SecurityMarginModel(actual);
             var expected = security.Leverage;
 
             Assert.AreEqual(expected, actual);
@@ -43,7 +58,7 @@ namespace QuantConnect.Tests.Common.Securities
         public void SetAndGetLeverageTest()
         {
             var security = GetSecurity(Symbols.AAPL);
-            security.MarginModel = new SecurityMarginModel(2);
+            security.BuyingPowerModel = new SecurityMarginModel(2);
 
             const decimal actual = 50;
             security.SetLeverage(actual);
@@ -51,7 +66,7 @@ namespace QuantConnect.Tests.Common.Securities
 
             Assert.AreEqual(expected, actual);
 
-            expected = security.MarginModel.GetLeverage(security);
+            expected = security.BuyingPowerModel.GetLeverage(security);
 
             Assert.AreEqual(expected, actual);
         }
@@ -60,9 +75,11 @@ namespace QuantConnect.Tests.Common.Securities
         public void GetInitialMarginRequiredForOrderTest()
         {
             var security = GetSecurity(Symbols.AAPL);
-            security.MarginModel = new SecurityMarginModel(2);
+            var buyingPowerModel = new TestSecurityMarginModel(2);
+            security.BuyingPowerModel = buyingPowerModel;
             var order = new MarketOrder(security.Symbol, 100, DateTime.Now);
-            var actual = security.MarginModel.GetInitialMarginRequiredForOrder(security, order);
+            var actual = buyingPowerModel.GetInitialMarginRequiredForOrder(
+                new InitialMarginRequiredForOrderParameters(new IdentityCurrencyConverter(Currencies.USD), security, order));
 
             Assert.AreEqual(0, actual);
         }
@@ -75,9 +92,9 @@ namespace QuantConnect.Tests.Common.Securities
             var expected = quantity / leverage;
 
             var security = GetSecurity(Symbols.AAPL);
-            security.MarginModel = new SecurityMarginModel(leverage);
+            security.BuyingPowerModel = new SecurityMarginModel(leverage);
             security.Holdings.SetHoldings(1m, quantity);
-            var actual = security.MarginModel.GetMaintenanceMargin(security);
+            var actual = security.BuyingPowerModel.GetReservedBuyingPowerForPosition(security);
 
             Assert.AreEqual(expected, actual);
         }
@@ -87,26 +104,26 @@ namespace QuantConnect.Tests.Common.Securities
         {
             const int quantity = 1000;
             const decimal leverage = 2;
-            var orderProcessor = new OrderProcessor();
+            var orderProcessor = new FakeOrderProcessor();
             var portfolio = GetPortfolio(orderProcessor, quantity);
-            portfolio.MarginCallModel = MarginCallModel.Null;
 
             var security = GetSecurity(Symbols.AAPL);
-            security.MarginModel = new SecurityMarginModel(leverage);
+            var buyingPowerModel = new TestSecurityMarginModel(leverage);
+            security.BuyingPowerModel = buyingPowerModel;
             portfolio.Securities.Add(security);
-            
+
             security.Holdings.SetHoldings(1m, quantity);
-            var actual1 = security.MarginModel.GetMarginRemaining(portfolio, security, OrderDirection.Buy);
+            var actual1 = buyingPowerModel.GetMarginRemaining(portfolio, security, OrderDirection.Buy);
             Assert.AreEqual(quantity / leverage, actual1);
 
-            var actual2 = security.MarginModel.GetMarginRemaining(portfolio, security, OrderDirection.Sell);
+            var actual2 = buyingPowerModel.GetMarginRemaining(portfolio, security, OrderDirection.Sell);
             Assert.AreEqual(quantity, actual2);
 
             security.Holdings.SetHoldings(1m, -quantity);
-            var actual3 = security.MarginModel.GetMarginRemaining(portfolio, security, OrderDirection.Sell);
+            var actual3 = buyingPowerModel.GetMarginRemaining(portfolio, security, OrderDirection.Sell);
             Assert.AreEqual(quantity / leverage, actual3);
 
-            var actual4 = security.MarginModel.GetMarginRemaining(portfolio, security, OrderDirection.Buy);
+            var actual4 = buyingPowerModel.GetMarginRemaining(portfolio, security, OrderDirection.Buy);
             Assert.AreEqual(quantity, actual4);
         }
 
@@ -119,9 +136,9 @@ namespace QuantConnect.Tests.Common.Securities
         {
             const int quantity = 1000;
             const decimal leverage = 1m;
-            var orderProcessor = new OrderProcessor();
+            var orderProcessor = new FakeOrderProcessor();
             var portfolio = GetPortfolio(orderProcessor, quantity);
-            portfolio.MarginCallModel = MarginCallModel.Null;
+            portfolio.MarginCallModel = new DefaultMarginCallModel(portfolio, null);
 
             var security = GetSecurity(Symbols.AAPL);
             portfolio.Securities.Add(security);
@@ -131,7 +148,8 @@ namespace QuantConnect.Tests.Common.Securities
             security.SetMarketPrice(new Tick(time, Symbols.AAPL, buyPrice, buyPrice));
 
             var order = new MarketOrder(Symbols.AAPL, quantity, time) {Price = buyPrice};
-            var fill = new OrderEvent(order, DateTime.UtcNow, 0) { FillPrice = buyPrice, FillQuantity = quantity };
+            var fill = new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero)
+                { FillPrice = buyPrice, FillQuantity = quantity };
             orderProcessor.AddOrder(order);
             var request = new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol, order.Quantity, 0, 0, order.Time, null);
             request.SetOrderId(0);
@@ -146,8 +164,8 @@ namespace QuantConnect.Tests.Common.Securities
 
             // we shouldn't be able to place a trader
             var newOrder = new MarketOrder(Symbols.AAPL, 1, time.AddSeconds(1)) {Price = buyPrice};
-            bool sufficientCapital = portfolio.Transactions.GetSufficientCapitalForOrder(portfolio, newOrder);
-            Assert.IsFalse(sufficientCapital);
+            var hasSufficientBuyingPower = security.BuyingPowerModel.HasSufficientBuyingPowerForOrder(portfolio, security, newOrder).IsSufficient;
+            Assert.IsFalse(hasSufficientBuyingPower);
 
             // now the stock doubles, so we should have margin remaining
             time = time.AddDays(1);
@@ -160,13 +178,13 @@ namespace QuantConnect.Tests.Common.Securities
 
             // we shouldn't be able to place a trader
             var anotherOrder = new MarketOrder(Symbols.AAPL, 1, time.AddSeconds(1)) { Price = highPrice };
-            sufficientCapital = portfolio.Transactions.GetSufficientCapitalForOrder(portfolio, anotherOrder);
-            Assert.IsTrue(sufficientCapital);
+            hasSufficientBuyingPower = security.BuyingPowerModel.HasSufficientBuyingPowerForOrder(portfolio, security, anotherOrder).IsSufficient;
+            Assert.IsTrue(hasSufficientBuyingPower);
 
             // now the stock plummets, so we should have negative margin remaining
             time = time.AddDays(1);
             const decimal lowPrice = buyPrice/2;
-            security.SetMarketPrice(new Tick(time, Symbols.AAPL, lowPrice, lowPrice)); 
+            security.SetMarketPrice(new Tick(time, Symbols.AAPL, lowPrice, lowPrice));
 
             Assert.AreEqual(-quantity/2m, portfolio.MarginRemaining);
             Assert.AreEqual(quantity, portfolio.TotalMarginUsed);
@@ -174,7 +192,7 @@ namespace QuantConnect.Tests.Common.Securities
 
             // this would not cause a margin call due to leverage = 1
             bool issueMarginCallWarning;
-            var marginCallOrders = portfolio.ScanForMarginCall(out issueMarginCallWarning);
+            var marginCallOrders = portfolio.MarginCallModel.GetMarginCallOrders(out issueMarginCallWarning);
             Assert.IsFalse(issueMarginCallWarning);
             Assert.AreEqual(0, marginCallOrders.Count);
 
@@ -186,29 +204,29 @@ namespace QuantConnect.Tests.Common.Securities
             security.SetMarketPrice(new Tick(time, Symbols.AAPL, newPrice, newPrice));
 
             // this would not cause a margin call, only a margin call warning
-            marginCallOrders = portfolio.ScanForMarginCall(out issueMarginCallWarning);
+            marginCallOrders = portfolio.MarginCallModel.GetMarginCallOrders(out issueMarginCallWarning);
             Assert.IsTrue(issueMarginCallWarning);
             Assert.AreEqual(0, marginCallOrders.Count);
 
-            // Price drops again to previous low, margin call orders will be issued 
+            // Price drops again to previous low, margin call orders will be issued
             security.SetMarketPrice(new Tick(time, Symbols.AAPL, lowPrice, lowPrice));
 
             order = new MarketOrder(Symbols.AAPL, quantity, time) { Price = buyPrice };
-            fill = new OrderEvent(order, DateTime.UtcNow, 0) { FillPrice = buyPrice, FillQuantity = quantity };
+            fill = new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero)
+                { FillPrice = buyPrice, FillQuantity = quantity };
             portfolio.ProcessFill(fill);
 
             Assert.AreEqual(0, portfolio.TotalPortfolioValue);
 
-            // Even with TotalPortfolioValue == 0, do not issue warning or orders
-            marginCallOrders = portfolio.ScanForMarginCall(out issueMarginCallWarning);
-            Assert.IsFalse(issueMarginCallWarning);
-            Assert.AreEqual(0, marginCallOrders.Count);
+            marginCallOrders = portfolio.MarginCallModel.GetMarginCallOrders(out issueMarginCallWarning);
+            Assert.IsTrue(issueMarginCallWarning);
+            Assert.AreEqual(1, marginCallOrders.Count);
         }
 
         private SecurityPortfolioManager GetPortfolio(IOrderProcessor orderProcessor, int quantity)
         {
             var securities = new SecurityManager(new TimeKeeper(DateTime.Now, new[] { TimeZones.NewYork }));
-            var transactions = new SecurityTransactionManager(securities);
+            var transactions = new SecurityTransactionManager(null, securities);
             transactions.SetOrderProcessor(orderProcessor);
 
             var portfolio = new SecurityPortfolioManager(securities, transactions);
@@ -221,58 +239,20 @@ namespace QuantConnect.Tests.Common.Securities
         {
             return new Security(
                 SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
-                new SubscriptionDataConfig(typeof(TradeBar), symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, true, true, true),
-                new Cash(CashBook.AccountCurrency, 0, 1m),
-                SymbolProperties.GetDefault(CashBook.AccountCurrency));
-        }
-        
-        public class OrderProcessor : IOrderProcessor
-        {
-            private readonly ConcurrentDictionary<int, Order> _orders = new ConcurrentDictionary<int, Order>();
-            private readonly ConcurrentDictionary<int, OrderTicket> _tickets = new ConcurrentDictionary<int, OrderTicket>();
-            public void AddOrder(Order order)
-            {
-                _orders[order.Id] = order;
-            }
-
-            public void AddTicket(OrderTicket ticket)
-            {
-                _tickets[ticket.OrderId] = ticket;
-            }
-            public int OrdersCount { get; private set; }
-            public Order GetOrderById(int orderId)
-            {
-                Order order;
-                _orders.TryGetValue(orderId, out order);
-                return order;
-            }
-
-            public Order GetOrderByBrokerageId(string brokerageId)
-            {
-                return _orders.Values.FirstOrDefault(x => x.BrokerId.Contains(brokerageId));
-            }
-
-            public IEnumerable<OrderTicket> GetOrderTickets(Func<OrderTicket, bool> filter = null)
-            {
-                return _tickets.Values.Where(filter ?? (x => true));
-            }
-
-            public OrderTicket GetOrderTicket(int orderId)
-            {
-                OrderTicket ticket;
-                _tickets.TryGetValue(orderId, out ticket);
-                return ticket;
-            }
-
-            public IEnumerable<Order> GetOrders(Func<Order, bool> filter = null)
-            {
-                return _orders.Values.Where(filter ?? (x => true));
-            }
-
-            public OrderTicket Process(OrderRequest request)
-            {
-                throw new NotImplementedException();
-            }
+                new SubscriptionDataConfig(
+                    typeof(TradeBar),
+                    symbol,
+                    Resolution.Minute,
+                    TimeZones.NewYork,
+                    TimeZones.NewYork,
+                    true,
+                    true,
+                    true
+                ),
+                new Cash(Currencies.USD, 0, 1m),
+                SymbolProperties.GetDefault(Currencies.USD),
+                ErrorCurrencyConverter.Instance
+            );
         }
     }
 }

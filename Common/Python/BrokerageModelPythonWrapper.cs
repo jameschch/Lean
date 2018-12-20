@@ -13,6 +13,7 @@
  * limitations under the License.
 */
 
+using System;
 using System.Collections.Generic;
 using Python.Runtime;
 using QuantConnect.Brokerages;
@@ -26,7 +27,7 @@ using QuantConnect.Securities;
 namespace QuantConnect.Python
 {
     /// <summary>
-    /// Wraps a <see cref="PyObject"/> object that models brokerage transactions, fees, and order
+    /// Provides an implementation of <see cref="IBrokerageModel"/> that wraps a <see cref="PyObject"/> object
     /// </summary>
     public class BrokerageModelPythonWrapper : IBrokerageModel
     {
@@ -56,6 +57,21 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
+        /// Gets the brokerages model percentage factor used to determine the required unused buying power for the account.
+        /// From 1 to 0. Example: 0 means no unused buying power is required. 0.5 means 50% of the buying power should be left unused.
+        /// </summary>
+        public decimal RequiredFreeBuyingPowerPercent
+        {
+            get
+            {
+                using (Py.GIL())
+                {
+                    return _model.RequiredFreeBuyingPowerPercent;
+                }
+            }
+        }
+
+        /// <summary>
         /// Gets a map of the default markets to be used for each security type
         /// </summary>
         public IReadOnlyDictionary<SecurityType, string> DefaultMarkets
@@ -70,7 +86,7 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.ApplySplit(List{OrderTicket}, Split)" /> in Python
+        /// Applies the split to the specified order ticket
         /// </summary>
         /// <param name="tickets">The open tickets matching the split event</param>
         /// <param name="split">The split event data</param>
@@ -83,7 +99,11 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.CanExecuteOrder(Security, Order)" /> in Python
+        /// Returns true if the brokerage would be able to execute this order at this time assuming
+        /// market prices are sufficient for the fill to take place. This is used to emulate the
+        /// brokerage fills in backtesting and paper trading. For example some brokerages may not perform
+        /// executions during extended market hours. This is not intended to be checking whether or not
+        /// the exchange is open, that is handled in the Security.Exchange property.
         /// </summary>
         /// <param name="security">The security being ordered</param>
         /// <param name="order">The order to test for execution</param>
@@ -97,7 +117,8 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.CanSubmitOrder(Security, Order, out BrokerageMessageEvent)" /> in Python
+        /// Returns true if the brokerage could accept this order. This takes into account
+        /// order type, security type, and order size limits.
         /// </summary>
         /// <remarks>
         /// For example, a brokerage may have no connectivity at certain times, or an order rate/size limit
@@ -115,7 +136,7 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.CanUpdateOrder(Security, Order, UpdateOrderRequest, out BrokerageMessageEvent)" /> in Python
+        /// Returns true if the brokerage would allow updating the order as specified by the request
         /// </summary>
         /// <param name="security">The security of the order</param>
         /// <param name="order">The order to be updated</param>
@@ -131,7 +152,7 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.GetFeeModel(Security)" /> in Python
+        /// Gets a new fee model that represents this brokerage's fee structure
         /// </summary>
         /// <param name="security">The security to get a fee model for</param>
         /// <returns>The new fee model for this brokerage</returns>
@@ -144,7 +165,7 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.GetFillModel(Security)" /> in Python
+        /// Gets a new fill model that represents this brokerage's fill behavior
         /// </summary>
         /// <param name="security">The security to get fill model for</param>
         /// <returns>The new fill model for this brokerage</returns>
@@ -157,7 +178,7 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.GetLeverage(Security)" /> in Python
+        /// Gets the brokerage's leverage for the specified security
         /// </summary>
         /// <param name="security">The security's whose leverage we seek</param>
         /// <returns>The leverage for the specified security</returns>
@@ -170,11 +191,25 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.GetSettlementModel(Security, AccountType)" /> in Python
+        /// Gets a new settlement model for the security
+        /// </summary>
+        /// <param name="security">The security to get a settlement model for</param>
+        /// <returns>The settlement model for this brokerage</returns>
+        public ISettlementModel GetSettlementModel(Security security)
+        {
+            using (Py.GIL())
+            {
+                return _model.GetSettlementModel(security);
+            }
+        }
+
+        /// <summary>
+        /// Gets a new settlement model for the security
         /// </summary>
         /// <param name="security">The security to get a settlement model for</param>
         /// <param name="accountType">The account type</param>
         /// <returns>The settlement model for this brokerage</returns>
+        [Obsolete("Flagged deprecated and will remove December 1st 2018")]
         public ISettlementModel GetSettlementModel(Security security, AccountType accountType)
         {
             using (Py.GIL())
@@ -184,7 +219,7 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
-        /// Wrapper for <see cref = "IBrokerageModel.GetSlippageModel(Security)" /> in Python
+        /// Gets a new slippage model that represents this brokerage's fill slippage behavior
         /// </summary>
         /// <param name="security">The security to get a slippage model for</param>
         /// <returns>The new slippage model for this brokerage</returns>
@@ -193,6 +228,35 @@ namespace QuantConnect.Python
             using (Py.GIL())
             {
                 return _model.GetSlippageModel(security);
+            }
+        }
+
+        /// <summary>
+        /// Gets a new buying power model for the security, returning the default model with the security's configured leverage.
+        /// For cash accounts, leverage = 1 is used.
+        /// </summary>
+        /// <param name="security">The security to get a buying power model for</param>
+        /// <returns>The buying power model for this brokerage/security</returns>
+        public IBuyingPowerModel GetBuyingPowerModel(Security security)
+        {
+            using (Py.GIL())
+            {
+                return _model.GetBuyingPowerModel(security);
+            }
+        }
+
+        /// <summary>
+        /// Gets a new buying power model for the security
+        /// </summary>
+        /// <param name="security">The security to get a buying power model for</param>
+        /// <param name="accountType">The account type</param>
+        /// <returns>The buying power model for this brokerage/security</returns>
+        [Obsolete("Flagged deprecated and will remove December 1st 2018")]
+        public IBuyingPowerModel GetBuyingPowerModel(Security security, AccountType accountType)
+        {
+            using (Py.GIL())
+            {
+                return _model.GetBuyingPowerModel(security, accountType);
             }
         }
     }

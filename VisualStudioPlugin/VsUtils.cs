@@ -23,7 +23,7 @@ namespace QuantConnect.VisualStudioPlugin
     /// <summary>
     /// Collection of commonly used methods to work with VisualStudio UI
     /// </summary>
-    static class VsUtils
+    internal static class VsUtils
     {
         /// <summary>
         /// Display message in VisualStudio status bar
@@ -37,7 +37,7 @@ namespace QuantConnect.VisualStudioPlugin
             statusBar.IsFrozen(out frozen);
             if (frozen == 0)
             {
-                statusBar.SetText(msg);
+                statusBar.SetText("QuantConnect: " + msg);
             }
         }
 
@@ -53,6 +53,12 @@ namespace QuantConnect.VisualStudioPlugin
             dialogWindow.ShowModal();
         }
 
+        /// <summary>
+        /// Display information message box
+        /// </summary>
+        /// <param name="serviceProvider">Visual Studio services provider</param>
+        /// <param name="title">Title of message box</param>
+        /// <param name="message">Message to display</param>
         public static void ShowMessageBox(IServiceProvider serviceProvider, string title, string message)
         {
             VsShellUtilities.ShowMessageBox(
@@ -60,6 +66,24 @@ namespace QuantConnect.VisualStudioPlugin
                 message,
                 title,
                 OLEMSGICON.OLEMSGICON_INFO,
+                OLEMSGBUTTON.OLEMSGBUTTON_OK,
+                OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST
+            );
+        }
+
+        /// <summary>
+        /// Display error message box
+        /// </summary>
+        /// <param name="serviceProvider">Visual Studio services provider</param>
+        /// <param name="title">Title of message box</param>
+        /// <param name="message">Message to display</param>
+        public static void ShowErrorMessageBox(IServiceProvider serviceProvider, string title, string message)
+        {
+            VsShellUtilities.ShowMessageBox(
+                serviceProvider,
+                message,
+                title,
+                OLEMSGICON.OLEMSGICON_CRITICAL,
                 OLEMSGBUTTON.OLEMSGBUTTON_OK,
                 OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST
             );
