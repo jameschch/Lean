@@ -15,28 +15,32 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
-    /// This regression algorithm is a test case for validation of conversion rates during warm up.
+    /// This regression test reproduces the issue where a Cash instance is added
+    /// during execution by the BrokerageTransactionHandler, in this case the
+    /// algorithm will be adding it in OnData() to reproduce the same scenario.
     /// </summary>
-    public class WarmupConversionRatesRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
+    public class SetCashOnDataRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
+        private Symbol _spy = QuantConnect.Symbol.Create("SPY", SecurityType.Equity, Market.USA);
+        private bool _added;
+
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
         public override void Initialize()
         {
-            SetStartDate(2018, 4, 5);
-            SetEndDate(2018, 4, 5);
-            SetCash(10000);
+            SetStartDate(2014, 12, 01);  //Set Start Date
+            SetEndDate(2014, 12, 21);    //Set End Date
+            SetCash(100000);             //Set Strategy Cash
 
-            SetWarmUp(TimeSpan.FromDays(1));
-            AddCrypto("BTCEUR");
-            AddCrypto("LTCUSD");
+            AddEquity("SPY", Resolution.Daily);
         }
 
         /// <summary>
@@ -45,23 +49,32 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            if (Portfolio.CashBook["EUR"].ConversionRate == 0
-                || Portfolio.CashBook["BTC"].ConversionRate == 0
-                || Portfolio.CashBook["LTC"].ConversionRate == 0)
+            if (!_added)
             {
-                Log($"BTCEUR current price: {Securities["BTCEUR"].Price}");
-                Log($"LTCUSD current price: {Securities["LTCUSD"].Price}");
-                Log($"EUR conversion rate: {Portfolio.CashBook["EUR"].ConversionRate}");
-                Log($"BTC conversion rate: {Portfolio.CashBook["BTC"].ConversionRate}");
-                Log($"LTC conversion rate: {Portfolio.CashBook["LTC"].ConversionRate}");
+                _added = true;
+                // this should not be done by users but could be done by the BrokerageTransactionHandler
+                // Users: see and use SetCash()
+                Portfolio.CashBook.Add("EUR", 10,0);
+            }
+            else
+            {
+                var cash = Portfolio.CashBook["EUR"];
+                if (cash.ConversionRateSecurity == null
+                    || cash.ConversionRate == 0)
+                {
+                    throw new Exception("Expected 'EUR' Cash to be fully set");
+                }
 
-                throw new Exception("Conversion rate is 0");
+                var eurUsdSubscription = SubscriptionManager.Subscriptions.Single(x => x.Symbol.Value == "EURUSD");
+                if (!eurUsdSubscription.IsInternalFeed)
+                {
+                    throw new Exception("Unexpected not internal 'EURUSD' Subscription");
+                }
             }
 
-            if (IsWarmingUp) return;
             if (!Portfolio.Invested)
             {
-                SetHoldings("LTCUSD", 1);
+                SetHoldings(_spy, 1);
                 Debug("Purchased Stock");
             }
         }
@@ -84,22 +97,22 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "-95.726%"},
-            {"Drawdown", "4.200%"},
+            {"Compounding Annual Return", "17.116%"},
+            {"Drawdown", "4.800%"},
             {"Expectancy", "0"},
-            {"Net Profit", "-0.859%"},
-            {"Sharpe Ratio", "-10.507"},
+            {"Net Profit", "0.913%"},
+            {"Sharpe Ratio", "0.845"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.074"},
-            {"Beta", "-167.611"},
-            {"Annual Standard Deviation", "0.103"},
-            {"Annual Variance", "0.011"},
-            {"Information Ratio", "-10.511"},
-            {"Tracking Error", "0.104"},
-            {"Treynor Ratio", "0.006"},
-            {"Total Fees", "$0.00"}
+            {"Alpha", "0.209"},
+            {"Beta", "-5.052"},
+            {"Annual Standard Deviation", "0.156"},
+            {"Annual Variance", "0.024"},
+            {"Information Ratio", "0.748"},
+            {"Tracking Error", "0.156"},
+            {"Treynor Ratio", "-0.026"},
+            {"Total Fees", "$2.60"}
         };
     }
 }

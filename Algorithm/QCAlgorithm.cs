@@ -89,6 +89,8 @@ namespace QuantConnect.Algorithm
         private Resolution? _warmupResolution;
         private Dictionary<string, string> _parameters = new Dictionary<string, string>();
 
+        private HistoryRequestFactory _historyRequestFactory;
+
         /// <summary>
         /// QCAlgorithm Base Class Constructor - Initialize the underlying QCAlgorithm components.
         /// QCAlgorithm manages the transactions, portfolio, charting and security subscriptions for the users algorithms.
@@ -155,6 +157,7 @@ namespace QuantConnect.Algorithm
 
             OptionChainProvider = new EmptyOptionChainProvider();
             FutureChainProvider = new EmptyFutureChainProvider();
+            _historyRequestFactory = new HistoryRequestFactory(this);
         }
 
         /// <summary>
@@ -1147,7 +1150,7 @@ namespace QuantConnect.Algorithm
         /// <param name="symbol">The cash symbol to set</param>
         /// <param name="startingCash">Decimal cash value of portfolio</param>
         /// <param name="conversionRate">The current conversion rate for the</param>
-        public void SetCash(string symbol, decimal startingCash, decimal conversionRate)
+        public void SetCash(string symbol, decimal startingCash, decimal conversionRate = 0)
         {
             if (!_locked)
             {

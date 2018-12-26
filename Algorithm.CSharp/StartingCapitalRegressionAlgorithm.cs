@@ -13,30 +13,37 @@
  * limitations under the License.
 */
 
-using System;
 using System.Collections.Generic;
+using QuantConnect.Brokerages;
 using QuantConnect.Data;
 using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
-    /// This regression algorithm is a test case for validation of conversion rates during warm up.
+    /// This algorithm reproduces GH issue 1859: 'Non-USD cash added during
+    /// Initialize not counted as starting capital in backtesting'
     /// </summary>
-    public class WarmupConversionRatesRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
+    public class StartingCapitalRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
+        private Symbol _symbol;
         /// <summary>
         /// Initialise the data and resolution required, as well as the cash and start-end dates for your algorithm. All algorithms must initialized.
         /// </summary>
         public override void Initialize()
         {
-            SetStartDate(2018, 4, 5);
-            SetEndDate(2018, 4, 5);
-            SetCash(10000);
+            SetStartDate(2018, 4, 4); //Set Start Date
+            SetEndDate(2018, 4, 4); //Set End Date
 
-            SetWarmUp(TimeSpan.FromDays(1));
-            AddCrypto("BTCEUR");
-            AddCrypto("LTCUSD");
+            SetCash(10000);
+            SetCash("EUR", 10000);
+            SetCash("BTC", 10000);
+            SetCash("ETH", 10000);
+
+            SetBrokerageModel(BrokerageName.GDAX, AccountType.Cash);
+
+            AddCrypto("BTCUSD");
+            _symbol = AddCrypto("ETHUSD").Symbol;
         }
 
         /// <summary>
@@ -45,23 +52,9 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
-            if (Portfolio.CashBook["EUR"].ConversionRate == 0
-                || Portfolio.CashBook["BTC"].ConversionRate == 0
-                || Portfolio.CashBook["LTC"].ConversionRate == 0)
-            {
-                Log($"BTCEUR current price: {Securities["BTCEUR"].Price}");
-                Log($"LTCUSD current price: {Securities["LTCUSD"].Price}");
-                Log($"EUR conversion rate: {Portfolio.CashBook["EUR"].ConversionRate}");
-                Log($"BTC conversion rate: {Portfolio.CashBook["BTC"].ConversionRate}");
-                Log($"LTC conversion rate: {Portfolio.CashBook["LTC"].ConversionRate}");
-
-                throw new Exception("Conversion rate is 0");
-            }
-
-            if (IsWarmingUp) return;
             if (!Portfolio.Invested)
             {
-                SetHoldings("LTCUSD", 1);
+                Buy(_symbol, 1);
                 Debug("Purchased Stock");
             }
         }
@@ -84,22 +77,22 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "-95.726%"},
-            {"Drawdown", "4.200%"},
+            {"Compounding Annual Return", "-100.000%"},
+            {"Drawdown", "10.700%"},
             {"Expectancy", "0"},
-            {"Net Profit", "-0.859%"},
-            {"Sharpe Ratio", "-10.507"},
+            {"Net Profit", "-7.119%"},
+            {"Sharpe Ratio", "-12.379"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.074"},
-            {"Beta", "-167.611"},
-            {"Annual Standard Deviation", "0.103"},
-            {"Annual Variance", "0.011"},
-            {"Information Ratio", "-10.511"},
-            {"Tracking Error", "0.104"},
-            {"Treynor Ratio", "0.006"},
-            {"Total Fees", "$0.00"}
+            {"Alpha", "-17.159"},
+            {"Beta", "1182.63"},
+            {"Annual Standard Deviation", "0.727"},
+            {"Annual Variance", "0.528"},
+            {"Information Ratio", "-12.399"},
+            {"Tracking Error", "0.726"},
+            {"Treynor Ratio", "-0.008"},
+            {"Total Fees", "$1.21"}
         };
     }
 }
