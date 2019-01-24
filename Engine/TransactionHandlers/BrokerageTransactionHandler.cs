@@ -1174,7 +1174,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
             if (!limitPrice.Equals(limitRound))
             {
-                _algorithm.Error(string.Format(format, "Limit", limitRound, limitPrice));
+                //_algorithm.Error(string.Format(format, "Limit", limitRound, limitPrice));
             }
             if (!stopPrice.Equals(stopRound))
             {
