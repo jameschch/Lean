@@ -32,7 +32,7 @@ namespace QuantConnect
         /// <summary>
         /// The root directory of the data folder for this application
         /// </summary>
-        public static string DataFolder { get; private set; }
+        public static string DataFolder { get; set; }
 
         /// <summary>
         /// Resets global values with the Config data.
