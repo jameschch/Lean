@@ -80,7 +80,7 @@ namespace Oanda.RestV20.Session
                 // wait for task to finish
                 if (_runningTask != null)
                 {
-                    _runningTask.Wait();
+                    _runningTask.Wait(10000);
                 }
             }
             catch (Exception)
