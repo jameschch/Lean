@@ -156,7 +156,7 @@ namespace QuantConnect.Util
                 if (_processQueue != null) _processQueue.Dispose();
 
                 // Wait for _holdQueue disposal be completed
-                Thread.Sleep(10000);
+                Thread.Sleep(1000);
 
                 if (_processQueueThread != null && _processQueueThread.IsAlive) _processQueueThread.Abort();
 
