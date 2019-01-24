@@ -338,8 +338,8 @@ namespace QuantConnect.Securities
         {
             get
             {
-                if (AbsoluteHoldingsCost == 0) return 0m;
-                return UnrealizedProfit/AbsoluteHoldingsCost;
+                //somehow, was possible to divide by zero here.
+                return AbsoluteHoldingsCost != 0 ? UnrealizedProfit / AbsoluteHoldingsCost : 0m;
             }
         }
 
