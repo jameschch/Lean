@@ -368,7 +368,7 @@ namespace QuantConnect.Data.Market
             tradeBar.High = csv[2].ToDecimal();
             tradeBar.Low = csv[3].ToDecimal();
             tradeBar.Close = csv[4].ToDecimal();
-            tradeBar.Volume = csv[5].ToDecimal();
+            tradeBar.Volume = csv.Count == 6 ?  csv[5].ToDecimal() : 0;
 
             return tradeBar;
         }
