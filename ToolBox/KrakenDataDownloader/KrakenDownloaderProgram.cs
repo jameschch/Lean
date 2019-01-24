@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using QuantConnect.Configuration;
 using QuantConnect.Logging;
 using QuantConnect.Util;
+using Polly;
 
 namespace QuantConnect.ToolBox.KrakenDownloader
 {
@@ -49,11 +50,19 @@ namespace QuantConnect.ToolBox.KrakenDownloader
                 {
                     // Download data
                     var pairObject = Symbol.Create(pair, SecurityType.Crypto, Market.Kraken);
-                    var data = downloader.Get(pairObject, castResolution, startDate, endDate);
 
-                    // Write data
-                    var writer = new LeanDataWriter(castResolution, pairObject, dataDirectory);
-                    writer.Write(data);
+                    var policy = Polly.Policy.Handle<Exception>().WaitAndRetryForever(retryAttempt => TimeSpan.FromSeconds(5),
+                        (s, e) => Log.Error("Retrying..."));
+
+                    policy.Execute(() =>
+                    {
+                        var data = downloader.Get(pairObject, castResolution, startDate, endDate);
+                        // Write data
+                        var writer = new LeanDataWriter(castResolution, pairObject, dataDirectory);
+                        writer.Write(data);
+                    });
+
+
                 }
             }
             catch (Exception err)
