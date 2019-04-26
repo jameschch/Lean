@@ -250,7 +250,7 @@ namespace QuantConnect.Data
             {
                 if (typeof(T) == typeof(Tick))
                 {
-                    dictionary = new Lazy<object>(() => new DataDictionary<T>(_data.Value.Values.SelectMany<dynamic, dynamic>(x => x.GetData()).OfType<T>(), x => x.Symbol));
+                    dictionary = new Lazy<object>(() => new DataDictionary<T>(_data.Value.Values.AsEnumerable().SelectMany<SymbolData, Tick>(x => x.GetData()).OfType<T>(), x => x.Symbol));
                 }
                 else if (typeof(T) == typeof(TradeBar))
                 {

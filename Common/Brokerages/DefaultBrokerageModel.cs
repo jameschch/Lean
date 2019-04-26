@@ -290,7 +290,7 @@ namespace QuantConnect.Brokerages
             switch (security.Type)
             {
                 case SecurityType.Crypto:
-                    model = new CashBuyingPowerModel();
+                    return new SecurityMarginModel(leverage, RequiredFreeBuyingPowerPercent);
                     break;
                 case SecurityType.Forex:
                 case SecurityType.Cfd:

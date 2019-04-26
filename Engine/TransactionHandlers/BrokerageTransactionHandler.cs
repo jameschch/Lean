@@ -35,7 +35,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
     /// </summary>
     public class BrokerageTransactionHandler : ITransactionHandler
     {
-        private IAlgorithm _algorithm;
+        public IAlgorithm _algorithm;
         private IBrokerage _brokerage;
         private bool _syncedLiveBrokerageCashToday;
 
@@ -1256,7 +1256,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
 
             if (!limitPrice.Equals(limitRound))
             {
-                _algorithm.Error(string.Format(format, "Limit", limitRound, limitPrice));
+                //_algorithm.Error(string.Format(format, "Limit", limitRound, limitPrice));
             }
             if (!stopPrice.Equals(stopRound))
             {

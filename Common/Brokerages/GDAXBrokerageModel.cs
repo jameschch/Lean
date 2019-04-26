@@ -188,7 +188,7 @@ namespace QuantConnect.Brokerages
         public override IBuyingPowerModel GetBuyingPowerModel(Security security)
         {
             // margin trading is not currently supported by GDAX
-            return new CashBuyingPowerModel();
+            return new SecurityMarginModel(3.3m);
         }
     }
 }

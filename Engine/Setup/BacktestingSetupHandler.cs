@@ -165,7 +165,7 @@ namespace QuantConnect.Lean.Engine.Setup
 
             var controls = job.Controls;
             var isolator = new Isolator();
-            var initializeComplete = isolator.ExecuteWithTimeLimit(TimeSpan.FromMinutes(5), () =>
+            var initializeComplete = isolator.ExecuteWithTimeLimit(TimeSpan.FromMinutes(15), () =>
             {
                 try
                 {

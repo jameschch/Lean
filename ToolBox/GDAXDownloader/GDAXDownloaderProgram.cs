@@ -32,13 +32,6 @@ namespace QuantConnect.ToolBox.GDAXDownloader
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
-            if (resolution.IsNullOrEmpty() || tickers.IsNullOrEmpty())
-            {
-                Console.WriteLine("GDAXDownloader ERROR: '--tickers=' or '--resolution=' parameter is missing");
-                Console.WriteLine("--tickers=ETH-USD,ETH-BTC,BTC-USD,etc.");
-                Console.WriteLine("--resolution=Second/Minute/Hour/Daily");
-                Environment.Exit(1);
-            }
             var castResolution = (Resolution) Enum.Parse(typeof(Resolution), resolution);
             try
             {
@@ -48,18 +41,17 @@ namespace QuantConnect.ToolBox.GDAXDownloader
                 // Create an instance of the downloader
                 const string market = Market.GDAX;
                 var downloader = new GDAXDownloader();
-                foreach (var ticker in tickers)
-                {
-                    // Download the data
-                    var symbolObject = Symbol.Create(ticker, SecurityType.Crypto, market);
-                    var data = downloader.Get(symbolObject, castResolution, fromDate, toDate);
 
-                    // Save the data
-                    var writer = new LeanDataWriter(castResolution, symbolObject, dataDirectory, TickType.Trade);
-                    var distinctData = data.GroupBy(i => i.Time, (key, group) => group.First()).ToArray();
+                // Download the data
+                var symbolObject = Symbol.Create(tickers.Single(), SecurityType.Crypto, market);
+                var data = downloader.Get(symbolObject, castResolution, fromDate, toDate);
 
-                    writer.Write(distinctData);
-                }
+                // Save the data
+
+                var writer = new LeanDataWriter(castResolution, symbolObject, dataDirectory, TickType.Trade);
+                var distinctData = data.GroupBy(i => i.Time, (key, group) => group.First()).ToArray();
+
+                writer.Write(distinctData);
 
                 Log.Trace("Finish data download. Press any key to continue..");
 
@@ -70,7 +62,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
                 Log.Trace(err.Message);
                 Log.Trace(err.StackTrace);
             }
-            Console.ReadLine();
+           // Console.ReadLine();
         }
     }
 }
