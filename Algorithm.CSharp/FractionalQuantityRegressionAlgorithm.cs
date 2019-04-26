@@ -19,6 +19,7 @@ using System;
 using System.Collections.Generic;
 using QuantConnect.Brokerages;
 using QuantConnect.Securities;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -44,15 +45,15 @@ namespace QuantConnect.Algorithm.CSharp
 
             // The default buying power model for the Crypto security type is now CashBuyingPowerModel.
             // Since this test algorithm uses leverage we need to set a buying power model with margin.
-            security.BuyingPowerModel = new SecurityMarginModel(3.3m);
+            security.SetBuyingPowerModel(new SecurityMarginModel(3.3m));
 
-            var con = new QuoteBarConsolidator(1);
+            var con = new TradeBarConsolidator(1);
             SubscriptionManager.AddConsolidator("BTCUSD", con);
             con.DataConsolidated += DataConsolidated;
             SetBenchmark(security.Symbol);
         }
 
-        private void DataConsolidated(object sender, QuoteBar e)
+        private void DataConsolidated(object sender, TradeBar e)
         {
             var quantity = Math.Truncate((Portfolio.Cash + Portfolio.TotalFees) / Math.Abs(e.Value + 1));
             if (!Portfolio.Invested)
@@ -83,6 +84,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -93,24 +99,24 @@ namespace QuantConnect.Algorithm.CSharp
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "6"},
-            {"Average Win", "0.80%"},
-            {"Average Loss", "-2.42%"},
-            {"Compounding Annual Return", "145.604%"},
-            {"Drawdown", "7.000%"},
-            {"Expectancy", "-0.113"},
-            {"Net Profit", "0.990%"},
-            {"Sharpe Ratio", "0.922"},
+            {"Average Win", "6.02%"},
+            {"Average Loss", "-2.40%"},
+            {"Compounding Annual Return", "915.597%"},
+            {"Drawdown", "5.500%"},
+            {"Expectancy", "1.339"},
+            {"Net Profit", "11.401%"},
+            {"Sharpe Ratio", "3.299"},
             {"Loss Rate", "33%"},
             {"Win Rate", "67%"},
-            {"Profit-Loss Ratio", "0.33"},
-            {"Alpha", "-1.411"},
-            {"Beta", "1.271"},
-            {"Annual Standard Deviation", "0.827"},
-            {"Annual Variance", "0.685"},
-            {"Information Ratio", "-4.895"},
-            {"Tracking Error", "0.193"},
-            {"Treynor Ratio", "0.6"},
-            {"Total Fees", "$2450.88"}
+            {"Profit-Loss Ratio", "2.51"},
+            {"Alpha", "-0.409"},
+            {"Beta", "1.047"},
+            {"Annual Standard Deviation", "0.493"},
+            {"Annual Variance", "0.243"},
+            {"Information Ratio", "-2.648"},
+            {"Tracking Error", "0.12"},
+            {"Treynor Ratio", "1.555"},
+            {"Total Fees", "$2650.41"}
         };
     }
 }

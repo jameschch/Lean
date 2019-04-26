@@ -225,6 +225,14 @@ namespace QuantConnect.Data.Market
                 switch (config.SecurityType)
                 {
                     case SecurityType.Equity:
+                    {
+                        var csv = line.ToCsv(6);
+                        Symbol = config.Symbol;
+                        Time = date.Date.AddMilliseconds(csv[0].ToInt64()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+                        Value = csv[1].ToDecimal() / scaleFactor;
+                        TickType = TickType.Trade;
+                        Quantity = csv[2].ToDecimal();
+                        if (csv.Count > 3)
                         {
                             var csv = line.ToCsv(6);
                             Symbol = config.Symbol;
@@ -243,30 +251,78 @@ namespace QuantConnect.Data.Market
 
                     case SecurityType.Forex:
                     case SecurityType.Cfd:
+                    {
+                        var csv = line.ToCsv(3);
+                        Symbol = config.Symbol;
+                        TickType = TickType.Quote;
+                        var ticks = (long)(csv[0].ToDecimal() * TimeSpan.TicksPerMillisecond);
+                        Time = date.Date.AddTicks(ticks)
+                            .ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+                        BidPrice = csv[1].ToDecimal();
+                        AskPrice = csv[2].ToDecimal();
+                        Value = (BidPrice + AskPrice) / 2;
+                        break;
+                    }
+
+                    case SecurityType.Crypto:
+                    {
+                        TickType = config.TickType;
+                        Symbol = config.Symbol;
+                        Exchange = config.Market;
+
+                        if (TickType == TickType.Trade)
                         {
                             var csv = line.ToCsv(3);
-                            Symbol = config.Symbol;
-                            TickType = TickType.Quote;
-                            Time = date.Date.AddMilliseconds(csv[0].ToInt64()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+                            Time = date.Date.AddMilliseconds((double)csv[0].ToDecimal())
+                                .ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+                            Value = csv[1].ToDecimal();
+                            Quantity = csv[2].ToDecimal();
+                        }
+
+                        if (TickType == TickType.Quote)
+                        {
+                            var csv = line.ToCsv(6);
+                            Time = date.Date.AddMilliseconds((double)csv[0].ToDecimal())
+                                .ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
                             BidPrice = csv[1].ToDecimal();
                             AskPrice = csv[2].ToDecimal();
                             Value = (BidPrice + AskPrice) / 2;
                             break;
                         }
+                        break;
+                    }
+                    case SecurityType.Future:
+                    case SecurityType.Option:
+                    {
+                        var csv = line.ToCsv(7);
+                        TickType = config.TickType;
+                        Time = date.Date.AddMilliseconds(csv[0].ToInt64())
+                            .ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+                        Symbol = config.Symbol;
 
-                    case SecurityType.Crypto:
+                        if (TickType == TickType.Trade)
                         {
-                            TickType = config.TickType;
-                            Symbol = config.Symbol;
-                            Exchange = config.Market;
-
-                            if (TickType == TickType.Trade)
+                            Value = csv[1].ToDecimal()/scaleFactor;
+                            Quantity = csv[2].ToDecimal();
+                            Exchange = csv[3];
+                            SaleCondition = csv[4];
+                            Suspicious = csv[5] == "1";
+                        }
+                        else if (TickType == TickType.OpenInterest)
+                        {
+                            Value = csv[1].ToDecimal();
+                        }
+                        else
+                        {
+                            if (csv[1].Length != 0)
                             {
-                                var csv = line.ToCsv(3);
-                                Time = date.Date.AddMilliseconds(csv[0].ToInt64())
-                                    .ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
-                                Value = csv[1].ToDecimal();
-                                Quantity = csv[2].ToDecimal();
+                                BidPrice = csv[1].ToDecimal()/scaleFactor;
+                                BidSize = csv[2].ToDecimal();
+                            }
+                            if (csv[3].Length != 0)
+                            {
+                                AskPrice = csv[3].ToDecimal()/scaleFactor;
+                                AskSize = csv[4].ToDecimal();
                             }
 
                             if (TickType == TickType.Quote)

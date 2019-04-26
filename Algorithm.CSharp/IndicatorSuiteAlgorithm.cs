@@ -19,6 +19,7 @@ using QuantConnect.Data;
 using QuantConnect.Data.Custom;
 using QuantConnect.Data.Market;
 using QuantConnect.Indicators;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -226,6 +227,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -238,21 +244,21 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "19.098%"},
+            {"Compounding Annual Return", "19.104%"},
             {"Drawdown", "7.300%"},
             {"Expectancy", "0"},
-            {"Net Profit", "41.844%"},
-            {"Sharpe Ratio", "1.639"},
+            {"Net Profit", "41.858%"},
+            {"Sharpe Ratio", "1.649"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.29"},
-            {"Beta", "-5.494"},
-            {"Annual Standard Deviation", "0.11"},
+            {"Alpha", "0.317"},
+            {"Beta", "-6.83"},
+            {"Annual Standard Deviation", "0.109"},
             {"Annual Variance", "0.012"},
-            {"Information Ratio", "1.457"},
-            {"Tracking Error", "0.11"},
-            {"Treynor Ratio", "-0.033"},
+            {"Information Ratio", "1.467"},
+            {"Tracking Error", "0.109"},
+            {"Treynor Ratio", "-0.026"},
             {"Total Fees", "$1.00"}
         };
     }

@@ -9,22 +9,23 @@
   "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
 
   // algorithm class selector
-  "algorithm-type-name": "RobotTree",
+  "algorithm-type-name": "BasicTemplateFrameworkAlgorithm",
 
   // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
   "algorithm-language": "CSharp",
 
   //Physical DLL location
-  "algorithm-location": "Jtc.Algorithm.dll",
-  //"algorithm-location": "../../../Algorithm.Python/BasicTemplateAlgorithm.py",
+  "algorithm-location": "QuantConnect.Algorithm.CSharp.dll",
+  //"algorithm-location": "../../../Algorithm.Python/BasicTemplateFrameworkAlgorithm.py",
   //"algorithm-location": "QuantConnect.Algorithm.FSharp.dll",
   //"algorithm-location": "QuantConnect.Algorithm.VisualBasic.dll",
   //"algorithm-location": "QuantConnect.Algorithm.Java.dll",
 
+  //Jupyter notebook
+  //"composer-dll-directory": ".",
+
   // engine
-  "data-folder":    "../../../../Data/",
-  "cache-location": "../../../../Data/	",
-  "data-directory": "../../../../Data/	",
+  "data-folder": "../../../Data/",
 
   // handlers
   "log-handler": "QuantConnect.Logging.CompositeLogHandler",
@@ -34,11 +35,15 @@
   "map-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
   "factor-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
   "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
+  "alpha-handler": "QuantConnect.Lean.Engine.Alphas.DefaultAlphaHandler",
 
   // limits on number of symbols to allow
   "symbol-minute-limit": 10000,
   "symbol-second-limit": 10000,
   "symbol-tick-limit": 10000,
+
+  // limits the amount of data points per chart series. Applies only for backtesting
+  "maximum-data-points-per-chart-series": 4000,
 
   // if one uses true in following token, market hours will remain open all hours and all days.
   // if one uses false will make lean operate only during regular market hours.
@@ -66,6 +71,7 @@
   "ib-tws-dir": "C:\\Jts",
   "ib-trading-mode": "paper",
   "ib-controller-dir": "C:\\IBController",
+  "ib-enable-delayed-streaming-data": false,
 
   // tradier configuration
   "tradier-account-id": "",
@@ -98,26 +104,33 @@
   "gdax-api-key": "",
   "gdax-passphrase": "",
 
+  // bitfinex configuration
+  "bitfinex-api-secret": "",
+  "bitfinex-api-key": "",
+
   // Required to access data from Quandl
   // To get your access token go to https://www.quandl.com/account/api
   "quandl-auth-token": "",
 
+  // Required to access data from Tiingo
+  // To get your access token go to https://www.tiingo.com
+  "tiingo-auth-token": "",
+
+  // alpaca configuration
+  // available trading mode: 'paper', 'live'
+  "alpaca-key-id": "",
+  "alpaca-secret-key": "",
+  "alpaca-trading-mode": "paper",
+
   // parameters to set in the algorithm (the below are just samples)
   "parameters": {
+    // Intrinio account user and password
+    "intrinio-username": "",
+    "intrinio-password": "",
+
     "ema-fast": 10,
     "ema-slow": 20
   },
-
-  //log noise
-  "algorithm-path-python": "../../../Algorithm.Python/",
-  "lean-manager-type": "LocalLeanManager",
-  "security-data-feeds": "",
-  "version-id": "",
-  "algorithm-manager-time-loop-maximum": 20,
-  "forward-console-messages": true,
-  "ignore-version-checks": false,
-  "job-project-id": 0,
-  "send-via-api": false,
 
   "environments": {
 
@@ -268,14 +281,43 @@
 
       // real brokerage implementations require the BrokerageTransactionHandler
       "live-mode-brokerage": "GDAXBrokerage",
-      "data-queue-handler": "GDAXBrokerage",
+      "data-queue-handler": "GDAXDataQueueHandler",
       "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
       "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
       "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
       "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
       "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
-      //"history-provider": "BrokerageHistoryProvider"
+      "history-provider": "BrokerageHistoryProvider"
     },
+
+    "live-bitfinex": {
+      "live-mode": true,
+
+      // real brokerage implementations require the BrokerageTransactionHandler
+      "live-mode-brokerage": "BitfinexBrokerage",
+      "data-queue-handler": "BitfinexBrokerage",
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": "BrokerageHistoryProvider"
+    },
+
+    // defines the 'live-alpaca' environment
+    "live-alpaca": {
+      "live-mode": true,
+
+      // real brokerage implementations require the BrokerageTransactionHandler
+      "live-mode-brokerage": "AlpacaBrokerage",
+      "data-queue-handler": "AlpacaBrokerage",
+      "setup-handler": "QuantConnect.Lean.Engine.Setup.BrokerageSetupHandler",
+      "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
+      "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
+      "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": "BrokerageHistoryProvider"
+    }
 
   }
 }

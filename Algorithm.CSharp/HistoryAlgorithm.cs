@@ -17,9 +17,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
+using QuantConnect.Data.Custom;
 using QuantConnect.Data.Market;
 using QuantConnect.Indicators;
 using QuantConnect.Securities.Equity;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -281,6 +283,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -293,22 +300,36 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "372.099%"},
+            {"Compounding Annual Return", "359.952%"},
             {"Drawdown", "1.100%"},
             {"Expectancy", "0"},
-            {"Net Profit", "1.715%"},
-            {"Sharpe Ratio", "4.521"},
+            {"Net Profit", "1.686%"},
+            {"Sharpe Ratio", "4.502"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "0"},
-            {"Beta", "79.129"},
-            {"Annual Standard Deviation", "0.193"},
-            {"Annual Variance", "0.037"},
-            {"Information Ratio", "4.465"},
-            {"Tracking Error", "0.193"},
+            {"Beta", "77.786"},
+            {"Annual Standard Deviation", "0.191"},
+            {"Annual Variance", "0.036"},
+            {"Information Ratio", "4.445"},
+            {"Tracking Error", "0.191"},
             {"Treynor Ratio", "0.011"},
-            {"Total Fees", "$3.27"}
+            {"Total Fees", "$3.26"}
         };
+
+        /// <summary>
+        /// Custom quandl data type for setting customized value column name. Value column is used for the primary trading calculations and charting.
+        /// </summary>
+        public class QuandlFuture : Quandl
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="QuandlFuture"/> class.
+            /// </summary>
+            public QuandlFuture()
+                : base(valueColumnName: "Settle")
+            {
+            }
+        }
     }
 }

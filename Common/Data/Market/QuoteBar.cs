@@ -465,7 +465,7 @@ namespace QuantConnect.Data.Market
             else
             {
                 // Using custom "ToDecimal" conversion for speed on high resolution data.
-                quoteBar.Time = date.Date.AddMilliseconds(csv[0].ToInt32()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
+                quoteBar.Time = date.Date.AddMilliseconds((double)csv[0].ToDecimal()).ConvertTo(config.DataTimeZone, config.ExchangeTimeZone);
             }
 
             // only create the bid if it exists in the file
@@ -473,10 +473,10 @@ namespace QuantConnect.Data.Market
             {
                 quoteBar.Bid = new Bar
                 {
-                    Open = config.GetNormalizedPrice(csv[1].ToDecimal() * scaleFactor),
-                    High = config.GetNormalizedPrice(csv[2].ToDecimal() * scaleFactor),
-                    Low = config.GetNormalizedPrice(csv[3].ToDecimal() * scaleFactor),
-                    Close = config.GetNormalizedPrice(csv[4].ToDecimal() * scaleFactor)
+                    Open = csv[1].ToDecimal() * scaleFactor,
+                    High = csv[2].ToDecimal() * scaleFactor,
+                    Low = csv[3].ToDecimal() * scaleFactor,
+                    Close = csv[4].ToDecimal() * scaleFactor
                 };
                 quoteBar.LastBidSize = csv[5].ToDecimal();
             }
@@ -490,10 +490,10 @@ namespace QuantConnect.Data.Market
             {
                 quoteBar.Ask = new Bar
                 {
-                    Open = config.GetNormalizedPrice(csv[6].ToDecimal() * scaleFactor),
-                    High = config.GetNormalizedPrice(csv[7].ToDecimal() * scaleFactor),
-                    Low = config.GetNormalizedPrice(csv[8].ToDecimal() * scaleFactor),
-                    Close = config.GetNormalizedPrice(csv[9].ToDecimal() * scaleFactor)
+                    Open = csv[6].ToDecimal() * scaleFactor,
+                    High = csv[7].ToDecimal() * scaleFactor,
+                    Low = csv[8].ToDecimal() * scaleFactor,
+                    Close = csv[9].ToDecimal() * scaleFactor
                 };
                 quoteBar.LastAskSize = csv[10].ToDecimal();
             }

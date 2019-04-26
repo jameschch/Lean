@@ -16,26 +16,23 @@
 
 using System;
 using System.Collections.Generic;
-using NodaTime;
+using System.Linq;
 using QuantConnect.Data.UniverseSelection;
-using QuantConnect.Securities;
 
 namespace QuantConnect.Lean.Engine.DataFeeds
 {
     /// <summary>
     /// Provides the ability to synchronize subscriptions into time slices
     /// </summary>
-    public class SubscriptionSynchronizer : ISubscriptionSynchronizer
+    public class SubscriptionSynchronizer : ISubscriptionSynchronizer, ITimeProvider
     {
-        private static readonly long MaxDateTimeTicks = DateTime.MaxValue.Ticks;
-
-        private DateTime _frontier;
-        private readonly CashBook _cashBook;
-        private readonly DateTimeZone _sliceTimeZone;
         private readonly UniverseSelection _universeSelection;
+        private TimeSliceFactory _timeSliceFactory;
+        private ITimeProvider _timeProvider;
+        private ManualTimeProvider _frontierTimeProvider;
 
         /// <summary>
-        /// Event fired when a subscription is finished
+        /// Event fired when a <see cref="Subscription"/> is finished
         /// </summary>
         public event EventHandler<Subscription> SubscriptionFinished;
 
@@ -44,16 +41,37 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// </summary>
         /// <param name="universeSelection">The universe selection instance used to handle universe
         /// selection subscription output</param>
-        /// <param name="sliceTimeZone">The time zone of the created slice object</param>
-        /// <param name="cashBook">The cash book, used for creating the cash book updates</param>
         /// <returns>A time slice for the specified frontier time</returns>
-        /// <param name="frontierUtc">The initial UTC frontier time to syncronize at</param>
-        public SubscriptionSynchronizer(UniverseSelection universeSelection, DateTimeZone sliceTimeZone, CashBook cashBook, DateTime frontierUtc)
+        public SubscriptionSynchronizer(UniverseSelection universeSelection)
         {
-            _frontier = frontierUtc;
             _universeSelection = universeSelection;
-            _sliceTimeZone = sliceTimeZone;
-            _cashBook = cashBook;
+        }
+
+        /// <summary>
+        /// Sets the time provider. If already set will throw.
+        /// </summary>
+        /// <param name="timeProvider">The time provider, used to obtain the current frontier UTC value</param>
+        public void SetTimeProvider(ITimeProvider timeProvider)
+        {
+            if (_timeProvider != null)
+            {
+                throw new Exception("SubscriptionSynchronizer.SetTimeProvider(): can only be called once");
+            }
+            _timeProvider = timeProvider;
+            _frontierTimeProvider = new ManualTimeProvider(_timeProvider.GetUtcNow());
+        }
+
+        /// <summary>
+        /// Sets the <see cref="TimeSliceFactory"/> instance to use
+        /// </summary>
+        /// <param name="timeSliceFactory">Used to create the new <see cref="TimeSlice"/></param>
+        public void SetTimeSliceFactory(TimeSliceFactory timeSliceFactory)
+        {
+            if (_timeSliceFactory != null)
+            {
+                throw new Exception("SubscriptionSynchronizer.SetTimeSliceFactory(): can only be called once");
+            }
+            _timeSliceFactory = timeSliceFactory;
         }
 
         /// <summary>
@@ -63,17 +81,19 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <param name="subscriptions">The subscriptions to sync</param>
         public TimeSlice Sync(IEnumerable<Subscription> subscriptions)
         {
-            long earlyBirdTicks;
+            var delayedSubscriptionFinished = false;
             var changes = SecurityChanges.None;
             var data = new List<DataFeedPacket>();
             // NOTE: Tight coupling in UniverseSelection.ApplyUniverseSelection
             var universeData = new Dictionary<Universe, BaseDataCollection>();
             var universeDataForTimeSliceCreate = new Dictionary<Universe, BaseDataCollection>();
 
+            _frontierTimeProvider.SetCurrentTimeUtc(_timeProvider.GetUtcNow());
+            var frontierUtc = _frontierTimeProvider.GetUtcNow();
+
             SecurityChanges newChanges;
             do
             {
-                earlyBirdTicks = MaxDateTimeTicks;
                 newChanges = SecurityChanges.None;
                 foreach (var subscription in subscriptions)
                 {
@@ -91,22 +111,17 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                             OnSubscriptionFinished(subscription);
                             continue;
                         }
-
-                        if (subscription.Current == null)
-                        {
-                            throw new Exception($"SubscriptionSynchronizer.Sync(): subscription.Current is null, configuration: {subscription}");
-                        }
                     }
 
                     var packet = new DataFeedPacket(subscription.Security, subscription.Configuration, subscription.RemovedFromUniverse);
 
-                    while (subscription.Current.EmitTimeUtc <= _frontier)
+                    while (subscription.Current != null && subscription.Current.EmitTimeUtc <= frontierUtc)
                     {
                         packet.Add(subscription.Current.Data);
 
                         if (!subscription.MoveNext())
                         {
-                            OnSubscriptionFinished(subscription);
+                            delayedSubscriptionFinished = true;
                             break;
                         }
                     }
@@ -128,7 +143,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                                 : packetBaseDataCollection.Data;
 
                             BaseDataCollection collection;
-                            if (universeData.TryGetValue(subscription.Universe, out collection))
+                            if (universeData.TryGetValue(subscription.Universes.Single(), out collection))
                             {
                                 collection.Data.AddRange(packetData);
                             }
@@ -137,40 +152,29 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                                 if (packetBaseDataCollection is OptionChainUniverseDataCollection)
                                 {
                                     var current = packetBaseDataCollection as OptionChainUniverseDataCollection;
-                                    collection = new OptionChainUniverseDataCollection(_frontier, subscription.Configuration.Symbol, packetData, current?.Underlying);
+                                    collection = new OptionChainUniverseDataCollection(frontierUtc, subscription.Configuration.Symbol, packetData, current?.Underlying);
                                 }
                                 else if (packetBaseDataCollection is FuturesChainUniverseDataCollection)
                                 {
-                                    collection = new FuturesChainUniverseDataCollection(_frontier, subscription.Configuration.Symbol, packetData);
+                                    collection = new FuturesChainUniverseDataCollection(frontierUtc, subscription.Configuration.Symbol, packetData);
                                 }
                                 else
                                 {
-                                    collection = new BaseDataCollection(_frontier, subscription.Configuration.Symbol, packetData);
+                                    collection = new BaseDataCollection(frontierUtc, subscription.Configuration.Symbol, packetData);
                                 }
 
-                                universeData[subscription.Universe] = collection;
-                            }
-
-                            // remove subscription for universe data if disposal requested AFTER time sync
-                            // this ensures we get any security changes from removing the universe and its children
-                            if (subscription.Universe.DisposeRequested)
-                            {
-                                OnSubscriptionFinished(subscription);
+                                universeData[subscription.Universes.Single()] = collection;
                             }
                         }
                     }
 
-                    if (subscription.Current != null)
+                    if (subscription.IsUniverseSelectionSubscription
+                        && subscription.Universes.Single().DisposeRequested
+                        || delayedSubscriptionFinished)
                     {
-                        if (earlyBirdTicks == MaxDateTimeTicks)
-                        {
-                            earlyBirdTicks = subscription.Current.EmitTimeUtc.Ticks;
-                        }
-                        else
-                        {
-                            // take the earliest between the next piece of data or the current earliest bird
-                            earlyBirdTicks = Math.Min(earlyBirdTicks, subscription.Current.EmitTimeUtc.Ticks);
-                        }
+                        delayedSubscriptionFinished = false;
+                        // we need to do this after all usages of subscription.Universes
+                        OnSubscriptionFinished(subscription);
                     }
                 }
 
@@ -179,18 +183,16 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     var universe = kvp.Key;
                     var baseDataCollection = kvp.Value;
                     universeDataForTimeSliceCreate[universe] = baseDataCollection;
-                    newChanges += _universeSelection.ApplyUniverseSelection(universe, _frontier, baseDataCollection);
+                    newChanges += _universeSelection.ApplyUniverseSelection(universe, frontierUtc, baseDataCollection);
                 }
                 universeData.Clear();
 
                 changes += newChanges;
             }
-            while (newChanges != SecurityChanges.None);
+            while (newChanges != SecurityChanges.None
+                || _universeSelection.AddPendingCurrencyDataFeeds(frontierUtc));
 
-            var timeSlice = TimeSlice.Create(_frontier, _sliceTimeZone, _cashBook, data, changes, universeDataForTimeSliceCreate);
-
-            // next frontier time
-            _frontier = new DateTime(Math.Max(earlyBirdTicks, _frontier.Ticks), DateTimeKind.Utc);
+            var timeSlice = _timeSliceFactory.Create(frontierUtc, data, changes, universeDataForTimeSliceCreate);
 
             return timeSlice;
         }
@@ -202,6 +204,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         {
             var handler = SubscriptionFinished;
             if (handler != null) handler(this, subscription);
+        }
+
+        /// <summary>
+        /// Returns the current UTC frontier time
+        /// </summary>
+        public DateTime GetUtcNow()
+        {
+            return _frontierTimeProvider.GetUtcNow();
         }
     }
 }

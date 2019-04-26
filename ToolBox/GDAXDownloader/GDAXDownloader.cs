@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,13 +28,13 @@ using QuantConnect.Logging;
 namespace QuantConnect.ToolBox.GDAXDownloader
 {
     /// <summary>
-    /// GDAX Data Downloader class 
+    /// GDAX Data Downloader class
     /// </summary>
     public class GDAXDownloader : IDataDownloader
     {
         const int MaxDatapointsPerRequest = 200;
         const int MaxRequestsPerSecond = 2;
-        const string HistoricCandlesUrl = "http://api.gdax.com/products/{0}/candles?start={1}&end={2}&granularity={3}";
+        const string HistoricCandlesUrl = "http://api.pro.coinbase.com/products/{0}/candles?start={1}&end={2}&granularity={3}";
 
         /// <summary>
         /// Get historical data enumerable for a single symbol, type and resolution given this start and end times(in UTC).
@@ -59,8 +60,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
 
                 Log.Trace(String.Format("Getting data for timeperiod from {0} to {1}..", windowStartTime, windowEndTime));
 
-                var requestURL = string.Format(HistoricCandlesUrl, symbol.Value.Substring(0, 3) + "-" + symbol.Value.Substring(3, 3), windowStartTime.ToString(),
-                    windowEndTime.ToString(), granularity);
+                var requestURL = string.Format(HistoricCandlesUrl, symbol.Value, windowStartTime.ToString(), windowEndTime.ToString(), granularity);
                 var request = (HttpWebRequest)WebRequest.Create(requestURL);
                 request.UserAgent = ".NET Framework Test Client";
 
@@ -111,7 +111,7 @@ namespace QuantConnect.ToolBox.GDAXDownloader
         /// <summary>
         /// Parse string response from web response
         /// </summary>
-        /// <param name="Symbol">Crypto security symbol.</param>
+        /// <param name="symbol">Crypto security symbol.</param>
         /// <param name="granularity">Resolution in seconds.</param>
         /// <param name="data">Web response as string.</param>
         /// <returns>web response as string</returns>
@@ -129,12 +129,12 @@ namespace QuantConnect.ToolBox.GDAXDownloader
                     {
                         Time = Time.UnixTimeStampToDateTime(epochs),
                         Symbol = symbol,
-                        Low = decimal.Parse(datapoint[1].ToString(), System.Globalization.NumberStyles.Any),
-                        High = decimal.Parse(datapoint[2].ToString(), System.Globalization.NumberStyles.Any),
-                        Open = decimal.Parse(datapoint[3].ToString(), System.Globalization.NumberStyles.Any),
-                        Close = decimal.Parse(datapoint[4].ToString(), System.Globalization.NumberStyles.Any),
-                        Volume = decimal.Parse(datapoint[5].ToString(), System.Globalization.NumberStyles.Any),
-                        Value = decimal.Parse(datapoint[4].ToString(), System.Globalization.NumberStyles.Any),
+                        Low = decimal.Parse(datapoint[1].ToString()),
+                        High = decimal.Parse(datapoint[2].ToString()),
+                        Open = decimal.Parse(datapoint[3].ToString()),
+                        Close = decimal.Parse(datapoint[4].ToString()),
+                        Volume = decimal.Parse(datapoint[5].ToString(), System.Globalization.NumberStyles.Float),
+                        Value = decimal.Parse(datapoint[4].ToString()),
                         DataType = MarketDataType.TradeBar,
                         Period = new TimeSpan(0, 0, (int)granularity),
                         EndTime = Time.UnixTimeStampToDateTime(epochs).AddSeconds(granularity)

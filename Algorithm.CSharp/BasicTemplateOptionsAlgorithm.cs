@@ -20,6 +20,7 @@ using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -93,6 +94,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -105,10 +111,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "-0.28%"},
-            {"Compounding Annual Return", "-78.105%"},
+            {"Compounding Annual Return", "-78.282%"},
             {"Drawdown", "0.300%"},
             {"Expectancy", "-1"},
-            {"Net Profit", "-0.280%"},
+            {"Net Profit", "-0.282%"},
             {"Sharpe Ratio", "0"},
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
@@ -120,7 +126,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$0.50"}
+            {"Total Fees", "$2.00"}
         };
     }
 }

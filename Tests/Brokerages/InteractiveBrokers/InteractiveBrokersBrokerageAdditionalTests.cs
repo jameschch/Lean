@@ -39,32 +39,6 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
         private readonly List<Order> _orders = new List<Order>();
 
         [Test]
-        public void StressTestGetUsdConversion()
-        {
-            var brokerage = GetBrokerage();
-            Assert.IsTrue(brokerage.IsConnected);
-
-            // private method testing hack :)
-            var method = brokerage.GetType().GetMethod("GetUsdConversion", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            const string currency = "SEK";
-            const int count = 20;
-
-            for (var i = 1; i <= count; i++)
-            {
-                var value = (decimal)method.Invoke(brokerage, new object[] { currency });
-
-                Console.WriteLine(i + " - GetUsdConversion({0}) = {1}", currency, value);
-
-                Assert.IsTrue(value > 0);
-            }
-
-            brokerage.Disconnect();
-            brokerage.Dispose();
-            InteractiveBrokersGatewayRunner.Stop();
-        }
-
-        [Test]
         public void TestRateLimiting()
         {
             using (var brokerage = GetBrokerage())
@@ -78,7 +52,7 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
                     Symbol = "EUR",
                     Exchange = "IDEALPRO",
                     SecType = "CASH",
-                    Currency = "USD"
+                    Currency = Currencies.USD
                 };
                 var parameters = new object[] { contract };
 
@@ -148,9 +122,22 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
 
             // grabs account info from configuration
             var securityProvider = new SecurityProvider();
-            securityProvider[Symbols.USDJPY] = new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
-                new SubscriptionDataConfig(typeof(TradeBar), Symbols.USDJPY, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, false, false, false),
-                new Cash(CashBook.AccountCurrency, 0, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency));
+            securityProvider[Symbols.USDJPY] = new Security(
+                SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
+                new SubscriptionDataConfig(
+                    typeof(TradeBar),
+                    Symbols.USDJPY,
+                    Resolution.Minute,
+                    TimeZones.NewYork,
+                    TimeZones.NewYork,
+                    false,
+                    false,
+                    false
+                ),
+                new Cash(Currencies.USD, 0, 1m),
+                SymbolProperties.GetDefault(Currencies.USD),
+                ErrorCurrencyConverter.Instance
+            );
 
             var brokerage = new InteractiveBrokersBrokerage(new QCAlgorithm(), new OrderProvider(_orders), securityProvider);
             brokerage.Connect();

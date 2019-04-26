@@ -4,12 +4,6 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
-/*
- * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
- * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -22,7 +16,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
-using QuantConnect.Securities.Option;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -35,10 +29,11 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="selecting options" />
     /// <meta name="tag" content="manual selection" />
-    public class OptionChainProviderAlgorithm : QCAlgorithm
+    public class OptionChainProviderAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         private Symbol _equitySymbol;
         private Symbol _optionContract = string.Empty;
+        private readonly HashSet<Symbol> _contractsAdded = new HashSet<Symbol>();
 
         public override void Initialize()
         {
@@ -46,6 +41,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetEndDate(2015, 12, 24);
             SetCash(100000);
             var equity = AddEquity("GOOG", Resolution.Minute);
+            equity.SetDataNormalizationMode(DataNormalizationMode.Raw);
             _equitySymbol = equity.Symbol;
         }
 
@@ -72,8 +68,11 @@ namespace QuantConnect.Algorithm.CSharp
                     _optionContract = otmCalls.OrderBy(x => x.ID.Date)
                                           .ThenBy(x => (x.ID.StrikePrice - underlyingPrice))
                                           .FirstOrDefault();
-                    // use AddOptionContract() to subscribe the data for specified contract
-                    AddOptionContract(_optionContract, Resolution.Minute);
+                    if (_contractsAdded.Add(_optionContract))
+                    {
+                        // use AddOptionContract() to subscribe the data for specified contract
+                        AddOptionContract(_optionContract, Resolution.Minute);
+                    }
                 }
                 else _optionContract = string.Empty;
             }
@@ -82,6 +81,11 @@ namespace QuantConnect.Algorithm.CSharp
                 MarketOrder(_optionContract, -1);
             }
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
 
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
@@ -96,10 +100,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "3.198%"},
+            {"Compounding Annual Return", "2.775%"},
             {"Drawdown", "0.200%"},
             {"Expectancy", "0"},
-            {"Net Profit", "0.006%"},
+            {"Net Profit", "0.005%"},
             {"Sharpe Ratio", "0"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
@@ -111,7 +115,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$1.25"},
+            {"Total Fees", "$2.00"},
         };
     }
 }

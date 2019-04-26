@@ -18,12 +18,18 @@ using QuantConnect.Data.Consolidators;
 using QuantConnect.Data.Market;
 using QuantConnect.Indicators;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace QuantConnect.Algorithm
 {
     public partial class QCAlgorithm
     {
+        /// <summary>
+        /// Gets whether or not WarmUpIndicator is allowed to warm up indicators/>
+        /// </summary>
+        public bool EnableAutomaticIndicatorWarmUp { get; set; } = false;
+
         /// <summary>
         /// Creates a new Acceleration Bands indicator.
         /// </summary>
@@ -193,6 +199,12 @@ namespace QuantConnect.Algorithm
             string name = CreateIndicatorName(symbol, "ATR" + period, resolution);
             var atr = new AverageTrueRange(name, period, type);
             RegisterIndicator(symbol, atr, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, atr);
+            }
+
             return atr;
         }
 
@@ -363,6 +375,12 @@ namespace QuantConnect.Algorithm
             string name = CreateIndicatorName(symbol, "EMA" + period, resolution);
             var ema = new ExponentialMovingAverage(name, period);
             RegisterIndicator(symbol, ema, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, ema, resolution);
+            }
+
             return ema;
         }
 
@@ -977,8 +995,7 @@ namespace QuantConnect.Algorithm
         /// <param name="resolution">The resolution</param>
         /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
         /// <returns>The RelativeStrengthIndex indicator for the requested symbol over the specified period</returns>
-        [Obsolete("The default MovingAverageType for the RSI helper method is changing to Wilders. If you depend on using Simple, please ensure you specify it as a parameter and not rely on the default value.")]
-        public RelativeStrengthIndex RSI(Symbol symbol, int period, MovingAverageType movingAverageType = MovingAverageType.Simple, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
+        public RelativeStrengthIndex RSI(Symbol symbol, int period, MovingAverageType movingAverageType = MovingAverageType.Wilders, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
         {
             var name = CreateIndicatorName(symbol, "RSI" + period, resolution);
             var rsi = new RelativeStrengthIndex(name, period, movingAverageType);
@@ -1000,8 +1017,15 @@ namespace QuantConnect.Algorithm
             string name = CreateIndicatorName(symbol, "SMA" + period, resolution);
             var sma = new SimpleMovingAverage(name, period);
             RegisterIndicator(symbol, sma, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, sma, resolution);
+            }
+
             return sma;
         }
+
         /// <summary>
         /// Creates a new StandardDeviation indicator. This will return the population standard deviation of samples over the specified period.
         /// </summary>
@@ -1209,6 +1233,12 @@ namespace QuantConnect.Algorithm
             var name = CreateIndicatorName(symbol, "VWAP" + period, resolution);
             var vwap = new VolumeWeightedAveragePriceIndicator(name, period);
             RegisterIndicator(symbol, vwap, resolution, selector);
+
+            if (EnableAutomaticIndicatorWarmUp)
+            {
+                WarmUpIndicator(symbol, vwap);
+            }
+
             return vwap;
         }
 
@@ -1478,9 +1508,153 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
+        /// Warms up a given indicator with historical data
+        /// </summary>
+        /// <param name="symbol">The symbol whose indicator we want</param>
+        /// <param name="indicator">The indicator we want to warm up</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The given indicator</returns>
+        public IndicatorBase<IndicatorDataPoint> WarmUpIndicator(Symbol symbol, IndicatorBase<IndicatorDataPoint> indicator, Resolution? resolution = null, Func<IBaseData, decimal> selector = null)
+        {
+            resolution = GetResolution(symbol, resolution);
+            var period = resolution.Value.ToTimeSpan();
+            return WarmUpIndicator(symbol, indicator, period, selector);
+        }
+
+        /// <summary>
+        /// Warms up a given indicator with historical data
+        /// </summary>
+        /// <param name="symbol">The symbol whose indicator we want</param>
+        /// <param name="indicator">The indicator we want to warm up</param>
+        /// <param name="period">The necessary period to warm up the indicator</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The given indicator</returns>
+        public IndicatorBase<IndicatorDataPoint> WarmUpIndicator(Symbol symbol, IndicatorBase<IndicatorDataPoint> indicator, TimeSpan period, Func<IBaseData, decimal> selector = null)
+        {
+            var history = GetIndicatorWarmUpHistory(symbol, indicator, period);
+            if (history == Enumerable.Empty<Slice>()) return indicator;
+
+            // assign default using cast
+            selector = selector ?? (x => x.Value);
+
+            Action<IBaseData> onDataConsolidated = bar =>
+            {
+                var input = new IndicatorDataPoint(bar.Symbol, bar.EndTime, selector(bar));
+                indicator.Update(input);
+            };
+
+            var consolidator = GetIndicatorWarmUpConsolidator(symbol, period, onDataConsolidated);
+            history.PushThrough(bar => consolidator.Update(bar));
+
+            // Scan for time after we've pumped all the data through for this consolidator
+            var lastBar = history.LastOrDefault();
+            if (lastBar != null && lastBar.ContainsKey(symbol))
+            {
+                consolidator.Scan(((IBaseData)lastBar[symbol]).EndTime);
+            }
+
+            return indicator;
+        }
+
+        /// <summary>
+        /// Warms up a given indicator with historical data
+        /// </summary>
+        /// <param name="symbol">The symbol whose indicator we want</param>
+        /// <param name="indicator">The indicator we want to warm up</param>
+        /// <param name="resolution">The resolution</param>
+        /// <param name="selector">Selects a value from the BaseData to send into the indicator, if null defaults to the Value property of BaseData (x => x.Value)</param>
+        /// <returns>The given indicator</returns>
+        public IndicatorBase<T> WarmUpIndicator<T>(Symbol symbol, IndicatorBase<T> indicator, Resolution? resolution = null, Func<IBaseData, T> selector = null)
+            where T : IBaseData
+        {
+            resolution = GetResolution(symbol, resolution);
+            var period = resolution.Value.ToTimeSpan();
+            return WarmUpIndicator(symbol, indicator, period, selector);
+        }
+
+        /// <summary>
+        /// Warms up a given indicator with historical data
+        /// </summary>
+        /// <param name="symbol">The symbol whose indicator we want</param>
+        /// <param name="indicator">The indicator we want to warm up</param>
+        /// <param name="period">The necessary period to warm up the indicator</param>
+        /// <param name="selector">Selects a value from the BaseData send into the indicator, if null defaults to a cast (x => (T)x)</param>
+        /// <returns>The given indicator</returns>
+        public IndicatorBase<T> WarmUpIndicator<T>(Symbol symbol, IndicatorBase<T> indicator, TimeSpan period, Func<IBaseData, T> selector = null)
+            where T : IBaseData
+        {
+            var history = GetIndicatorWarmUpHistory(symbol, indicator, period);
+            if (history == Enumerable.Empty<Slice>()) return indicator;
+
+            // assign default using cast
+            selector = selector ?? (x => (T)x);
+
+            Action<IBaseData> onDataConsolidated = bar =>
+            {
+                indicator.Update(selector(bar));
+            };
+
+            // Push the historical data through a consolidator 
+            var consolidator = GetIndicatorWarmUpConsolidator(symbol, period, onDataConsolidated);
+            history.PushThrough(bar => consolidator.Update(bar));
+
+            // Scan for time after we've pumped all the data through for this consolidator
+            var lastBar = history.LastOrDefault();
+            var lastTime = lastBar == null ? DateTime.MinValue : lastBar[symbol].EndTime;
+            consolidator.Scan(lastTime);
+
+            return indicator;
+        }
+
+        private IEnumerable<Slice> GetIndicatorWarmUpHistory(Symbol symbol, IIndicator indicator, TimeSpan timeSpan)
+        {
+            var periods = (indicator as IIndicatorWarmUpPeriodProvider)?.WarmUpPeriod;
+
+            if (periods.HasValue)
+            {
+                var resolution = timeSpan.ToHigherResolutionEquivalent(false);
+                var resolutionTicks = resolution.ToTimeSpan().Ticks;
+                if (resolutionTicks != 0)
+                {
+                    periods *= (int)(timeSpan.Ticks / resolutionTicks);
+                }
+
+                try
+                {
+                    return History(new[] { symbol }, periods.Value, resolution);
+                }
+                catch (ArgumentException e)
+                {
+                    Debug($"{indicator.Name} could not be warmed up. Reason: {e.Message}");
+                }
+            }
+
+            return Enumerable.Empty<Slice>();
+        }
+
+        private IDataConsolidator GetIndicatorWarmUpConsolidator<T>(Symbol symbol, TimeSpan period, Action<T> handler)
+            where T : class, IBaseData
+        {
+            if (SubscriptionManager.Subscriptions.Any(x => x.Symbol == symbol))
+            {
+                return Consolidate(symbol, period, handler);
+            }
+
+            var dataType = SubscriptionManager.LookupSubscriptionConfigDataTypes(
+                symbol.SecurityType,
+                Resolution.Daily,
+                symbol.IsCanonical()).First();
+
+            var consolidator = CreateConsolidator(period, dataType.Item1, dataType.Item2);
+            consolidator.DataConsolidated += (s, bar) => handler((T)bar);
+            return consolidator;
+        }
+
+        /// <summary>
         /// Gets the default consolidator for the specified symbol and resolution
         /// </summary>
-        /// <param name="symbol">The symbo whose data is to be consolidated</param>
+        /// <param name="symbol">The symbol whose data is to be consolidated</param>
         /// <param name="resolution">The resolution for the consolidator, if null, uses the resolution from subscription</param>
         /// <returns>The new default consolidator</returns>
         public IDataConsolidator ResolveConsolidator(Symbol symbol, Resolution? resolution)
@@ -1511,7 +1685,7 @@ namespace QuantConnect.Algorithm
         /// <summary>
         /// Gets the default consolidator for the specified symbol and resolution
         /// </summary>
-        /// <param name="symbol">The symbo whose data is to be consolidated</param>
+        /// <param name="symbol">The symbol whose data is to be consolidated</param>
         /// <param name="timeSpan">The requested time span for the consolidator, if null, uses the resolution from subscription</param>
         /// <returns>The new default consolidator</returns>
         public IDataConsolidator ResolveConsolidator(Symbol symbol, TimeSpan? timeSpan)
@@ -1649,20 +1823,6 @@ namespace QuantConnect.Algorithm
         /// <param name="period">The consolidation period</param>
         /// <param name="handler">Data handler receives new consolidated data when generated</param>
         /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
-        public IDataConsolidator Consolidate<T>(Symbol symbol, Resolution period, Action<T> handler)
-            where T : class, IBaseData
-        {
-            return Consolidate(symbol, period.ToTimeSpan(), null, handler);
-        }
-
-        /// <summary>
-        /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol and tick type.
-        /// The handler and tick type must match.
-        /// </summary>
-        /// <param name="symbol">The symbol who's data is to be consolidated</param>
-        /// <param name="period">The consolidation period</param>
-        /// <param name="handler">Data handler receives new consolidated data when generated</param>
-        /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
         public IDataConsolidator Consolidate<T>(Symbol symbol, TimeSpan period, Action<T> handler)
             where T : class, IBaseData
         {
@@ -1723,6 +1883,122 @@ namespace QuantConnect.Algorithm
             consolidator.DataConsolidated += (sender, consolidated) => handler((T) consolidated);
 
             return consolidator;
+        }
+
+        /// <summary>
+        /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol
+        /// </summary>
+        /// <param name="symbol">The symbol who's data is to be consolidated</param>
+        /// <param name="calendarType">The consolidation calendar type</param>
+        /// <param name="handler">Data handler receives new consolidated data when generated</param>
+        /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
+        public IDataConsolidator Consolidate(Symbol symbol, Func<DateTime, CalendarInfo> calendarType, Action<QuoteBar> handler)
+        {
+            return Consolidate(symbol, calendarType, TickType.Quote, handler);
+        }
+
+        /// <summary>
+        /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol
+        /// </summary>
+        /// <param name="symbol">The symbol who's data is to be consolidated</param>
+        /// <param name="calendarType">The consolidation calendar type</param>
+        /// <param name="handler">Data handler receives new consolidated data when generated</param>
+        /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
+        public IDataConsolidator Consolidate(Symbol symbol, Func<DateTime, CalendarInfo> calendarType, Action<TradeBar> handler)
+        {
+            return Consolidate(symbol, calendarType, TickType.Trade, handler);
+        }
+
+        /// <summary>
+        /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol and tick type.
+        /// The handler and tick type must match.
+        /// </summary>
+        /// <param name="symbol">The symbol who's data is to be consolidated</param>
+        /// <param name="calendarType">The consolidation calendar type</param>
+        /// <param name="handler">Data handler receives new consolidated data when generated</param>
+        /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
+        public IDataConsolidator Consolidate<T>(Symbol symbol, Func<DateTime, CalendarInfo> calendarType, Action<T> handler)
+            where T : class, IBaseData
+        {
+            return Consolidate(symbol, calendarType, null, handler);
+        }
+
+        /// <summary>
+        /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol and tick type.
+        /// The handler and tick type must match.
+        /// </summary>
+        /// <param name="symbol">The symbol who's data is to be consolidated</param>
+        /// <param name="calendarType">The consolidation calendar type</param>
+        /// <param name="tickType">The tick type of subscription used as data source for consolidator. Specify null to use first subscription found.</param>
+        /// <param name="handler">Data handler receives new consolidated data when generated</param>
+        /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
+        private IDataConsolidator Consolidate<T>(Symbol symbol, Func<DateTime, CalendarInfo> calendarType, TickType? tickType, Action<T> handler)
+            where T : class, IBaseData
+        {
+            // resolve consolidator input subscription
+            var subscription = GetSubscription(symbol, tickType);
+
+            // create requested consolidator
+            var consolidator = CreateConsolidator(calendarType, subscription.Type, subscription.TickType);
+
+            if (!typeof(T).IsAssignableFrom(consolidator.OutputType))
+            {
+                // special case downgrading of QuoteBar -> TradeBar
+                if (typeof(T) == typeof(TradeBar) && consolidator.OutputType == typeof(QuoteBar))
+                {
+                    // collapse quote bar into trade bar (ignore the funky casting, required due to generics)
+                    consolidator.DataConsolidated += (sender, consolidated) => handler((T)(object)((QuoteBar)consolidated).Collapse());
+                }
+
+                throw new ArgumentException(
+                    $"Unable to consolidate with the specified handler because the consolidator's output type " +
+                    $"is {consolidator.OutputType.Name} but the handler's input type is {typeof(T).Name}.");
+            }
+
+            // register user-defined handler to receive consolidated data events
+            consolidator.DataConsolidated += (sender, consolidated) => handler((T)consolidated);
+            
+            // register the consolidator for automatic updates via SubscriptionManager
+            SubscriptionManager.AddConsolidator(symbol, consolidator);
+
+            return consolidator;
+        }
+
+        private IDataConsolidator CreateConsolidator(Func<DateTime, CalendarInfo> calendarType, Type consolidatorInputType, TickType tickType)
+        {
+            // if our type can be used as a trade bar, then let's just make one of those
+            // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to TradeBar
+            if (typeof(TradeBar).IsAssignableFrom(consolidatorInputType))
+            {
+                return new TradeBarConsolidator(calendarType);
+            }
+
+            // if our type can be used as a quote bar, then let's just make one of those
+            // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to QuoteBar
+            if (typeof(QuoteBar).IsAssignableFrom(consolidatorInputType))
+            {
+                return new QuoteBarConsolidator(calendarType);
+            }
+
+            // if our type can be used as a tick then we'll use a consolidator that keeps the TickType
+            // we use IsAssignableFrom instead of IsSubclassOf so that we can account for types that are able to be cast to Tick
+            if (typeof(Tick).IsAssignableFrom(consolidatorInputType))
+            {
+                if (tickType == TickType.Quote)
+                {
+                    return new TickQuoteBarConsolidator(calendarType);
+                }
+                return new TickConsolidator(calendarType);
+            }
+
+            // if our type can be used as a DynamicData then we'll use the DynamicDataConsolidator
+            if (typeof(DynamicData).IsAssignableFrom(consolidatorInputType))
+            {
+                return new DynamicDataConsolidator(calendarType);
+            }
+
+            // no matter what we can always consolidate based on the time-value pair of BaseData
+            return new BaseDataConsolidator(calendarType);
         }
     }
 }

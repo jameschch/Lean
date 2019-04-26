@@ -18,6 +18,7 @@ using System.Collections.Generic;
 using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -169,6 +170,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -180,23 +186,23 @@ namespace QuantConnect.Algorithm.CSharp
         {
             {"Total Trades", "90"},
             {"Average Win", "0.78%"},
-            {"Average Loss", "-0.40%"},
-            {"Compounding Annual Return", "18.516%"},
+            {"Average Loss", "-0.39%"},
+            {"Compounding Annual Return", "18.547%"},
             {"Drawdown", "4.700%"},
-            {"Expectancy", "1.061"},
-            {"Net Profit", "18.516%"},
-            {"Sharpe Ratio", "1.988"},
+            {"Expectancy", "1.068"},
+            {"Net Profit", "18.547%"},
+            {"Sharpe Ratio", "1.993"},
             {"Loss Rate", "30%"},
             {"Win Rate", "70%"},
-            {"Profit-Loss Ratio", "1.95"},
-            {"Alpha", "0.11"},
-            {"Beta", "3.072"},
+            {"Profit-Loss Ratio", "1.96"},
+            {"Alpha", "0.119"},
+            {"Beta", "2.617"},
             {"Annual Standard Deviation", "0.086"},
             {"Annual Variance", "0.007"},
-            {"Information Ratio", "1.759"},
+            {"Information Ratio", "1.764"},
             {"Tracking Error", "0.086"},
-            {"Treynor Ratio", "0.055"},
-            {"Total Fees", "$251.46"}
+            {"Treynor Ratio", "0.065"},
+            {"Total Fees", "$251.12"}
         };
     }
 }

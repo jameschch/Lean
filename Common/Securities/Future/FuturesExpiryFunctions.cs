@@ -70,6 +70,24 @@ namespace QuantConnect.Securities.Future
                     FuturesExpiryUtilityFunctions.NthLastBusinessDay(time,3)
                 )
             },
+            // Aluminum MW U.S. Transaction Premium Platts (25MT) (AUP): https://www.cmegroup.com/trading/metals/base/aluminum-mw-us-transaction-premium-platts-swap-futures_contract_specifications.html
+            {Futures.Metals.AluminumMWUSTransactionPremiumPlatts25MT, (time =>
+                {
+                    // Trading terminates on the last business day of the contract month.
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Metals.AluminumMWUSTransactionPremiumPlatts25MT, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
             // Indices
             // SP500EMini (ES): http://www.cmegroup.com/trading/equity-index/us-index/e-mini-sandp500_contract_specifications.html
             {Futures.Indices.SP500EMini, (time =>
@@ -95,7 +113,79 @@ namespace QuantConnect.Securities.Future
                     return thirdFriday.Add(new TimeSpan(13,30,0));
                 })
             },
-            // CBOE Volatility Index Futures (VIX)  is not found on cmegroup will discuss and update
+            // Russell2000EMini (RTY): https://www.cmegroup.com/trading/equity-index/us-index/e-mini-russell-2000_contract_specifications.html
+            {Futures.Indices.Russell2000EMini, (time =>
+                {
+                    // Trading can occur up to 9:30 a.m. Eastern Time (ET) on the 3rd Friday of the contract month
+                    var thirdFriday = FuturesExpiryUtilityFunctions.ThirdFriday(time);
+                    return thirdFriday.Add(new TimeSpan (13,30,0));
+                })
+            },
+            // Nikkei225Dollar (NKD): https://www.cmegroup.com/trading/equity-index/international-index/nikkei-225-dollar_contract_specifications.html
+            {Futures.Indices.Nikkei225Dollar, (time =>
+                {
+                    // Trading terminates at 5:00 p.m. Eastern Time (ET) on Business Day prior to 2nd Friday of the contract month.
+                    var secondFriday = FuturesExpiryUtilityFunctions.SecondFriday(time);
+                    var priorBusinessDay = secondFriday.AddDays(-1);
+                    while (!FuturesExpiryUtilityFunctions.NotHoliday(priorBusinessDay))
+                    {
+                        priorBusinessDay = priorBusinessDay.AddDays(-1);
+                    }
+                    return priorBusinessDay.Add(TimeSpan.FromHours(21));
+                })
+            },
+            // CBOE Volatility Index Futures (VIX): https://cfe.cboe.com/cfe-products/vx-cboe-volatility-index-vix-futures/contract-specifications
+            {Futures.Indices.VIX, (time =>
+                {
+                    // Trading can occur up to 9:00 a.m. Eastern Time (ET) on the "Wednesday that is 30 days prior to
+                    // the third Friday of the calendar month immediately following the month in which the contract expires".
+                    var nextThirdFriday = FuturesExpiryUtilityFunctions.ThirdFriday(time.AddMonths(1));
+                    var expiryDate = nextThirdFriday.AddDays(-30);
+                    // If the next third Friday or the Wednesday are holidays, then it is moved to the previous day.
+                    if (USHoliday.Dates.Contains(expiryDate) || USHoliday.Dates.Contains(nextThirdFriday))
+                    {
+                        expiryDate = expiryDate.AddDays(-1);
+                    }
+                    // Trading hours for expiring VX futures contracts end at 8:00 a.m. Chicago time on the final settlement date.
+                    return expiryDate.Add(new TimeSpan(13, 0, 0));
+                })
+            },
+            // Bloomberg Commodity Index (AW): https://www.cmegroup.com/trading/agricultural/commodity-index/bloomberg-commodity-index_contract_specifications.html
+            {Futures.Indices.BloombergCommodityIndex, (time =>
+                {
+                    // 3rd Wednesday of the contract month/ 1:30pm
+                    var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Indices.BloombergCommodityIndex, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+                    
+                    while (holidays.Contains(thirdWednesday))
+                    {
+                        thirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday, -1);
+                    }
+
+                    return thirdWednesday.Add(new TimeSpan(18, 30, 0));
+                })
+            },
+            // E-mini Nasdaq-100 Biotechnology Index (BIO): https://www.cmegroup.com/trading/equity-index/us-index/e-mini-nasdaq-biotechnology_contract_specifications.html
+            {Futures.Indices.NASDAQ100BiotechnologyEMini, (time =>
+                {
+                    // Trading can occur up to 9:30 a.m. ET on the 3rd Friday of the contract month
+                    var thirdFriday = FuturesExpiryUtilityFunctions.ThirdFriday(time);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Indices.NASDAQ100BiotechnologyEMini, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(thirdFriday))
+                    {
+                        thirdFriday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdFriday, -1);
+                    }
+
+                    return thirdFriday.Add(new TimeSpan(13, 30, 0));
+                })
+            },
             // Grains And OilSeeds Group
             // Wheat (ZW): http://www.cmegroup.com/trading/agricultural/grain-and-oilseed/wheat_contract_specifications.html
             {Futures.Grains.Wheat, (time =>
@@ -145,7 +235,13 @@ namespace QuantConnect.Securities.Future
                     return FuturesExpiryUtilityFunctions.AddBusinessDays(fifteenth,-1);
                 })
             },
-
+            // Black Sea Corn Financially Settled (Platts) (BCF): https://www.cmegroup.com/trading/agricultural/grain-and-oilseed/black-sea-corn-financially-settled-platts_contract_specifications.html
+            {Futures.Grains.BlackSeaCornFinanciallySettledPlatts, (time =>
+                {
+                    // Trading terminates on the last business day of the contract month which is also a Platts publication date for the price assessment.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
             // Currencies group
             // U.S. Dollar Index Futures is not found on cmegroup will discuss and update
             //  GBP (6B): http://www.cmegroup.com/trading/fx/g10/british-pound_contract_specifications.html
@@ -153,8 +249,8 @@ namespace QuantConnect.Securities.Future
                 {
                     // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
                     var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
-                    var secondBusinessDayPrecedingThridWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
-                    return secondBusinessDayPrecedingThridWednesday.Add(new TimeSpan(14,16,0));
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
                 })
             },
             // CAD (6C): http://www.cmegroup.com/trading/fx/g10/canadian-dollar_contract_specifications.html
@@ -171,8 +267,8 @@ namespace QuantConnect.Securities.Future
                 {
                     // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
                     var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
-                    var secondBusinessDayPrecedingThridWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
-                    return secondBusinessDayPrecedingThridWednesday.Add(new TimeSpan(14,16,0));
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
                 })
             },
             // CHF (6S): http://www.cmegroup.com/trading/fx/g10/swiss-franc_contract_specifications.html
@@ -180,8 +276,8 @@ namespace QuantConnect.Securities.Future
                 {
                     // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
                     var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
-                    var secondBusinessDayPrecedingThridWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
-                    return secondBusinessDayPrecedingThridWednesday.Add(new TimeSpan(14,16,0));
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
                 })
             },
             // EUR (6E): http://www.cmegroup.com/trading/fx/g10/euro-fx_contract_specifications.html
@@ -189,8 +285,8 @@ namespace QuantConnect.Securities.Future
                 {
                     // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
                     var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
-                    var secondBusinessDayPrecedingThridWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
-                    return secondBusinessDayPrecedingThridWednesday.Add(new TimeSpan(14,16,0));
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
                 })
             },
             // AUD (6A): http://www.cmegroup.com/trading/fx/g10/australian-dollar_contract_specifications.html
@@ -198,8 +294,8 @@ namespace QuantConnect.Securities.Future
                 {
                     // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
                     var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
-                    var secondBusinessDayPrecedingThridWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
-                    return secondBusinessDayPrecedingThridWednesday.Add(new TimeSpan(14,16,0));
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
                 })
             },
             // NZD (6N): http://www.cmegroup.com/trading/fx/g10/new-zealand-dollar_contract_specifications.html
@@ -207,11 +303,135 @@ namespace QuantConnect.Securities.Future
                 {
                     // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
                     var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
-                    var secondBusinessDayPrecedingThridWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
-                    return secondBusinessDayPrecedingThridWednesday.Add(new TimeSpan(14,16,0));
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
                 })
             },
+            // RUB (6R): https://www.cmegroup.com/trading/fx/emerging-market/russian-ruble_contract_specifications.html
+            {Futures.Currencies.RUB, (time =>
+                {
+                    // 11:00 a.m. Mosccow time on the fifteenth day of the month, or, if not a business day, on the next business day for the Moscow interbank foreign exchange market.
+                    var fifteenth = new DateTime(time.Year, time.Month, 15);
 
+                    while (!FuturesExpiryUtilityFunctions.NotHoliday(fifteenth))
+                    {
+                        fifteenth = FuturesExpiryUtilityFunctions.AddBusinessDays(fifteenth, 1);
+                    }
+                    return fifteenth.Add(new TimeSpan(08,0,0));
+                })
+            },
+            // BRL (6L): https://www.cmegroup.com/trading/fx/emerging-market/brazilian-real_contract_specifications.html
+            {Futures.Currencies.BRL, (time =>
+                {
+                    // On the last business day of the month, at 9:15 a.m. CT, immediately preceding the contract month, on which the Central Bank of Brazil is scheduled to publish its final end-of-month (EOM), "Commercial exchange rate for Brazilian reais per U.S. dollar for cash delivery" (PTAX rate).
+                    var lastPrecedingBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(time, -1);
+                    var symbolHolidays = MarketHoursDatabase.FromDataFolder().GetEntry("usa", Futures.Currencies.BRL, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (symbolHolidays.Contains(lastPrecedingBusinessDay))
+                    {
+                        lastPrecedingBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastPrecedingBusinessDay, -1);
+                    }
+
+                    return lastPrecedingBusinessDay.Add(new TimeSpan(14,15,0));
+                })
+            },
+            // MXN (6M): https://www.cmegroup.com/trading/fx/emerging-market/mexican-peso_contract_specifications.html
+            {Futures.Currencies.MXN, (time =>
+                {
+                    // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday). 
+                    var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday,-2);
+
+                    var symbolHolidays = MarketHoursDatabase.FromDataFolder().GetEntry("usa", Futures.Currencies.MXN, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    // Columbus Day as per SIFMA holiday schedule
+                    if (symbolHolidays.Contains(secondBusinessDayPrecedingThirdWednesday))
+                    {
+                        secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(secondBusinessDayPrecedingThirdWednesday, -1);
+                    }
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
+                })
+            },
+            // ZAR (6Z): https://www.cmegroup.com/trading/fx/emerging-market/south-african-rand_contract_specifications.html
+            {Futures.Currencies.ZAR, (time =>
+                {
+                    // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday)
+                    var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday, -2);
+
+                    var symbolHolidays = MarketHoursDatabase.FromDataFolder().GetEntry("usa", Futures.Currencies.ZAR, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (symbolHolidays.Contains(secondBusinessDayPrecedingThirdWednesday))
+                    {
+                        secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(secondBusinessDayPrecedingThirdWednesday, -1);
+                    }
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
+                })
+            },
+            // AUD/CAD (ACD): https://www.cmegroup.com/trading/fx/g10/australian-dollar-canadian-dollar_contract_specifications.html
+            {Futures.Currencies.AUDCAD, (time =>
+                {
+                    // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday)
+                    var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday, -2);
+
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Currencies.AUDCAD, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(secondBusinessDayPrecedingThirdWednesday))
+                    {
+                        secondBusinessDayPrecedingThirdWednesday =  FuturesExpiryUtilityFunctions.AddBusinessDays(secondBusinessDayPrecedingThirdWednesday, -1);
+                    }
+
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14,16,0));
+                })
+            },
+            // Australian Dollar/Japanese Yen (AJY): https://www.cmegroup.com/trading/fx/g10/australian-dollar-japanese-yen_contract_specifications.html
+            {Futures.Currencies.AUDJPY, (time =>
+                {
+                    // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
+                    var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday, -2);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Currencies.AUDJPY, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(secondBusinessDayPrecedingThirdWednesday))
+                    {
+                        secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(secondBusinessDayPrecedingThirdWednesday, -1);
+                    }
+
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14, 16, 0));
+                })
+            },
+            // Australian Dollar/New Zealand Dollar (ANE): https://www.cmegroup.com/trading/fx/g10/australian-dollar-new-zealand-dollar_contract_specifications.html
+            {Futures.Currencies.AUDNZD, (time =>
+                {
+                    // 9:16 a.m. Central Time (CT) on the second business day immediately preceding the third Wednesday of the contract month (usually Monday).
+                    var thirdWednesday = FuturesExpiryUtilityFunctions.ThirdWednesday(time);
+                    var secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(thirdWednesday, -2);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Currencies.AUDNZD, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(secondBusinessDayPrecedingThirdWednesday))
+                    {
+                        secondBusinessDayPrecedingThirdWednesday = FuturesExpiryUtilityFunctions.AddBusinessDays(secondBusinessDayPrecedingThirdWednesday, -1);
+                    }
+
+                    return secondBusinessDayPrecedingThirdWednesday.Add(new TimeSpan(14, 16, 0));
+                })
+            },
             // Financials group
             // Y30TreasuryBond (ZB): http://www.cmegroup.com/trading/interest-rates/us-treasury/30-year-us-treasury-bond_contract_specifications.html
             {Futures.Financials.Y30TreasuryBond, (time =>
@@ -250,6 +470,473 @@ namespace QuantConnect.Securities.Future
             // EuroDollar Futures : TODO London bank calendar
 
             // Energies group
+            // Propane Non LDH Mont Belvieu (1S): https://www.cmegroup.com/trading/energy/petrochemicals/propane-non-ldh-mt-belvieu-opis-balmo-swap_contract_specifications.html
+            {Futures.Energies.PropaneNonLDHMontBelvieu, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month (no time specified)
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Argus Propane Far East Index BALMO (22): https://www.cmegroup.com/trading/energy/petrochemicals/argus-propane-far-east-index-balmo-swap-futures_contract_specifications.html
+            {Futures.Energies.ArgusPropaneFarEastIndexBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month. Business days are based on the Singapore Public Holiday calendar.
+                    // TODO: Might need singapore calendar
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mini European 3.5% Fuel Oil Barges FOB Rdam (Platts) (A0D): https://www.cmegroup.com/trading/energy/refined-products/mini-european-35pct-fuel-oil-platts-barges-fob-rdam-swap-futures_contract_specifications.html
+            {Futures.Energies.MiniEuropeanThreePointPercentFiveFuelOilBargesPlatts, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.MiniEuropeanThreePointPercentFiveFuelOilBargesPlatts, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Mini Singapore Fuel Oil 180 cst (Platts) (A0F): https://www.cmegroup.com/trading/energy/refined-products/mini-singapore-fuel-oil-180-cst-platts-swap-futures_contract_specifications.html
+            {Futures.Energies.MiniSingaporeFuelOil180CstPlatts, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    // Special case exists where the last trade occurs on US holiday, but not an exchange holiday (markets closed)
+                    // In order to fix that case, we will start from the last day of the month and go backwards checking if it's a weekday and a holiday
+                    var lastDay = new DateTime(time.Year, time.Month, DateTime.DaysInMonth(time.Year, time.Month)); 
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.MiniSingaporeFuelOil180CstPlatts, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastDay) || !lastDay.IsCommonBusinessDay())
+                    {
+                        lastDay = lastDay.AddDays(-1);
+                    }
+
+                    return lastDay;
+                })
+            },
+            // Gulf Coast ULSD (Platts) Up-Down BALMO Futures (A1L): https://www.cmegroup.com/trading/energy/refined-products/ulsd-up-down-balmo-calendar-swap-futures_contract_specifications.html
+            {Futures.Energies.GulfCoastULSDPlattsUpDownBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Gulf Coast Jet (Platts) Up-Down BALMO Futures (A1M): https://www.cmegroup.com/trading/energy/refined-products/jet-fuel-up-down-balmo-calendar-swap_contract_specifications.html
+            {Futures.Energies.GulfCoastJetPlattsUpDownBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Propane Non-LDH Mont Belvieu (OPIS) Futures (A1R): https://www.cmegroup.com/trading/energy/petrochemicals/propane-non-ldh-mt-belvieu-opis-swap_contract_specifications.html
+            {Futures.Energies.PropaneNonLDHMontBelvieuOPIS, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // European Propane CIF ARA (Argus) BALMO Futures (A32): https://www.cmegroup.com/trading/energy/petrochemicals/european-propane-cif-ara-argus-balmo-swap-futures_contract_specifications.html
+            {Futures.Energies.EuropeanPropaneCIFARAArgusBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Premium Unleaded Gasoline 10 ppm FOB MED (Platts) Futures (A3G): https://www.cmegroup.com/trading/energy/refined-products/premium-unleaded-10-ppm-platts-fob-med-swap_contract_specifications.html
+            {Futures.Energies.PremiumUnleadedGasoline10ppmFOBMEDPlatts, (time => 
+                {
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.PremiumUnleadedGasoline10ppmFOBMEDPlatts, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Argus Propane Far East Index Futures (A7E): 
+            {Futures.Energies.ArgusPropaneFarEastIndex, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Gasoline Euro-bob Oxy NWE Barges (Argus) Crack Spread BALMO Futures (A7I): https://www.cmegroup.com/trading/energy/refined-products/gasoline-euro-bob-oxy-new-barges-crack-spread-balmo-swap-futures_contract_specifications.html
+            {Futures.Energies.GasolineEurobobOxyNWEBargesArgusCrackSpreadBALMO, (time =>
+                {
+                    // Trading ceases on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mont Belvieu Natural Gasoline (OPIS) Futures (A7Q): https://www.cmegroup.com/trading/energy/petrochemicals/mont-belvieu-natural-gasoline-5-decimal-opis-swap_contract_specifications.html
+            {Futures.Energies.MontBelvieuNaturalGasolineOPIS, (time => 
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mont Belvieu Normal Butane (OPIS) BALMO Futures (A8J): https://www.cmegroup.com/trading/energy/petrochemicals/mont-belvieu-normal-butane-opis-balmo-swap_contract_specifications.html
+            {Futures.Energies.MontBelvieuNormalButaneOPISBALMO, (time =>
+                {
+                    // Trading terminates on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Conway Propane (OPIS) Futures (A8K): https://www.cmegroup.com/trading/energy/petrochemicals/conway-propane-opis-swap_contract_specifications.html
+            {Futures.Energies.ConwayPropaneOPIS, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mont Belvieu LDH Propane (OPIS) BALMO Futures (A8O): https://www.cmegroup.com/trading/energy/petrochemicals/mont-belvieu-ldh-propane-opis-balmo-swap-futures_contract_specifications.html
+            {Futures.Energies.MontBelvieuLDHPropaneOPISBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Argus Propane Far East Index vs. European Propane CIF ARA (Argus) Futures (A91): https://www.cmegroup.com/trading/energy/petrochemicals/argus-propane-far-east-index-vs-european-propane-cif-ara-argus-swap-futures_contract_specifications.html
+            {Futures.Energies.ArgusPropaneFarEastIndexVsEuropeanPropaneCIFARAArgus, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.ArgusPropaneFarEastIndexVsEuropeanPropaneCIFARAArgus, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Argus Propane (Saudi Aramco) Futures (A9N): https://www.cmegroup.com/trading/energy/petrochemicals/argus-propane-saudi-aramco-swap-futures_contract_specifications.html
+            {Futures.Energies.ArgusPropaneSaudiAramco, (time =>
+                {
+                    // Trading shall terminate on the last business day of the month prior to the contract month.
+                    // Business days are based on the Singapore Public Holiday Calendar.
+                    // Special case in 2021 where last traded date falls on US Holiday, but not exchange holiday
+                    var previousMonth = time.AddMonths(-1);
+                    var lastDay = new DateTime(previousMonth.Year, previousMonth.Month, DateTime.DaysInMonth(previousMonth.Year, previousMonth.Month));
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.ArgusPropaneSaudiAramco, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (!lastDay.IsCommonBusinessDay() || holidays.Contains(lastDay))
+                    {
+                        lastDay = lastDay.AddDays(-1);
+                    }
+
+                    return lastDay;
+                })
+            },
+            // Group Three ULSD (Platts) vs. NY Harbor ULSD Futures (AA6): https://www.cmegroup.com/trading/energy/refined-products/group-three-ultra-low-sulfur-diesel-ulsd-platts-vs-heating-oil-spread-swap_contract_specifications.html
+            {Futures.Energies.GroupThreeULSDPlattsVsNYHarborULSD, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Group Three Sub-octane Gasoline (Platts) vs. RBOB Futures (AA8): https://www.cmegroup.com/trading/energy/refined-products/group-three-unleaded-gasoline-platts-vs-rbob-spread-swap_contract_specifications.html
+            {Futures.Energies.GroupThreeSuboctaneGasolinePlattsVsRBOB, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Singapore Fuel Oil 180 cst (Platts) BALMO Futures (ABS): https://www.cmegroup.com/trading/energy/refined-products/singapore-180cst-fuel-oil-balmo-swap_contract_specifications.html
+            {Futures.Energies.SingaporeFuelOil180cstPlattsBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Singapore Fuel Oil 380 cst (Platts) BALMO Futures (ABT): https://www.cmegroup.com/trading/energy/refined-products/singapore-380cst-fuel-oil-balmo-swap_contract_specifications.html
+            {Futures.Energies.SingaporeFuelOil380cstPlattsBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mont Belvieu Ethane (OPIS) Futures (AC0): https://www.cmegroup.com/trading/energy/petrochemicals/mont-belvieu-ethane-opis-5-decimals-swap_contract_specifications.html
+            {Futures.Energies.MontBelvieuEthaneOPIS, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mont Belvieu Normal Butane (OPIS) Futures (AD0): https://www.cmegroup.com/trading/energy/petrochemicals/mont-belvieu-normal-butane-5-decimals-swap_contract_specifications.html
+            {Futures.Energies.MontBelvieuNormalButaneOPIS, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month.
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Brent Crude Oil vs. Dubai Crude Oil (Platts) Futures (ADB): https://www.cmegroup.com/trading/energy/crude-oil/brent-dubai-swap-futures_contract_specifications.html
+            {Futures.Energies.BrentCrudeOilVsDubaiCrudeOilPlatts, (time =>
+                {
+                    // Trading shall cease on the last London and Singapore business day of the contract month.
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.BrentCrudeOilVsDubaiCrudeOilPlatts, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Argus LLS vs. WTI (Argus) Trade Month Futures (AE5): https://www.cmegroup.com/trading/energy/crude-oil/argus-lls-vs-wti-argus-trade-month-swap-futures_contract_specifications.html
+            {Futures.Energies.ArgusLLSvsWTIArgusTradeMonth, (time =>
+                {
+                    // Trading shall cease at the close of trading on the last business day that falls on or before the 25th calendar day of the month prior to the contract month. If the 25th calendar day is a weekend or holiday, trading shall cease on the first business day prior to the 25th calendar day. 
+                    var previousMonth = time.AddMonths(-1);
+                    var twentyFifthDay = new DateTime(previousMonth.Year, previousMonth.Month, 25);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.ArgusLLSvsWTIArgusTradeMonth, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+                    
+                    while (!twentyFifthDay.IsCommonBusinessDay() || holidays.Contains(twentyFifthDay))
+                    {
+                        twentyFifthDay = FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifthDay, -1);
+                    }
+
+                    return twentyFifthDay;
+                })
+            },
+            // Singapore Gasoil (Platts) vs. Low Sulphur Gasoil (AGA): https://www.cmegroup.com/trading/energy/refined-products/gasoil-arb-singapore-gasoil-platts-vs-ice-rdam-gasoil-swap_contract_specifications.html
+            {Futures.Energies.SingaporeGasoilPlattsVsLowSulphurGasoilFutures, (time =>
+                {
+                    // Trading ceases on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.SingaporeGasoilPlattsVsLowSulphurGasoilFutures, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+                    
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Los Angeles CARBOB Gasoline (OPIS) vs. RBOB Gasoline (AJL): https://www.cmegroup.com/trading/energy/refined-products/los-angeles-carbob-gasoline-opis-spread-swap_contract_specifications.html
+            {Futures.Energies.LosAngelesCARBOBGasolineOPISvsRBOBGasoline, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Los Angeles Jet (OPIS) vs. NY Harbor ULSD (AJS): https://www.cmegroup.com/trading/energy/refined-products/los-angeles-carbob-gasoline-opis-spread-swap_contract_specifications.html
+            {Futures.Energies.LosAngelesJetOPISvsNYHarborULSD, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Los Angeles CARB Diesel (OPIS) vs. NY Harbor ULSD (AKL): https://www.cmegroup.com/trading/energy/refined-products/los-angeles-carbob-diesel-opis-spread-swap_contract_specifications.html 
+            {Futures.Energies.LosAngelesCARBDieselOPISvsNYHarborULSD, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // European Naphtha (Platts) BALMO (AKZ): https://www.cmegroup.com/trading/energy/refined-products/european-naphtha-balmo-swap_contract_specifications.html
+            {Futures.Energies.EuropeanNaphthaPlattsBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // European Propane CIF ARA (Argus) (APS): https://www.cmegroup.com/trading/energy/petrochemicals/european-propane-cif-ara-argus-swap_contract_specifications.html
+            {Futures.Energies.EuropeanPropaneCIFARAArgus, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.EuropeanPropaneCIFARAArgus, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Mont Belvieu Natural Gasoline (OPIS) BALMO (AR0): https://www.cmegroup.com/trading/energy/petrochemicals/mt-belvieu-natural-gasoline-balmo-swap_contract_specifications.html
+            {Futures.Energies.MontBelvieuNaturalGasolineOPISBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // RBOB Gasoline Crack Spread (ARE): https://www.cmegroup.com/trading/energy/refined-products/rbob-crack-spread-swap-futures_contract_specifications.html
+            {Futures.Energies.RBOBGasolineCrackSpread, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Gulf Coast HSFO (Platts) BALMO (AVZ): https://www.cmegroup.com/trading/energy/refined-products/gulf-coast-3pct-fuel-oil-balmo-swap_contract_specifications.html
+            {Futures.Energies.GulfCoastHSFOPlattsBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Mars (Argus) vs. WTI Trade Month (AYV): https://www.cmegroup.com/trading/energy/crude-oil/mars-crude-oil-argus-vs-wti-trade-month-spread-swap-futures_contract_specifications.html
+            {Futures.Energies.MarsArgusVsWTITradeMonth, (time =>
+                {
+                    // Trading shall cease at the close of trading on the last business day that falls on or before the 25th calendar day of the 
+                    // month prior to the contract month. If the 25th calendar day is a weekend or holiday, trading shall cease on the 
+                    // first business day prior to the 25th calendar day.
+                    var twentyFifthDayPriorMonth = new DateTime(time.Year, time.Month, 25).AddMonths(-1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.MarsArgusVsWTITradeMonth, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (!FuturesExpiryUtilityFunctions.NotHoliday(twentyFifthDayPriorMonth) || holidays.Contains(twentyFifthDayPriorMonth))
+                    {
+                        twentyFifthDayPriorMonth = FuturesExpiryUtilityFunctions.AddBusinessDays(twentyFifthDayPriorMonth, -1);
+                    }
+
+                    return twentyFifthDayPriorMonth;
+                })
+            },
+            // Mars (Argus) vs. WTI Financial (AYX): https://www.cmegroup.com/trading/energy/crude-oil/mars-crude-oil-argus-vs-wti-calendar-spread-swap-futures_contract_specifications.html
+            {Futures.Energies.MarsArgusVsWTIFinancial, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.MarsArgusVsWTIFinancial, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Ethanol T2 FOB Rdam Including Duty (Platts) (AZ1): https://www.cmegroup.com/trading/energy/ethanol/ethanol-platts-t2-fob-rotterdam-including-duty-swap-futures_contract_specifications.html
+            {Futures.Energies.EthanolT2FOBRdamIncludingDutyPlatts, (time =>
+                {
+                    // Trading terminates on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.EthanolT2FOBRdamIncludingDutyPlatts, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Mont Belvieu LDH Propane (OPIS) (B0): https://www.cmegroup.com/trading/energy/petrochemicals/mont-belvieu-propane-5-decimals-swap_contract_specifications.html
+            {Futures.Energies.MontBelvieuLDHPropaneOPIS, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
+            // Gasoline Euro-bob Oxy NWE Barges (Argus) (B7H): https://www.cmegroup.com/trading/energy/refined-products/gasoline-euro-bob-oxy-new-barges-swap-futures_contract_specifications.html
+            {Futures.Energies.GasolineEurobobOxyNWEBargesArgus, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.GasolineEurobobOxyNWEBargesArgus, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // WTI-Brent Financial (BK): https://www.cmegroup.com/trading/energy/crude-oil/wti-brent-ice-calendar-swap-futures_contract_specifications.html
+            {Futures.Energies.WTIBrentFinancial, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.WTIBrentFinancial, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // 3.5% Fuel Oil Barges FOB Rdam (Platts) Crack Spread (1000mt) (BOO): https://www.cmegroup.com/trading/energy/refined-products/35pct-fuel-oil-platts-barges-fob-rdam-crack-spread-1000mt-swap-futures_contract_specifications.html
+            {Futures.Energies.ThreePointFivePercentFuelOilBargesFOBRdamPlattsCrackSpread1000mt, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    var lastBusinessDay = FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                    var holidays = MarketHoursDatabase.FromDataFolder()
+                        .GetEntry("usa", Futures.Energies.ThreePointFivePercentFuelOilBargesFOBRdamPlattsCrackSpread1000mt, SecurityType.Future)
+                        .ExchangeHours
+                        .Holidays;
+
+                    while (holidays.Contains(lastBusinessDay))
+                    {
+                        lastBusinessDay = FuturesExpiryUtilityFunctions.AddBusinessDays(lastBusinessDay, -1);
+                    }
+
+                    return lastBusinessDay;
+                })
+            },
+            // Gasoline Euro-bob Oxy NWE Barges (Argus) BALMO (BR7): https://www.cmegroup.com/trading/energy/refined-products/gasoline-euro-bob-oxy-new-barges-balmo-swap-futures_contract_specifications.html
+            {Futures.Energies.GasolineEurobobOxyNWEBargesArgusBALMO, (time =>
+                {
+                    // Trading shall cease on the last business day of the contract month
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(time, 1);
+                })
+            },
             // CrudeOilWTI (CL): http://www.cmegroup.com/trading/energy/crude-oil/light-sweet-crude_contract_specifications.html
             {Futures.Energies.CrudeOilWTI, (time =>
                 {
@@ -349,6 +1036,14 @@ namespace QuantConnect.Securities.Future
                         lastThursday = lastThursday.AddDays(-7);
                     }
                     return lastThursday;
+                })
+            },
+            // Sugar #11 CME (YO): https://www.cmegroup.com/trading/agricultural/softs/sugar-no11_contract_specifications.html
+            {Futures.Softs.Sugar11CME, (time =>
+                {
+                    // Trading terminates on the day immediately preceding the first notice day of the corresponding trading month of Sugar No. 11 futures at ICE Futures U.S.
+                    var precedingMonth = time.AddMonths(-1);
+                    return FuturesExpiryUtilityFunctions.NthLastBusinessDay(precedingMonth, 1);
                 })
             }
         };

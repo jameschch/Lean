@@ -13,41 +13,59 @@
  * limitations under the License.
 */
 
+using System;
+using QuantConnect.Securities;
+
 namespace QuantConnect.Orders.Fees
 {
     /// <summary>
-    /// Provides an implementation of <see cref="IFeeModel"/> that models GDAX order fees
+    /// Provides an implementation of <see cref="FeeModel"/> that models GDAX order fees
     /// </summary>
-    public class GDAXFeeModel : IFeeModel
+    public class GDAXFeeModel : FeeModel
     {
         /// <summary>
-        /// Tier 1 taker fees
-        /// https://www.gdax.com/fees
+        /// Get the fee for this order in quote currency
         /// </summary>
-        public const decimal TakerFee = 0.003m;
-
-        /// <summary>
-        /// Get the fee for this order in units of the account currency
-        /// </summary>
-        /// <param name="security">The security matching the order</param>
-        /// <param name="order">The order to compute fees for</param>
-        /// <returns>The cost of the order in units of the account currency</returns>
-        public decimal GetOrderFee(Securities.Security security, Order order)
+        /// <param name="parameters">A <see cref="OrderFeeParameters"/> object
+        /// containing the security and order</param>
+        /// <returns>The cost of the order in quote currency</returns>
+        public override OrderFee GetOrderFee(OrderFeeParameters parameters)
         {
-            // marketable limit orders are considered takers
-            if (order.Type == OrderType.Limit && !order.IsMarketable)
-            {
-                // limit order posted to the order book, 0% maker fee
-                return 0m;
-            }
+            var order = parameters.Order;
+            var security = parameters.Security;
 
-            // get order value in account currency, then apply taker fee factor
+            // marketable limit orders are considered takers
+            var isMaker = order.Type == OrderType.Limit && !order.IsMarketable;
+
+            var feePercentage = GetFeePercentage(order.Time, isMaker);
+
+            // get order value in quote currency, then apply maker/taker fee factor
             var unitPrice = order.Direction == OrderDirection.Buy ? security.AskPrice : security.BidPrice;
-            unitPrice *= security.QuoteCurrency.ConversionRate * security.SymbolProperties.ContractMultiplier;
+            unitPrice *= security.SymbolProperties.ContractMultiplier;
 
             // currently we do not model 30-day volume, so we use the first tier
 
-            return unitPrice * order.AbsoluteQuantity * TakerFee;
+            var fee = unitPrice * order.AbsoluteQuantity * feePercentage;
+
+            return new OrderFee(new CashAmount(fee, security.QuoteCurrency.Symbol));
+        }
+
+        /// <summary>
+        /// Returns the maker/taker fee percentage effective at the requested date.
+        /// </summary>
+        /// <param name="utcTime">The date/time requested (UTC)</param>
+        /// <param name="isMaker">true if the maker percentage fee is requested, false otherwise</param>
+        /// <returns>The fee percentage effective at the requested date</returns>
+        public static decimal GetFeePercentage(DateTime utcTime, bool isMaker)
+        {
+            // Tier 1 fees
+            // https://pro.coinbase.com/orders/fees
+            // https://blog.coinbase.com/coinbase-pro-market-structure-update-fbd9d49f43d7
+
+            if (utcTime < new DateTime(2019, 3, 23, 1, 30, 0))
+                return isMaker ? 0m : 0.003m;
+
+            return isMaker ? 0.0015m : 0.0025m;
         }
     }
 }

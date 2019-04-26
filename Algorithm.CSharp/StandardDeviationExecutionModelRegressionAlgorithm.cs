@@ -15,12 +15,12 @@
 */
 
 using System.Collections.Generic;
-using QuantConnect.Algorithm.Framework;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Execution;
 using QuantConnect.Algorithm.Framework.Portfolio;
 using QuantConnect.Algorithm.Framework.Selection;
 using QuantConnect.Orders;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -29,7 +29,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// This algorithm shows how the execution model works to split up orders and submit them only when
     /// the price is 2 standard deviations from the 60min mean (default model settings).
     /// </summary>
-    public class StandardDeviationExecutionModelRegressionAlgorithm : QCAlgorithmFramework, IRegressionAlgorithmDefinition
+    public class StandardDeviationExecutionModelRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         public override void Initialize()
         {
@@ -58,6 +58,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -67,37 +72,37 @@ namespace QuantConnect.Algorithm.CSharp
         /// </summary>
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
-            {"Total Trades", "122"},
+            {"Total Trades", "183"},
             {"Average Win", "0.04%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "2404.970%"},
-            {"Drawdown", "0.600%"},
+            {"Compounding Annual Return", "1438.588%"},
+            {"Drawdown", "0.500%"},
             {"Expectancy", "0"},
-            {"Net Profit", "4.204%"},
-            {"Sharpe Ratio", "11.737"},
+            {"Net Profit", "3.557%"},
+            {"Sharpe Ratio", "10.031"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
             {"Alpha", "0"},
-            {"Beta", "189.924"},
-            {"Annual Standard Deviation", "0.179"},
-            {"Annual Variance", "0.032"},
-            {"Information Ratio", "11.686"},
-            {"Tracking Error", "0.178"},
+            {"Beta", "161.24"},
+            {"Annual Standard Deviation", "0.177"},
+            {"Annual Variance", "0.031"},
+            {"Information Ratio", "9.976"},
+            {"Tracking Error", "0.177"},
             {"Treynor Ratio", "0.011"},
-            {"Total Fees", "$142.50"},
+            {"Total Fees", "$230.20"},
             {"Total Insights Generated", "5"},
             {"Total Insights Closed", "3"},
-            {"Total Insights Analysis Completed", "0"},
+            {"Total Insights Analysis Completed", "3"},
             {"Long Insight Count", "3"},
             {"Short Insight Count", "2"},
             {"Long/Short Ratio", "150.0%"},
-            {"Estimated Monthly Alpha Value", "$820507.2530"},
-            {"Total Accumulated Estimated Alpha Value", "$132192.8352"},
-            {"Mean Population Estimated Insight Value", "$44064.2784"},
-            {"Mean Population Direction", "0%"},
+            {"Estimated Monthly Alpha Value", "$799818.3566"},
+            {"Total Accumulated Estimated Alpha Value", "$128859.6241"},
+            {"Mean Population Estimated Insight Value", "$42953.2080"},
+            {"Mean Population Direction", "100%"},
             {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0%"},
+            {"Rolling Averaged Population Direction", "100%"},
             {"Rolling Averaged Population Magnitude", "0%"}
         };
     }

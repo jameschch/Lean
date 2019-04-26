@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -20,6 +20,7 @@ using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Util;
+using QuantConnect.Interfaces;
 
 // ReSharper disable InvokeAsExtensionMethod -- .net 4.7.2 added ToHashSet and it looks like our version of mono has it as well causing ambiguity in the cloud
 
@@ -33,6 +34,7 @@ namespace QuantConnect.Algorithm.CSharp
         private readonly HashSet<Symbol> _expectedSecurities = new HashSet<Symbol>();
         private readonly HashSet<Symbol> _expectedData = new HashSet<Symbol>();
         private readonly HashSet<Symbol> _expectedUniverses = new HashSet<Symbol>();
+        private bool _expectUniverseSubscription;
 
         // order of expected contract additions as price moves
         private int _expectedContractIndex;
@@ -60,6 +62,12 @@ namespace QuantConnect.Algorithm.CSharp
         public override void OnData(Slice data)
         {
             // verify expectations
+            if (SubscriptionManager.Subscriptions.Count(x => x.Symbol == OptionChainSymbol)
+                != (_expectUniverseSubscription ? 1 : 0))
+            {
+                Log($"SubscriptionManager.Subscriptions:  {string.Join(" -- ", SubscriptionManager.Subscriptions)}");
+                throw new Exception($"Unexpected {OptionChainSymbol} subscription presence");
+            }
             if (!data.ContainsKey(Underlying))
             {
                 // TODO : In fact, we're unable to properly detect whether or not we auto-added or it was manually added
@@ -110,6 +118,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 _expectedSecurities.Add(OptionChainSymbol);
                 _expectedUniverses.Add(OptionChainSymbol);
+                _expectUniverseSubscription = true;
             }
 
             // 11:30AM remove GOOG option chain
@@ -120,6 +129,8 @@ namespace QuantConnect.Algorithm.CSharp
                 _expectedData.RemoveWhere(s => _expectedContracts.Contains(s));
                 // remove option chain universe from expected universes
                 _expectedUniverses.Remove(OptionChainSymbol);
+                // OptionChainSymbol universe subscription should not be present
+                _expectUniverseSubscription = false;
             }
         }
 
@@ -185,6 +196,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp };
@@ -197,10 +213,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "6"},
             {"Average Win", "0%"},
             {"Average Loss", "-0.21%"},
-            {"Compounding Annual Return", "-96.657%"},
+            {"Compounding Annual Return", "-98.595%"},
             {"Drawdown", "0.600%"},
             {"Expectancy", "-1"},
-            {"Net Profit", "-0.626%"},
+            {"Net Profit", "-0.631%"},
             {"Sharpe Ratio", "0"},
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
@@ -212,7 +228,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$1.50"},
+            {"Total Fees", "$6.00"}
         };
     }
 }

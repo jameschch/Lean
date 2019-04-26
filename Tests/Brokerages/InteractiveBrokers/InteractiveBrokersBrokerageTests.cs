@@ -27,6 +27,8 @@ using QuantConnect.Data.Market;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
+using QuantConnect.Tests.Engine;
+using QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests;
 
 namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
 {
@@ -52,9 +54,22 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
 
             // grabs account info from configuration
             var securityProvider = new SecurityProvider();
-            securityProvider[Symbols.USDJPY] = new Security(SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
-                new SubscriptionDataConfig(typeof(TradeBar), Symbols.USDJPY, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, false, false, false),
-                new Cash(CashBook.AccountCurrency, 0, 1m), SymbolProperties.GetDefault(CashBook.AccountCurrency));
+            securityProvider[Symbols.USDJPY] = new Security(
+                SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
+                new SubscriptionDataConfig(
+                    typeof(TradeBar),
+                    Symbols.USDJPY,
+                    Resolution.Minute,
+                    TimeZones.NewYork,
+                    TimeZones.NewYork,
+                    false,
+                    false,
+                    false
+                ),
+                new Cash(Currencies.USD, 0, 1m),
+                SymbolProperties.GetDefault(Currencies.USD),
+                ErrorCurrencyConverter.Instance
+            );
 
             _interactiveBrokersBrokerage = new InteractiveBrokersBrokerage(new QCAlgorithm(), new OrderProvider(_orders), securityProvider);
             _interactiveBrokersBrokerage.Connect();
@@ -117,6 +132,7 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
 
                 _interactiveBrokersBrokerage.Dispose();
                 _interactiveBrokersBrokerage = null;
+                _orders.Clear();
             }
             finally
             {
@@ -507,13 +523,13 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
         {
             var ib = _interactiveBrokersBrokerage;
             var cashBalance = ib.GetCashBalance();
-            Assert.IsTrue(cashBalance.Any(x => x.Symbol == "USD"));
+            Assert.IsTrue(cashBalance.Any(x => x.Currency == Currencies.USD));
             foreach (var cash in cashBalance)
             {
                 Console.WriteLine(cash);
-                if (cash.Symbol == "USD")
+                if (cash.Currency == Currencies.USD)
                 {
-                    Assert.AreNotEqual(0m, cashBalance.Single(x => x.Symbol == "USD"));
+                    Assert.AreNotEqual(0m, cashBalance.Single(x => x.Currency == Currencies.USD));
                 }
             }
         }
@@ -547,10 +563,10 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
                 _orders.Add(order);
                 ib.PlaceOrder(order);
 
-                orderEventFired.WaitOneAssertFail(1500, "Didnt receive order event #" + i);
+                orderEventFired.WaitOneAssertFail(3000, "Didnt receive order event #" + i);
                 orderEventFired.Reset();
 
-                accountChangedFired.WaitOneAssertFail(1500, "Didnt receive account event #" + i);
+                accountChangedFired.WaitOneAssertFail(3000, "Didnt receive account event #" + i);
                 accountChangedFired.Reset();
             }
 
@@ -562,7 +578,7 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
         {
             var ib = _interactiveBrokersBrokerage;
 
-            decimal balance = ib.GetCashBalance().Single(x => x.Symbol == "USD").Amount;
+            decimal balance = ib.GetCashBalance().Single(x => x.Currency == Currencies.USD).Amount;
 
             // wait for our order to fill
             var manualResetEvent = new ManualResetEvent(false);
@@ -572,9 +588,9 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
             _orders.Add(order);
             ib.PlaceOrder(order);
 
-            manualResetEvent.WaitOneAssertFail(1500, "Didn't receive account changed event");
+            manualResetEvent.WaitOneAssertFail(3000, "Didn't receive account changed event");
 
-            decimal balanceAfterTrade = ib.GetCashBalance().Single(x => x.Symbol == "USD").Amount;
+            decimal balanceAfterTrade = ib.GetCashBalance().Single(x => x.Currency == Currencies.USD).Amount;
 
             Assert.AreNotEqual(balance, balanceAfterTrade);
         }
@@ -696,6 +712,55 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
             Assert.IsTrue(ib.IsConnected);
         }
 
+        [Test]
+        public void DoesNotLoopEndlesslyIfGetCashBalanceAlwaysThrows()
+        {
+            var ib = _interactiveBrokersBrokerage;
+            Assert.IsTrue(ib.IsConnected);
+
+            ib.Disconnect();
+            Assert.IsFalse(ib.IsConnected);
+
+            var algorithm = new QCAlgorithm();
+            var marketHoursDatabase = MarketHoursDatabase.FromDataFolder();
+            var symbolPropertiesDataBase = SymbolPropertiesDatabase.FromDataFolder();
+            var securityService = new SecurityService(algorithm.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, algorithm);
+            algorithm.Securities.SetSecurityService(securityService);
+            algorithm.SetLiveMode(true);
+
+            var transactionHandler = new BrokerageTransactionHandlerTests.TestBrokerageTransactionHandler();
+            transactionHandler.Initialize(algorithm, ib, new TestResultHandler());
+
+            // Advance current time UTC so cash sync is performed
+            transactionHandler.TestCurrentTimeUtc = transactionHandler.TestCurrentTimeUtc.AddDays(2);
+
+            // simulate connect always failing
+            EventHandler handler = (s, e) => ib.Client.ClientSocket.Close();
+            ib.Client.ConnectAck += handler;
+
+            try
+            {
+                while (true)
+                {
+                    transactionHandler.ProcessSynchronousEvents();
+
+                    Assert.IsFalse(ib.IsConnected);
+
+                    Thread.Sleep(1000);
+                }
+            }
+            catch (Exception exception)
+            {
+                // expect exception from ProcessSynchronousEvents when max attempts reached
+                Assert.That(exception.Message.Contains("maximum number of attempts"));
+            }
+
+            // perform clean connect so the test can complete Teardown without exceptions
+            ib.Client.ConnectAck -= handler;
+            ib.Connect();
+            Assert.IsTrue(ib.IsConnected);
+        }
+
         private static Order AssertOrderOpened(bool orderFilled, InteractiveBrokersBrokerage ib, Order order)
         {
             // if the order didn't fill check for it as an open order
@@ -715,6 +780,5 @@ namespace QuantConnect.Tests.Brokerages.InteractiveBrokers
             Assert.Pass("The order was successfully filled!");
             return null;
         }
-
     }
 }

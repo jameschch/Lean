@@ -17,13 +17,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using QuantConnect.Algorithm.Framework;
+using QuantConnect.Algorithm;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Portfolio;
 using QuantConnect.Algorithm.Framework.Selection;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Tests.Common.Securities;
+using QuantConnect.Tests.Engine.DataFeeds;
 
 namespace QuantConnect.Tests.Algorithm.Framework
 {
@@ -34,7 +35,8 @@ namespace QuantConnect.Tests.Algorithm.Framework
         public void SetsInsightGeneratedAndCloseTimes()
         {
             var eventFired = false;
-            var algo = new QCAlgorithmFramework();
+            var algo = new QCAlgorithm();
+            algo.SubscriptionManager.SetDataManager(new DataManagerStub(algo));
             algo.Transactions.SetOrderProcessor(new FakeOrderProcessor());
             algo.InsightsGenerated += (algorithm, data) =>
             {
@@ -44,8 +46,8 @@ namespace QuantConnect.Tests.Algorithm.Framework
                 Assert.IsTrue(insights.All(insight => insight.GeneratedTimeUtc != default(DateTime)));
                 Assert.IsTrue(insights.All(insight => insight.CloseTimeUtc != default(DateTime)));
             };
-            algo.AddEquity("SPY");
-            algo.SetUniverseSelection(new ManualUniverseSelectionModel(algo.Securities.Keys));
+            var security = algo.AddEquity("SPY");
+            algo.SetUniverseSelection(new ManualUniverseSelectionModel());
 
             var alpha = new FakeAlpha();
             algo.SetAlpha(alpha);
@@ -53,12 +55,15 @@ namespace QuantConnect.Tests.Algorithm.Framework
             var construction = new FakePortfolioConstruction();
             algo.SetPortfolioConstruction(construction);
 
-            algo.OnFrameworkData(new Slice(new DateTime(2000, 01, 01), algo.Securities.Select(s => new Tick
+            var tick = new Tick
             {
-                Symbol = s.Key,
+                Symbol = security.Symbol,
                 Value = 1,
                 Quantity = 2
-            })));
+            };
+            security.SetMarketPrice(tick);
+
+            algo.OnFrameworkData(new Slice(new DateTime(2000, 01, 01), algo.Securities.Select(s => tick)));
 
             Assert.IsTrue(eventFired);
             Assert.AreEqual(1, construction.Insights.Count);
@@ -68,7 +73,7 @@ namespace QuantConnect.Tests.Algorithm.Framework
 
         class FakeAlpha : AlphaModel
         {
-            public override IEnumerable<Insight> Update(QCAlgorithmFramework algorithm, Slice data)
+            public override IEnumerable<Insight> Update(QCAlgorithm algorithm, Slice data)
             {
                 yield return Insight.Price(Symbols.SPY, TimeSpan.FromDays(1), InsightDirection.Up, .5, .75);
             }
@@ -77,7 +82,7 @@ namespace QuantConnect.Tests.Algorithm.Framework
         class FakePortfolioConstruction : PortfolioConstructionModel
         {
             public IReadOnlyCollection<Insight> Insights { get; private set; }
-            public override IEnumerable<IPortfolioTarget> CreateTargets(QCAlgorithmFramework algorithm, Insight[] insights)
+            public override IEnumerable<IPortfolioTarget> CreateTargets(QCAlgorithm algorithm, Insight[] insights)
             {
                 Insights = insights;
                 return insights.Select(insight => PortfolioTarget.Percent(algorithm, insight.Symbol, 0.01m));

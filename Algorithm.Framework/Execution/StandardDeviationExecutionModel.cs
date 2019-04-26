@@ -22,6 +22,7 @@ using QuantConnect.Data.Consolidators;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Indicators;
 using QuantConnect.Securities;
+using QuantConnect.Orders;
 
 namespace QuantConnect.Algorithm.Framework.Execution
 {
@@ -69,7 +70,7 @@ namespace QuantConnect.Algorithm.Framework.Execution
         /// </summary>
         /// <param name="algorithm">The algorithm instance</param>
         /// <param name="targets">The portfolio targets</param>
-        public override void Execute(QCAlgorithmFramework algorithm, IPortfolioTarget[] targets)
+        public override void Execute(QCAlgorithm algorithm, IPortfolioTarget[] targets)
         {
             _targetsCollection.AddRange(targets);
 
@@ -83,12 +84,6 @@ namespace QuantConnect.Algorithm.Framework.Execution
                 // fetch our symbol data containing our STD/SMA indicators
                 SymbolData data;
                 if (!_symbolData.TryGetValue(symbol, out data))
-                {
-                    continue;
-                }
-
-                // ensure we're receiving price data before submitting orders
-                if (data.Security.Price == 0m)
                 {
                     continue;
                 }
@@ -107,14 +102,9 @@ namespace QuantConnect.Algorithm.Framework.Execution
                         algorithm.MarketOrder(symbol, Math.Sign(unorderedQuantity) * orderSize);
                     }
                 }
-
-                // check to see if we're done with this target
-                unorderedQuantity = OrderSizing.GetUnorderedQuantity(algorithm, target);
-                if (unorderedQuantity == 0m)
-                {
-                    _targetsCollection.Remove(target.Symbol);
-                }
             }
+
+            _targetsCollection.ClearFulfilled(algorithm);
         }
 
         /// <summary>
@@ -122,29 +112,15 @@ namespace QuantConnect.Algorithm.Framework.Execution
         /// </summary>
         /// <param name="algorithm">The algorithm instance that experienced the change in securities</param>
         /// <param name="changes">The security additions and removals from the algorithm</param>
-        public override void OnSecuritiesChanged(QCAlgorithmFramework algorithm, SecurityChanges changes)
+        public override void OnSecuritiesChanged(QCAlgorithm algorithm, SecurityChanges changes)
         {
-            var addedSymbols = new List<Symbol>();
             foreach (var added in changes.AddedSecurities)
             {
                 // initialize new securities
                 if (!_symbolData.ContainsKey(added.Symbol))
                 {
-                    var symbolData = new SymbolData(algorithm, added, _period, _resolution);
-                    addedSymbols.Add(added.Symbol);
-                    _symbolData[added.Symbol] = symbolData;
+                    _symbolData[added.Symbol] = new SymbolData(algorithm, added, _period, _resolution);
                 }
-            }
-
-            if (addedSymbols.Count > 0)
-            {
-                // warmup our indicators by pushing history through the consolidators
-                algorithm.History(addedSymbols, _period, _resolution)
-                    .PushThroughConsolidators(symbol =>
-                    {
-                        SymbolData data;
-                        return _symbolData.TryGetValue(symbol, out data) ? data.Consolidator : null;
-                    });
             }
 
             foreach (var removed in changes.RemovedSecurities)
@@ -169,28 +145,15 @@ namespace QuantConnect.Algorithm.Framework.Execution
         protected virtual bool PriceIsFavorable(SymbolData data, decimal unorderedQuantity)
         {
             var deviations = _deviations * data.STD;
-            if (unorderedQuantity > 0)
-            {
-                if (data.Security.BidPrice < data.SMA - deviations)
-                {
-                    return true;
-                }
-            }
-            else
-            {
-                if (data.Security.AskPrice > data.SMA + deviations)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return unorderedQuantity > 0
+                ? data.Security.BidPrice < data.SMA - deviations
+                : data.Security.AskPrice > data.SMA + deviations;
         }
 
         /// <summary>
         /// Determines if it's safe to remove the associated symbol data
         /// </summary>
-        protected virtual bool IsSafeToRemove(QCAlgorithmFramework algorithm, Symbol symbol)
+        protected virtual bool IsSafeToRemove(QCAlgorithm algorithm, Symbol symbol)
         {
             // confirm the security isn't currently a member of any universe
             return !algorithm.UniverseManager.Any(kvp => kvp.Value.ContainsMember(symbol));
@@ -203,21 +166,25 @@ namespace QuantConnect.Algorithm.Framework.Execution
             public SimpleMovingAverage SMA { get; }
             public IDataConsolidator Consolidator { get; }
 
-            public SymbolData(QCAlgorithmFramework algorithm, Security security, int period, Resolution resolution)
+            public SymbolData(QCAlgorithm algorithm, Security security, int period, Resolution resolution)
             {
                 Security = security;
                 Consolidator = algorithm.ResolveConsolidator(security.Symbol, resolution);
+
                 var smaName = algorithm.CreateIndicatorName(security.Symbol, "SMA" + period, resolution);
                 SMA = new SimpleMovingAverage(smaName, period);
+                algorithm.RegisterIndicator(security.Symbol, SMA, Consolidator);
+
                 var stdName = algorithm.CreateIndicatorName(security.Symbol, "STD" + period, resolution);
                 STD = new StandardDeviation(stdName, period);
+                algorithm.RegisterIndicator(security.Symbol, STD, Consolidator);
 
-                algorithm.SubscriptionManager.AddConsolidator(security.Symbol, Consolidator);
-                Consolidator.DataConsolidated += (sender, consolidated) =>
+                // warmup our indicators by pushing history through the indicators
+                foreach (var bar in algorithm.History(Security.Symbol, period, resolution))
                 {
-                    SMA.Update(consolidated.EndTime, consolidated.Value);
-                    STD.Update(consolidated.EndTime, consolidated.Value);
-                };
+                    SMA.Update(bar.EndTime, bar.Value);
+                    STD.Update(bar.EndTime, bar.Value);
+                }
             }
         }
     }

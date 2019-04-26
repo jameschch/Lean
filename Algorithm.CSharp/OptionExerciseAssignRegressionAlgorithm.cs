@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -20,7 +20,7 @@ using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
 using QuantConnect.Orders;
-using QuantConnect.Securities;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -108,6 +108,11 @@ namespace QuantConnect.Algorithm.CSharp
         }
 
         /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
+
+        /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
         /// </summary>
         public Language[] Languages { get; } = { Language.CSharp, Language.Python };
@@ -120,10 +125,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "4"},
             {"Average Win", "0.30%"},
             {"Average Loss", "-0.33%"},
-            {"Compounding Annual Return", "-85.023%"},
+            {"Compounding Annual Return", "-85.144%"},
             {"Drawdown", "0.400%"},
             {"Expectancy", "-0.358"},
-            {"Net Profit", "-0.350%"},
+            {"Net Profit", "-0.352%"},
             {"Sharpe Ratio", "0"},
             {"Loss Rate", "67%"},
             {"Win Rate", "33%"},
@@ -135,7 +140,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "0"},
             {"Tracking Error", "0"},
             {"Treynor Ratio", "0"},
-            {"Total Fees", "$0.50"},
+            {"Total Fees", "$2.00"}
         };
     }
 }

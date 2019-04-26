@@ -15,7 +15,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using QuantConnect.Data;
+using QuantConnect.Interfaces;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -47,8 +49,21 @@ namespace QuantConnect.Algorithm.CSharp
         /// <param name="data">Slice object keyed by symbol containing the stock data</param>
         public override void OnData(Slice data)
         {
+            if (_added)
+            {
+                var eurUsdSubscription = SubscriptionManager.Subscriptions.Single(x => x.Symbol.Value == "EURUSD");
+                if (eurUsdSubscription.IsInternalFeed)
+                {
+                    throw new Exception("Unexpected internal 'EURUSD' Subscription");
+                }
+            }
             if (!_added)
             {
+                var eurUsdSubscription = SubscriptionManager.Subscriptions.Single(x => x.Symbol.Value == "EURUSD");
+                if (!eurUsdSubscription.IsInternalFeed)
+                {
+                    throw new Exception("Unexpected not internal 'EURUSD' Subscription");
+                }
                 var eurusd = AddForex("EURUSD", Resolution.Daily);
                 _dataPointsPerSymbol.Add(eurusd.Symbol, 0);
 
@@ -72,8 +87,12 @@ namespace QuantConnect.Algorithm.CSharp
             // EURUSD has one less data point, because it was added on the first time step instead of during Initialize
             var expectedDataPointsPerSymbol = new Dictionary<string, int>
             {
+                // normal feed
                 { "EURGBP", 3 },
-                { "EURUSD", 2 }
+                // internal feed on the first day, normal feed on the other two days
+                { "EURUSD", 2 },
+                // internal feed only
+                { "GBPUSD", 0 }
             };
 
             foreach (var kvp in _dataPointsPerSymbol)
@@ -84,10 +103,15 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (actualDataPoints != expectedDataPointsPerSymbol[symbol.Value])
                 {
-                    throw new Exception($"Data point count mismatch for symbol {symbol.Value}: expected: {expectedDataPointsPerSymbol}, actual: {actualDataPoints}");
+                    throw new Exception($"Data point count mismatch for symbol {symbol.Value}: expected: {expectedDataPointsPerSymbol[symbol.Value]}, actual: {actualDataPoints}");
                 }
             }
         }
+
+        /// <summary>
+        /// This is used by the regression test system to indicate if the open source Lean repository has the required data to run this algorithm.
+        /// </summary>
+        public bool CanRunLocally { get; } = true;
 
         /// <summary>
         /// This is used by the regression test system to indicate which languages this algorithm is written in.
