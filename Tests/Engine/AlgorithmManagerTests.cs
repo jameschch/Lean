@@ -61,7 +61,8 @@ namespace QuantConnect.Tests.Engine
                     new SecurityService(algorithm.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, algorithm)),
                 algorithm,
                 algorithm.TimeKeeper,
-                marketHoursDatabase);
+                marketHoursDatabase,
+                false);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
             var transactions = new BacktestingTransactionHandler();
             var results = new BacktestingResultHandler();
@@ -374,6 +375,8 @@ namespace QuantConnect.Tests.Engine
             {
                 throw new NotImplementedException();
             }
+
+            public event EventHandler<OrderEvent> NewOrderEvent;
         }
 
         class NullSynchronizer : ISynchronizer

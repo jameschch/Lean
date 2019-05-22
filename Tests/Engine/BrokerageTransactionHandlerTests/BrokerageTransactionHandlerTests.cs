@@ -17,6 +17,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Moq;
 using NodaTime;
 using NUnit.Framework;
@@ -57,7 +58,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void OrderQuantityIsFlooredToNearestMultipleOfLotSizeWhenLongOrderIsRounded()
         {
             //Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates the order
@@ -86,7 +87,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void OrderQuantityIsCeiledToNearestMultipleOfLotSizeWhenShortOrderIsRounded()
         {
             //Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates the order
@@ -115,7 +116,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void OrderIsNotPlacedWhenOrderIsLowerThanLotSize()
         {
             //Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates the order
@@ -142,7 +143,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void LimitOrderPriceIsRounded()
         {
             //Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates the order
@@ -175,7 +176,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void StopMarketOrderPriceIsRounded()
         {
             //Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates the order
@@ -328,7 +329,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void InvalidUpdateOrderRequestShouldNotInvalidateOrder()
         {
             // Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
             _algorithm.SetBrokerageModel(new TestBrokerageModel());
             // Creates a limit order
@@ -369,7 +370,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void UpdateOrderRequestShouldWork()
         {
             // Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates a limit order
@@ -408,7 +409,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void UpdateOrderRequestShouldFailForFilledOrder()
         {
             // Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             var broker = new BacktestingBrokerage(_algorithm);
             transactionHandler.Initialize(_algorithm, broker, new BacktestingResultHandler());
 
@@ -670,7 +671,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void UpdateOrderRequestShouldFailForInvalidOrderId()
         {
             // Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             var updateRequest = new UpdateOrderRequest(DateTime.Now, -10, new UpdateOrderFields());
@@ -685,7 +686,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void GetOpenOrdersWorksForSubmittedFilledStatus()
         {
             // Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             var broker = new BacktestingBrokerage(_algorithm);
             transactionHandler.Initialize(_algorithm, broker, new BacktestingResultHandler());
 
@@ -718,7 +719,7 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
         public void GetOpenOrdersWorksForCancelPendingCanceledStatus()
         {
             // Initializes the transaction handler
-            var transactionHandler = new BrokerageTransactionHandler();
+            var transactionHandler = new TestBrokerageTransactionHandler();
             transactionHandler.Initialize(_algorithm, new BacktestingBrokerage(_algorithm), new BacktestingResultHandler());
 
             // Creates a limit order
@@ -884,6 +885,66 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
             }
         }
 
+        [Test]
+        public void AddOrderWaitsForOrderToBeProcessed()
+        {
+            var algorithm = new QCAlgorithm();
+            algorithm.SubscriptionManager.SetDataManager(new DataManagerStub(algorithm));
+
+            var security = algorithm.AddSecurity(SecurityType.Equity, "SPY");
+            security.SetMarketPrice(new Tick { Value = 150 });
+            algorithm.SetFinishedWarmingUp();
+
+            var transactionHandler = new BrokerageTransactionHandler();
+            transactionHandler.Initialize(algorithm, new BacktestingBrokerage(algorithm), new BacktestingResultHandler());
+            // lets wait until the transactionHandler starts running
+            Thread.Sleep(250);
+
+            algorithm.Transactions.SetOrderProcessor(transactionHandler);
+
+            var ticket = algorithm.LimitOrder(security.Symbol, 1, 100);
+
+            var openOrders = algorithm.Transactions.GetOpenOrders();
+
+            transactionHandler.Exit();
+
+            Assert.AreEqual(1, openOrders.Count);
+            Assert.IsTrue(ticket.HasOrder);
+        }
+
+        [Test]
+        public void FillMessageIsAddedToOrderTag()
+        {
+            // Initializes the transaction handler
+            var transactionHandler = new BrokerageTransactionHandler();
+            var brokerage = new BacktestingBrokerage(_algorithm);
+            transactionHandler.Initialize(_algorithm, brokerage, new BacktestingResultHandler());
+
+            // Creates a market order
+            var security = _algorithm.Securities[Ticker];
+            var price = 1.12m;
+            security.SetMarketPrice(new Tick(DateTime.UtcNow.AddDays(-1), security.Symbol, price, price, price));
+            var orderRequest = new SubmitOrderRequest(OrderType.Market, security.Type, security.Symbol, 1000, 0, 0, DateTime.UtcNow, "TestTag");
+
+            // Mock the order processor
+            var orderProcessorMock = new Mock<IOrderProcessor>();
+            orderProcessorMock.Setup(m => m.GetOrderTicket(It.IsAny<int>())).Returns(new OrderTicket(_algorithm.Transactions, orderRequest));
+            _algorithm.Transactions.SetOrderProcessor(orderProcessorMock.Object);
+
+            Assert.AreEqual(transactionHandler.GetOpenOrders().Count, 0);
+            // Submit and process the market order
+            var orderTicket = transactionHandler.Process(orderRequest);
+            transactionHandler.HandleOrderRequest(orderRequest);
+            Assert.IsTrue(orderTicket.Status == OrderStatus.Submitted);
+
+            brokerage.Scan();
+            Assert.IsTrue(orderTicket.Status == OrderStatus.Filled);
+
+            var order = transactionHandler.GetOrderById(orderTicket.OrderId);
+            Assert.IsTrue(order.Tag.Contains("TestTag"));
+            Assert.IsTrue(order.Tag.Contains("Warning: fill at stale price"));
+        }
+
         internal class EmptyHistoryProvider : HistoryProviderBase
         {
             public override int DataPointCount => 0;
@@ -944,6 +1005,11 @@ namespace QuantConnect.Tests.Engine.BrokerageTransactionHandlerTests
             public DateTime GetLastSyncDate()
             {
                 return LastSyncDate;
+            }
+
+            protected override void InitializeTransactionThread()
+            {
+                // nop
             }
         }
     }

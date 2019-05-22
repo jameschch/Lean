@@ -28,7 +28,7 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
     /// The pass this information back to the algorithm portfolio and ensure the cash and portfolio are synchronized.
     /// </summary>
     [InheritedExport(typeof(ITransactionHandler))]
-    public interface ITransactionHandler : IOrderProcessor
+    public interface ITransactionHandler : IOrderProcessor, IOrderEventProvider
     {
         /// <summary>
         /// Boolean flag indicating the thread is busy.
@@ -59,11 +59,6 @@ namespace QuantConnect.Lean.Engine.TransactionHandlers
         /// Initializes the transaction handler for the specified algorithm using the specified brokerage implementation
         /// </summary>
         void Initialize(IAlgorithm algorithm, IBrokerage brokerage, IResultHandler resultHandler);
-
-        /// <summary>
-        /// Primary thread entry point to launch the transaction thread.
-        /// </summary>
-        void Run();
 
         /// <summary>
         /// Signal a end of thread request to stop montioring the transactions.

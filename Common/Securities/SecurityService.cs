@@ -110,11 +110,11 @@ namespace QuantConnect.Securities
 
                 case SecurityType.Option:
                     if (addToSymbolCache) SymbolCache.Set(symbol.Underlying.Value, symbol.Underlying);
-                    security = new Option.Option(symbol, exchangeHours, _cashBook[_cashBook.AccountCurrency], new Option.OptionSymbolProperties(symbolProperties), _cashBook);
+                    security = new Option.Option(symbol, exchangeHours, quoteCash, new Option.OptionSymbolProperties(symbolProperties), _cashBook);
                     break;
 
                 case SecurityType.Future:
-                    security = new Future.Future(symbol, exchangeHours, _cashBook[_cashBook.AccountCurrency], symbolProperties, _cashBook);
+                    security = new Future.Future(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
                     break;
 
                 case SecurityType.Forex:
@@ -154,8 +154,10 @@ namespace QuantConnect.Securities
                 security.SetLeverage(leverage);
             }
 
-            // In live mode, equity assumes specific price variation model
-            if (_isLiveMode && security.Type == SecurityType.Equity)
+            var isNotNormalized = configList.DataNormalizationMode() == DataNormalizationMode.Raw;
+
+            // In live mode and non normalized data, equity assumes specific price variation model
+            if ((_isLiveMode || isNotNormalized) && security.Type == SecurityType.Equity)
             {
                 security.PriceVariationModel = new EquityPriceVariationModel();
             }

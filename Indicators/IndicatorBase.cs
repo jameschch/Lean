@@ -16,6 +16,7 @@
 using System;
 using System.Diagnostics;
 using QuantConnect.Data;
+using QuantConnect.Logging;
 
 namespace QuantConnect.Indicators
 {
@@ -76,8 +77,9 @@ namespace QuantConnect.Indicators
         {
             if (_previousInput != null && input.Time < _previousInput.Time)
             {
-                // if we receive a time in the past, throw
-                throw new ArgumentException($"This is a forward only indicator: {Name} Input: {input.Time:u} Previous: {_previousInput.Time:u}");
+                // if we receive a time in the past, log and return
+                Log.Error($"This is a forward only indicator: {Name} Input: {input.Time:u} Previous: {_previousInput.Time:u}. It will not be updated with this input.");
+                return IsReady;
             }
             if (!ReferenceEquals(input, _previousInput))
             {
@@ -186,9 +188,17 @@ namespace QuantConnect.Indicators
             if (ReferenceEquals(obj, null)) return false;
             if (obj.GetType().IsSubclassOf(typeof (IndicatorBase<>))) return ReferenceEquals(this, obj);
 
-            // the obj is not an indicator, so let's check for value types, try converting to decimal
-            var converted = Convert.ToDecimal(obj);
-            return Current.Value == converted;
+            try
+            {
+                // the obj is not an indicator, so let's check for value types, try converting to decimal
+                var converted = Convert.ToDecimal(obj);
+                return Current.Value == converted;
+            }
+            catch (InvalidCastException)
+            {
+                // conversion failed, return false
+                return false;
+            }
         }
 
         /// <summary>

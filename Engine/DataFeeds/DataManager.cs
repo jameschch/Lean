@@ -46,6 +46,16 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             = new ConcurrentDictionary<SubscriptionDataConfig, SubscriptionDataConfig>();
 
         /// <summary>
+        /// Event fired when a new subscription is added
+        /// </summary>
+        public event EventHandler<Subscription> SubscriptionAdded;
+
+        /// <summary>
+        /// Event fired when an existing subscription is removed
+        /// </summary>
+        public event EventHandler<Subscription> SubscriptionRemoved;
+
+        /// <summary>
         /// Creates a new instance of the DataManager
         /// </summary>
         public DataManager(
@@ -53,7 +63,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             UniverseSelection universeSelection,
             IAlgorithm algorithm,
             ITimeKeeper timeKeeper,
-            MarketHoursDatabase marketHoursDatabase)
+            MarketHoursDatabase marketHoursDatabase,
+            bool liveMode)
         {
             _dataFeed = dataFeed;
             UniverseSelection = universeSelection;
@@ -62,7 +73,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             AvailableDataTypes = SubscriptionManager.DefaultDataTypes();
             _timeKeeper = timeKeeper;
             _marketHoursDatabase = marketHoursDatabase;
-            _liveMode = algorithm.LiveMode;
+            _liveMode = liveMode;
 
             var liveStart = DateTime.UtcNow;
             // wire ourselves up to receive notifications when universes are added/removed
@@ -170,6 +181,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 return false;
             }
 
+            if (_liveMode)
+            {
+                OnSubscriptionAdded(subscription);
+            }
+
             LiveDifferentiatedLog($"DataManager.AddSubscription(): Added {request.Configuration}." +
                 $" Start: {request.StartTimeUtc}. End: {request.EndTimeUtc}");
             return DataFeedSubscriptions.TryAdd(subscription);
@@ -200,6 +216,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                     _dataFeed.RemoveSubscription(subscription);
 
+                    if (_liveMode)
+                    {
+                        OnSubscriptionRemoved(subscription);
+                    }
+
                     subscription.Dispose();
 
                     RemoveSubscriptionDataConfig(subscription);
@@ -209,6 +230,24 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Event invocator for the <see cref="SubscriptionAdded"/> event
+        /// </summary>
+        /// <param name="subscription">The added subscription</param>
+        private void OnSubscriptionAdded(Subscription subscription)
+        {
+            SubscriptionAdded?.Invoke(this, subscription);
+        }
+
+        /// <summary>
+        /// Event invocator for the <see cref="SubscriptionRemoved"/> event
+        /// </summary>
+        /// <param name="subscription">The removed subscription</param>
+        private void OnSubscriptionRemoved(Subscription subscription)
+        {
+            SubscriptionRemoved?.Invoke(this, subscription);
         }
 
         #endregion
@@ -241,18 +280,22 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
             else
             {
-                // count data subscriptions by symbol, ignoring multiple data types.
-                // this limit was added due to the limits IB places on number of subscriptions
-                var uniqueCount = SubscriptionManagerSubscriptions
-                    .Where(x => !x.Symbol.IsCanonical())
-                    .DistinctBy(x => x.Symbol.Value)
-                    .Count();
-
-                if (uniqueCount > _algorithmSettings.DataSubscriptionLimit)
+                // for performance, only count if we are above the limit
+                if (SubscriptionManagerCount() > _algorithmSettings.DataSubscriptionLimit)
                 {
-                    throw new Exception(
-                        $"The maximum number of concurrent market data subscriptions was exceeded ({_algorithmSettings.DataSubscriptionLimit})." +
-                        "Please reduce the number of symbols requested or increase the limit using Settings.DataSubscriptionLimit.");
+                    // count data subscriptions by symbol, ignoring multiple data types.
+                    // this limit was added due to the limits IB places on number of subscriptions
+                    var uniqueCount = SubscriptionManagerSubscriptions
+                        .Where(x => !x.Symbol.IsCanonical())
+                        .DistinctBy(x => x.Symbol.Value)
+                        .Count();
+
+                    if (uniqueCount > _algorithmSettings.DataSubscriptionLimit)
+                    {
+                        throw new Exception(
+                            $"The maximum number of concurrent market data subscriptions was exceeded ({_algorithmSettings.DataSubscriptionLimit})." +
+                            "Please reduce the number of symbols requested or increase the limit using Settings.DataSubscriptionLimit.");
+                    }
                 }
 
                 // add the time zone to our time keeper
@@ -311,11 +354,12 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             bool extendedMarketHours = false,
             bool isFilteredSubscription = true,
             bool isInternalFeed = false,
-            bool isCustomData = false
+            bool isCustomData = false,
+            DataNormalizationMode dataNormalizationMode = DataNormalizationMode.Adjusted
             )
         {
             return Add(symbol, resolution, fillForward, extendedMarketHours, isFilteredSubscription, isInternalFeed, isCustomData,
-                new List<Tuple<Type, TickType>> { new Tuple<Type, TickType>(dataType, LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType))})
+                new List<Tuple<Type, TickType>> { new Tuple<Type, TickType>(dataType, LeanData.GetCommonTickTypeForCommonDataTypes(dataType, symbol.SecurityType))}, dataNormalizationMode)
                 .First();
         }
 
@@ -332,7 +376,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             bool isFilteredSubscription = true,
             bool isInternalFeed = false,
             bool isCustomData = false,
-            List<Tuple<Type, TickType>> subscriptionDataTypes = null
+            List<Tuple<Type, TickType>> subscriptionDataTypes = null,
+            DataNormalizationMode dataNormalizationMode = DataNormalizationMode.Adjusted
             )
         {
             var dataTypes = subscriptionDataTypes ??
@@ -340,9 +385,10 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
             var marketHoursDbEntry = _marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
             var exchangeHours = marketHoursDbEntry.ExchangeHours;
-            var dataNormalizationMode = symbol.ID.SecurityType == SecurityType.Option || symbol.ID.SecurityType == SecurityType.Future
-                ? DataNormalizationMode.Raw
-                : DataNormalizationMode.Adjusted;
+            if (symbol.ID.SecurityType == SecurityType.Option || symbol.ID.SecurityType == SecurityType.Future)
+            {
+                dataNormalizationMode = DataNormalizationMode.Raw;
+            }
 
             if (marketHoursDbEntry.DataTimeZone == null)
             {

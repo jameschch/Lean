@@ -141,8 +141,7 @@ namespace QuantConnect.Securities
 
             var fees = parameters.Security.FeeModel.GetOrderFee(
                 new OrderFeeParameters(parameters.Security,
-                    parameters.Order,
-                    parameters.CurrencyConverter.AccountCurrency)).Value;
+                    parameters.Order)).Value;
             var feesInAccountCurrency = parameters.CurrencyConverter.
                 ConvertToAccountCurrency(fees).Amount;
 
@@ -174,7 +173,8 @@ namespace QuantConnect.Securities
             OrderDirection direction
             )
         {
-            var result = portfolio.MarginRemaining;
+            var totalPortfolioValue = portfolio.TotalPortfolioValue;
+            var result = portfolio.GetMarginRemaining(totalPortfolioValue);
 
             if (direction != OrderDirection.Hold)
             {
@@ -209,7 +209,7 @@ namespace QuantConnect.Securities
                 }
             }
 
-            result -= portfolio.TotalPortfolioValue * RequiredFreeBuyingPowerPercent;
+            result -= totalPortfolioValue * RequiredFreeBuyingPowerPercent;
             return result < 0 ? 0 : result;
         }
 
@@ -314,9 +314,12 @@ namespace QuantConnect.Securities
         /// <returns>Returns the maximum allowed market order quantity and if zero, also the reason</returns>
         public virtual GetMaximumOrderQuantityForTargetValueResult GetMaximumOrderQuantityForTargetValue(GetMaximumOrderQuantityForTargetValueParameters parameters)
         {
+            // this is expensive so lets fetch it once
+            var totalPortfolioValue = parameters.Portfolio.TotalPortfolioValue;
+
             // adjust target portfolio value to comply with required Free Buying Power Percent
             var targetPortfolioValue =
-                parameters.Target * (parameters.Portfolio.TotalPortfolioValue - parameters.Portfolio.TotalPortfolioValue * RequiredFreeBuyingPowerPercent);
+                parameters.Target * (totalPortfolioValue - totalPortfolioValue * RequiredFreeBuyingPowerPercent);
 
             // if targeting zero, simply return the negative of the quantity
             if (targetPortfolioValue == 0)
@@ -331,7 +334,8 @@ namespace QuantConnect.Securities
             var direction = targetPortfolioValue > currentHoldingsValue ? OrderDirection.Buy : OrderDirection.Sell;
 
             // determine the unit price in terms of the account currency
-            var unitPrice = new MarketOrder(parameters.Security.Symbol, 1, DateTime.UtcNow).GetValue(parameters.Security);
+            var utcTime = parameters.Security.LocalTime.ConvertToUtc(parameters.Security.Exchange.TimeZone);
+            var unitPrice = new MarketOrder(parameters.Security.Symbol, 1, utcTime).GetValue(parameters.Security);
             if (unitPrice == 0)
             {
                 var reason = $"The price of the {parameters.Security.Symbol.Value} security is zero because it does not have any market " +
@@ -391,18 +395,17 @@ namespace QuantConnect.Securities
                 }
 
                 // generate the order
-                var order = new MarketOrder(parameters.Security.Symbol, orderQuantity, DateTime.UtcNow);
+                var order = new MarketOrder(parameters.Security.Symbol, orderQuantity, utcTime);
 
                 var fees = parameters.Security.FeeModel.GetOrderFee(
                     new OrderFeeParameters(parameters.Security,
-                        order,
-                        parameters.Portfolio.CashBook.AccountCurrency)).Value;
+                        order)).Value;
                 orderFees = parameters.Portfolio.CashBook.ConvertToAccountCurrency(fees).Amount;
 
                 // The TPV, take out the fees(unscaled) => yields available value for trading(less fees)
                 // then scale that by the target -- finally remove currentHoldingsValue to get targetOrderValue
                 targetOrderValue = Math.Abs(
-                    (parameters.Portfolio.TotalPortfolioValue - orderFees - parameters.Portfolio.TotalPortfolioValue * RequiredFreeBuyingPowerPercent)
+                    (totalPortfolioValue - orderFees - totalPortfolioValue * RequiredFreeBuyingPowerPercent)
                     * parameters.Target - currentHoldingsValue
                 );
 

@@ -31,7 +31,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
 
         /// <summary>Gets the number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1" />.</summary>
         /// <returns>The number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1" />.</returns>
-        public int Count => _insights.Sum(kvp => kvp.Value.Count);
+        public int Count => _insights.Aggregate(0, (i, kvp) => i + kvp.Value.Count);
 
         /// <summary>Gets a value indicating whether the <see cref="T:System.Collections.Generic.ICollection`1" /> is read-only.</summary>
         /// <returns>true if the <see cref="T:System.Collections.Generic.ICollection`1" /> is read-only; otherwise, false.</returns>
@@ -103,8 +103,8 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// <exception cref="T:System.ArgumentException">The number of elements in the source <see cref="T:System.Collections.Generic.ICollection`1" /> is greater than the available space from <paramref name="arrayIndex" /> to the end of the destination <paramref name="array" />.</exception>
         public void CopyTo(Insight[] array, int arrayIndex)
         {
-            var copy = this.ToList();
-            copy.CopyTo(array, arrayIndex);
+            // Avoid calling `ToList` on insights to avoid potential infinite loop (issue #3168)
+            Array.Copy(_insights.SelectMany(kvp => kvp.Value).ToArray(), 0, array, arrayIndex, Count);
         }
 
         /// <summary>Removes the first occurrence of a specific object from the <see cref="T:System.Collections.Generic.ICollection`1" />.</summary>

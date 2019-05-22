@@ -157,14 +157,6 @@ namespace QuantConnect.Interfaces
         }
 
         /// <summary>
-        /// Gets a flag indicating whether or not this algorithm uses the QCAlgorithmFramework
-        /// </summary>
-        bool IsFrameworkAlgorithm
-        {
-            get;
-        }
-
-        /// <summary>
         /// Gets whether or not this algorithm is still warming up
         /// </summary>
         bool IsWarmingUp
@@ -444,7 +436,7 @@ namespace QuantConnect.Interfaces
         void OnMarginCall(List<SubmitOrderRequest> requests);
 
         /// <summary>
-        /// Margin call warning event handler. This method is called when Portoflio.MarginRemaining is under 5% of your Portfolio.TotalPortfolioValue
+        /// Margin call warning event handler. This method is called when Portfolio.MarginRemaining is under 5% of your Portfolio.TotalPortfolioValue
         /// </summary>
         void OnMarginCallWarning();
 
@@ -567,6 +559,14 @@ namespace QuantConnect.Interfaces
         bool RemoveSecurity(Symbol symbol);
 
         /// <summary>
+        /// Sets the account currency cash symbol this algorithm is to manage.
+        /// </summary>
+        /// <remarks>Has to be called during <see cref="Initialize"/> before
+        /// calling <see cref="SetCash(decimal)"/> or adding any <see cref="Security"/></remarks>
+        /// <param name="accountCurrency">The account currency cash symbol to set</param>
+        void SetAccountCurrency(string accountCurrency);
+
+        /// <summary>
         /// Set the starting capital for the strategy
         /// </summary>
         /// <param name="startingCash">decimal starting capital, default $100,000</param>
@@ -661,5 +661,18 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="slice">The Slice object</param>
         void SetCurrentSlice(Slice slice);
+
+        /// <summary>
+        /// Provide the API for the algorithm.
+        /// </summary>
+        /// <param name="api">Initiated API</param>
+        void SetApi(IApi api);
+
+        /// <summary>
+        /// Sets the order event provider
+        /// </summary>
+        /// <param name="newOrderEvent">The order event provider</param>
+        /// <remarks>Will be called before the <see cref="SecurityPortfolioManager"/></remarks>
+        void SetOrderEventProvider(IOrderEventProvider newOrderEvent);
     }
 }

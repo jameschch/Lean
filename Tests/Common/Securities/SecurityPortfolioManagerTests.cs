@@ -538,6 +538,111 @@ namespace QuantConnect.Tests.Common.Securities
         }
 
         [Test]
+        public void BuyingSellingCfdDoesntAddToCash()
+        {
+            var securities = new SecurityManager(TimeKeeper);
+            var transactions = new SecurityTransactionManager(null, securities);
+            var portfolio = new SecurityPortfolioManager(securities, transactions);
+            portfolio.SetCash(0);
+            portfolio.SetCash("EUR", 0, 1.10m);
+
+            securities.Add(
+                Symbols.DE30EUR,
+                new Security(
+                    SecurityExchangeHours,
+                    CreateTradeBarDataConfig(SecurityType.Cfd, Symbols.DE30EUR),
+                    portfolio.CashBook["EUR"],
+                    SymbolProperties.GetDefault("EUR"),
+                    ErrorCurrencyConverter.Instance
+                )
+            );
+
+            var fillBuy = new OrderEvent(1, Symbols.DE30EUR, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Buy, 10000, 5, OrderFee.Zero);
+            portfolio.ProcessFill(fillBuy);
+
+            Assert.AreEqual(0, portfolio.Cash);
+            Assert.AreEqual(5, securities[Symbols.DE30EUR].Holdings.Quantity);
+
+            var fillSell = new OrderEvent(2, Symbols.DE30EUR, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Sell, 10000, -5, OrderFee.Zero);
+            portfolio.ProcessFill(fillSell);
+
+            Assert.AreEqual(0, portfolio.Cash);
+            Assert.AreEqual(0, securities[Symbols.DE30EUR].Holdings.Quantity);
+        }
+
+        [Test]
+        public void BuyingSellingCfdAddsToCashOnClose()
+        {
+            var securities = new SecurityManager(TimeKeeper);
+            var transactions = new SecurityTransactionManager(null, securities);
+            var portfolio = new SecurityPortfolioManager(securities, transactions);
+            portfolio.SetCash(0);
+            portfolio.SetCash("EUR", 0, 1.10m);
+
+            securities.Add(
+                Symbols.DE30EUR,
+                new Security(
+                    SecurityExchangeHours,
+                    CreateTradeBarDataConfig(SecurityType.Cfd, Symbols.DE30EUR),
+                    portfolio.CashBook["EUR"],
+                    SymbolProperties.GetDefault("EUR"),
+                    ErrorCurrencyConverter.Instance
+                )
+            );
+            securities[Symbols.DE30EUR].SettlementModel = new AccountCurrencyImmediateSettlementModel();
+
+            var fillBuy = new OrderEvent(1, Symbols.DE30EUR, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Buy, 10000, 5, OrderFee.Zero);
+            portfolio.ProcessFill(fillBuy);
+
+            Assert.AreEqual(0, portfolio.CashBook["EUR"].Amount);
+            Assert.AreEqual(0, portfolio.CashBook["USD"].Amount);
+            Assert.AreEqual(0, portfolio.Cash);
+            Assert.AreEqual(5, securities[Symbols.DE30EUR].Holdings.Quantity);
+
+            var fillSell = new OrderEvent(2, Symbols.DE30EUR, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Sell, 10100, -5, OrderFee.Zero);
+            portfolio.ProcessFill(fillSell);
+
+            // PNL = (10100 - 10000) * 5 * 1.10 = 550 USD
+            Assert.AreEqual(0, portfolio.CashBook["EUR"].Amount);
+            Assert.AreEqual(550, portfolio.CashBook["USD"].Amount);
+            Assert.AreEqual(550, portfolio.Cash);
+            Assert.AreEqual(0, securities[Symbols.DE30EUR].Holdings.Quantity);
+        }
+
+        [Test]
+        public void BuyingSellingCfdAddsCorrectSales()
+        {
+            var securities = new SecurityManager(TimeKeeper);
+            var transactions = new SecurityTransactionManager(null, securities);
+            var portfolio = new SecurityPortfolioManager(securities, transactions);
+            portfolio.SetCash(0);
+            portfolio.SetCash("EUR", 0, 1.10m);
+
+            securities.Add(
+                Symbols.DE30EUR,
+                new Security(
+                    SecurityExchangeHours,
+                    CreateTradeBarDataConfig(SecurityType.Cfd, Symbols.DE30EUR),
+                    portfolio.CashBook["EUR"],
+                    SymbolProperties.GetDefault("EUR"),
+                    ErrorCurrencyConverter.Instance
+                )
+            );
+
+            var fillBuy = new OrderEvent(1, Symbols.DE30EUR, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Buy, 10000, 5, OrderFee.Zero);
+            portfolio.ProcessFill(fillBuy);
+
+            // 10000 price * 5 quantity * 1.10 exchange rate = 55000 USD
+            Assert.AreEqual(55000, securities[Symbols.DE30EUR].Holdings.TotalSaleVolume);
+
+            var fillSell = new OrderEvent(2, Symbols.DE30EUR, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Sell, 10000, -5, OrderFee.Zero);
+            portfolio.ProcessFill(fillSell);
+
+            // 2 * 10000 price * 5 quantity * 1.10 exchange rate = 110000 USD
+            Assert.AreEqual(110000, securities[Symbols.DE30EUR].Holdings.TotalSaleVolume);
+        }
+
+        [Test]
         public void SellingShortFromZeroAddsToCash()
         {
             var securities = new SecurityManager(TimeKeeper);
@@ -642,7 +747,7 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.AreEqual(1000, portfolio.Cash);
 
             var orderFee = security.FeeModel.GetOrderFee(new OrderFeeParameters(
-                security, new MarketOrder(Symbols.EURUSD, 100, DateTime.MinValue), Currencies.USD));
+                security, new MarketOrder(Symbols.EURUSD, 100, DateTime.MinValue)));
             var fill = new OrderEvent(1, Symbols.EURUSD, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Buy, 1.1000m, 100, orderFee);
             portfolio.ProcessFill(fill);
             Assert.AreEqual(100, security.Holdings.Quantity);
@@ -678,7 +783,7 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.AreEqual(10000, portfolio.Cash);
 
             var orderFee = security.FeeModel.GetOrderFee(new OrderFeeParameters(
-                security, new MarketOrder(Symbols.BTCUSD, 2, DateTime.MinValue), Currencies.USD));
+                security, new MarketOrder(Symbols.BTCUSD, 2, DateTime.MinValue)));
             var fill = new OrderEvent(1, Symbols.BTCUSD, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Buy, 4000.01m, 2, OrderFee.Zero);
             portfolio.ProcessFill(fill);
             Assert.AreEqual(2, security.Holdings.Quantity);
@@ -714,7 +819,7 @@ namespace QuantConnect.Tests.Common.Securities
             // Buy on Monday
             var timeUtc = new DateTime(2015, 10, 26, 15, 30, 0);
             var orderFee = security.FeeModel.GetOrderFee(new OrderFeeParameters(
-                security, new MarketOrder(Symbols.AAPL, 10, timeUtc), Currencies.USD));
+                security, new MarketOrder(Symbols.AAPL, 10, timeUtc)));
             var fill = new OrderEvent(1, Symbols.AAPL, timeUtc, OrderStatus.Filled, OrderDirection.Buy, 100, 10, orderFee);
             portfolio.ProcessFill(fill);
             Assert.AreEqual(10, security.Holdings.Quantity);            Assert.AreEqual(-1, portfolio.Cash);
@@ -723,7 +828,7 @@ namespace QuantConnect.Tests.Common.Securities
             // Sell on Tuesday, cash unsettled
             timeUtc = timeUtc.AddDays(1);
             orderFee = security.FeeModel.GetOrderFee(new OrderFeeParameters(
-                security, new MarketOrder(Symbols.AAPL, 10, timeUtc), Currencies.USD));
+                security, new MarketOrder(Symbols.AAPL, 10, timeUtc)));
             fill = new OrderEvent(2, Symbols.AAPL, timeUtc, OrderStatus.Filled, OrderDirection.Sell, 100, -10, orderFee);
             portfolio.ProcessFill(fill);
             Assert.AreEqual(0, security.Holdings.Quantity);
@@ -2035,6 +2140,66 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.AreEqual(initialCash, algorithm.Portfolio.CashBook.TotalValueInAccountCurrency);
         }
 
+        [Test]
+        public void SetAccountCurrency()
+        {
+            var algorithm = new QCAlgorithm();
+            var securities = new SecurityManager(TimeKeeper);
+            var transactions = new SecurityTransactionManager(null, securities);
+            algorithm.Portfolio = new SecurityPortfolioManager(securities, transactions);
+
+            Assert.AreEqual(Currencies.USD, algorithm.AccountCurrency);
+            Assert.AreEqual(Currencies.USD, algorithm.Portfolio.CashBook.AccountCurrency);
+            var amount = algorithm.Portfolio.CashBook[Currencies.USD].Amount;
+
+            algorithm.SetAccountCurrency("btc");
+            Assert.AreEqual("BTC", algorithm.AccountCurrency);
+            Assert.AreEqual("BTC", algorithm.Portfolio.CashBook.AccountCurrency);
+            Assert.AreEqual(amount, algorithm.Portfolio.CashBook["BTC"].Amount);
+        }
+
+        [Test]
+        public void CanNotChangeAccountCurrencyAfterAddingASecurity()
+        {
+            var algorithm = new QCAlgorithm();
+            var securities = new SecurityManager(TimeKeeper);
+            var transactions = new SecurityTransactionManager(null, securities);
+            var portfolio = new SecurityPortfolioManager(securities, transactions);
+
+            algorithm.Securities = securities;
+
+            securities.Add(
+                Symbols.SPY,
+                new Security(
+                    SecurityExchangeHours,
+                    CreateTradeBarDataConfig(SecurityType.Equity, Symbols.SPY),
+                    new Cash(Currencies.USD, 0, 1m),
+                    SymbolProperties.GetDefault(Currencies.USD),
+                    ErrorCurrencyConverter.Instance
+                )
+            );
+            Assert.Throws<InvalidOperationException>(() => portfolio.SetAccountCurrency(Currencies.USD));
+        }
+
+        [TestCase("SetCash(decimal cash)")]
+        [TestCase("SetCash(string symbol, ...)")]
+        public void CanNotChangeAccountCurrencyAfterSettingCash(string overload)
+        {
+            var securities = new SecurityManager(TimeKeeper);
+            var transactions = new SecurityTransactionManager(null, securities);
+            var portfolio = new SecurityPortfolioManager(securities, transactions);
+
+            if (overload == "SetCash(decimal cash)")
+            {
+                portfolio.SetCash(10);
+            }
+            else
+            {
+                portfolio.SetCash(Currencies.USD, 1, 1);
+            }
+            Assert.Throws<InvalidOperationException>(() => portfolio.SetAccountCurrency(Currencies.USD));
+        }
+
         private SubscriptionDataConfig CreateTradeBarDataConfig(SecurityType type, Symbol symbol)
         {
             if (type == SecurityType.Equity)
@@ -2044,6 +2209,8 @@ namespace QuantConnect.Tests.Common.Securities
             if (type == SecurityType.Future)
                 return new SubscriptionDataConfig(typeof(TradeBar), symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, true, true, true);
             if (type == SecurityType.Crypto)
+                return new SubscriptionDataConfig(typeof(TradeBar), symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, true, true, true);
+            if (type == SecurityType.Cfd)
                 return new SubscriptionDataConfig(typeof(TradeBar), symbol, Resolution.Minute, TimeZones.NewYork, TimeZones.NewYork, true, true, true);
             throw new NotImplementedException(type.ToString());
         }

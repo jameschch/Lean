@@ -351,7 +351,8 @@ namespace QuantConnect.Brokerages.Backtesting
                                 var context = new FillModelParameters(
                                     security,
                                     order,
-                                    Algorithm.SubscriptionManager.SubscriptionDataConfigService);
+                                    Algorithm.SubscriptionManager.SubscriptionDataConfigService,
+                                    Algorithm.Settings.StalePriceTimeSpan);
                                 fills = new[] { model.Fill(context).OrderEvent };
                             }
 
@@ -367,8 +368,7 @@ namespace QuantConnect.Brokerages.Backtesting
                                     {
                                         fill.OrderFee = security.FeeModel.GetOrderFee(
                                             new OrderFeeParameters(security,
-                                                order,
-                                                Algorithm.Portfolio.CashBook.AccountCurrency));
+                                                order));
                                     }
                                 }
                             }

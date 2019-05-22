@@ -24,7 +24,6 @@ from QuantConnect.Orders.Fees import *
 from QuantConnect.Securities import *
 from QuantConnect.Orders.Fills import *
 import numpy as np
-import decimal as d
 import random
 
 ### <summary>
@@ -71,15 +70,18 @@ class CustomFillModel(ImmediateFillModel):
     def __init__(self, algorithm):
         self.algorithm = algorithm
         self.absoluteRemainingByOrderId = {}
-        random.seed(100)
+        self.random = Random(387510346)
 
     def MarketFill(self, asset, order):
-        #if not _absoluteRemainingByOrderId.TryGetValue(order.Id, absoluteRemaining):
         absoluteRemaining = order.AbsoluteQuantity
-        self.absoluteRemainingByOrderId[order.Id] = order.AbsoluteQuantity
+
+        if order.Id in self.absoluteRemainingByOrderId.keys():
+            absoluteRemaining = self.absoluteRemainingByOrderId[order.Id]
+
         fill = super().MarketFill(asset, order)
-        absoluteFillQuantity = int(min(absoluteRemaining, random.randint(0, 2*int(order.AbsoluteQuantity))))
+        absoluteFillQuantity = int(min(absoluteRemaining, self.random.Next(0, 2*int(order.AbsoluteQuantity))))
         fill.FillQuantity = np.sign(order.Quantity) * absoluteFillQuantity
+        
         if absoluteRemaining == absoluteFillQuantity:
             fill.Status = OrderStatus.Filled
             if self.absoluteRemainingByOrderId.get(order.Id):
@@ -99,7 +101,7 @@ class CustomFeeModel(FeeModel):
         # custom fee math
         fee = max(1, parameters.Security.Price
                   * parameters.Order.AbsoluteQuantity
-                  * d.Decimal(0.00001))
+                  * 0.00001)
         self.algorithm.Log("CustomFeeModel: " + str(fee))
         return OrderFee(CashAmount(fee, "USD"))
 
@@ -109,6 +111,6 @@ class CustomSlippageModel:
 
     def GetSlippageApproximation(self, asset, order):
         # custom slippage math
-        slippage = asset.Price * d.Decimal(0.0001 * np.log10(2*float(order.AbsoluteQuantity)))
+        slippage = asset.Price * 0.0001 * np.log10(2*float(order.AbsoluteQuantity))
         self.algorithm.Log("CustomSlippageModel: " + str(slippage))
         return slippage

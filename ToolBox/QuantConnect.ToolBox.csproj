@@ -140,8 +140,8 @@
     <Reference Include="Polly, Version=7.0.0.0, Culture=neutral, PublicKeyToken=c8a3ffc3f8f825cc, processorArchitecture=MSIL">
       <HintPath>..\packages\Polly.7.1.0\lib\netstandard1.1\Polly.dll</HintPath>
     </Reference>
-    <Reference Include="Python.Runtime, Version=1.0.5.12, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.12\lib\Python.Runtime.dll</HintPath>
+    <Reference Include="Python.Runtime, Version=1.0.5.20, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.20\lib\Python.Runtime.dll</HintPath>
     </Reference>
     <Reference Include="QuantConnect.Fxcm">
       <HintPath>..\Brokerages\Fxcm\QuantConnect.Fxcm.dll</HintPath>
@@ -181,9 +181,49 @@
       <HintPath>..\packages\WebSocket4Net.0.15.2\lib\net45\WebSocket4Net.dll</HintPath>
     </Reference>
   </ItemGroup>
+  <PropertyGroup>
+    <IsWindows>false</IsWindows>
+    <IsWindows Condition="'$(OS)' == 'Windows_NT'">true</IsWindows>
+    <IsOSX>false</IsOSX>
+    <IsOSX Condition="'$(IsWindows)' != 'true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX>
+    <IsLinux>false</IsLinux>
+    <IsLinux Condition="'$(IsWindows)' != 'true' AND '$(IsOSX)' != 'true' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
+  </PropertyGroup>
+  <Target Name="PrintRID" BeforeTargets="Build">
+    <Message Text="IsWindows $(IsWindows)" Importance="high" />
+    <Message Text="IsOSX $(IsOSX)" Importance="high" />
+    <Message Text="IsLinux $(IsLinux)" Importance="high" />
+    <Message Text="ForceLinuxBuild $(ForceLinuxBuild)" Importance="high" />
+  </Target>
+  <Choose>
+    <When Condition="$(IsWindows) AND '$(ForceLinuxBuild)' != 'true'">
+      <ItemGroup>
+        <Reference Include="Python.Runtime, Version=1.0.5.20, Culture=neutral, processorArchitecture=MSIL">
+          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.20\lib\win\Python.Runtime.dll</HintPath>
+        </Reference>
+      </ItemGroup>
+    </When>
+    <When Condition="$(IsLinux) OR '$(ForceLinuxBuild)' == 'true'">
+      <ItemGroup>
+        <Reference Include="Python.Runtime, Version=1.0.5.20, Culture=neutral, processorArchitecture=MSIL">
+          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.20\lib\linux\Python.Runtime.dll</HintPath>
+        </Reference>
+      </ItemGroup>
+    </When>
+    <When Condition="$(IsOSX) AND '$(ForceLinuxBuild)' != 'true'">
+      <ItemGroup>
+        <Reference Include="Python.Runtime, Version=1.0.5.20, Culture=neutral, processorArchitecture=MSIL">
+          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.20\lib\osx\Python.Runtime.dll</HintPath>
+        </Reference>
+      </ItemGroup>
+    </When>
+  </Choose>
   <ItemGroup>
     <Compile Include="BitfinexDownloader\BitfinexDataDownloader.cs" />
     <Compile Include="BitfinexDownloader\BitfinexDownloaderProgram.cs" />
+    <Compile Include="CoinApiDataConverter\CoinApiDataConverterProgram.cs" />
+    <Compile Include="CoinApiDataConverter\CoinApiDataReader.cs" />
+    <Compile Include="CoinApiDataConverter\CoinApiEntryData.cs" />
     <Compile Include="GDAXDownloader\GDAXDownloader.cs" />
     <Compile Include="GDAXDownloader\GDAXDownloaderProgram.cs" />
     <Compile Include="GzipStreamProvider.cs" />
@@ -193,6 +233,17 @@
     <Compile Include="IEX\IEXDownloaderProgram.cs" />
     <Compile Include="IVolatilityEquityConverter\IVolatilityEquityConverterProgram.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="RandomDataGenerator\DividendSplitMapGenerator.cs" />
+    <Compile Include="RandomDataGenerator\ConsoleLeveledOutput.cs" />
+    <Compile Include="RandomDataGenerator\DataDensity.cs" />
+    <Compile Include="RandomDataGenerator\RandomDataGeneratorSettings.cs" />
+    <Compile Include="RandomDataGenerator\IRandomValueGenerator.cs" />
+    <Compile Include="RandomDataGenerator\RandomDataGeneratorProgram.cs" />
+    <Compile Include="RandomDataGenerator\RandomValueGenerator.cs" />
+    <Compile Include="RandomDataGenerator\RandomValueGeneratorException.cs" />
+    <Compile Include="RandomDataGenerator\SymbolGenerator.cs" />
+    <Compile Include="RandomDataGenerator\TickGenerator.cs" />
+    <Compile Include="RandomDataGenerator\TooManyFailedAttemptsException.cs" />
     <Compile Include="TickAggregator.cs" />
     <Compile Include="AlgoSeekFuturesConverter\AlgoSeekFuturesConverter.cs" />
     <Compile Include="AlgoSeekFuturesConverter\AlgoSeekFuturesProcessor.cs" />
@@ -220,8 +271,6 @@
     <Compile Include="FxcmVolumeDownloader\FxcmVolumeDownloadProgram.cs" />
     <Compile Include="FxcmDownloader\FxcmDataDownloader.cs" />
     <Compile Include="FxcmDownloader\FxcmDownloaderProgram.cs" />
-    <Compile Include="GoogleDownloader\GoogleDataDownloader.cs" />
-    <Compile Include="GoogleDownloader\GoogleDownloaderProgram.cs" />
     <Compile Include="IDataProcessor.cs" />
     <Compile Include="IEX\IEXDataQueueHandler.cs" />
     <Compile Include="IQFeed\IQFeedDataQueueHandler.cs" />
@@ -275,6 +324,7 @@
     <None Include="IQFeed\IQFeed-symbol-map.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Compile Include="KaikoDataConverter\KaikoCryptoReader.cs" />
     <None Include="packages.config" />
     <Content Include="Visualizer\QuantConnect.Visualizer.py">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -329,12 +379,12 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets')" />
+  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.20\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.20\build\QuantConnect.pythonnet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.12\build\QuantConnect.pythonnet.targets'))" />
+    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.20\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.20\build\QuantConnect.pythonnet.targets'))" />
   </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
        Other similar extension points exist, see Microsoft.Common.targets.

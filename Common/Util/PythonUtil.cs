@@ -28,6 +28,8 @@ namespace QuantConnect.Util
     /// </summary>
     public class PythonUtil
     {
+        private static readonly Lazy<dynamic> lazyInspect = new Lazy<dynamic>(() => Py.Import("inspect"));
+
         /// <summary>
         /// Encapsulates a python method with a <see cref="System.Action{T1}"/>
         /// </summary>
@@ -38,7 +40,7 @@ namespace QuantConnect.Util
         {
             using (Py.GIL())
             {
-                int count = 0;
+                long count = 0;
                 if (!TryGetArgLength(pyObject, out count) || count != 1)
                 {
                     return null;
@@ -59,7 +61,7 @@ namespace QuantConnect.Util
         {
             using (Py.GIL())
             {
-                int count = 0;
+                long count = 0;
                 if (!TryGetArgLength(pyObject, out count) || count != 2)
                 {
                     return null;
@@ -80,7 +82,7 @@ namespace QuantConnect.Util
         {
             using (Py.GIL())
             {
-                int count = 0;
+                long count = 0;
                 if (!TryGetArgLength(pyObject, out count) || count != 1)
                 {
                     return null;
@@ -180,23 +182,28 @@ namespace QuantConnect.Util
         /// <param name="pyObject">Object representing a method</param>
         /// <param name="length">Lenght of arguments</param>
         /// <returns>True if pyObject is a method</returns>
-        private static bool TryGetArgLength(PyObject pyObject, out int length)
+        private static bool TryGetArgLength(PyObject pyObject, out long length)
         {
             using (Py.GIL())
             {
-                dynamic inspect = Py.Import("inspect");
-
+                var inspect = lazyInspect.Value;
                 if (inspect.isfunction(pyObject))
                 {
-                    var args = inspect.getargspec(pyObject).args;
-                    length = new PyList(args).Length();
+                    var args = inspect.getargspec(pyObject).args as PyObject;
+                    var pyList = new PyList(args);
+                    length = pyList.Length();
+                    pyList.Dispose();
+                    args.Dispose();
                     return true;
                 }
 
                 if (inspect.ismethod(pyObject))
                 {
-                    var args = inspect.getargspec(pyObject).args;
-                    length = new PyList(args).Length() - 1;
+                    var args = inspect.getargspec(pyObject).args as PyObject;
+                    var pyList = new PyList(args);
+                    length = pyList.Length() - 1;
+                    pyList.Dispose();
+                    args.Dispose();
                     return true;
                 }
             }

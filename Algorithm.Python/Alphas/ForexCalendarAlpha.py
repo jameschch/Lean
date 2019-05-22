@@ -31,7 +31,7 @@ from QuantConnect.Data.Custom import DailyFx
 ### This demonstration alpha reads the DailyFx calendar and provides insights based upon
 ### the news' outlook for the root currency's(USD) associated pairs
 ### </summary>
-class ForexCalendarAlgorithm(QCAlgorithmFramework):
+class ForexCalendarAlgorithm(QCAlgorithm):
 
     def Initialize(self):
 
@@ -64,9 +64,13 @@ class ForexCalendarAlgorithm(QCAlgorithmFramework):
         # Set to use our FxCalendar Alpha Model
         self.SetAlpha(FxCalendarTrigger())
 
-        # Default Models For Other Framework Settings
+        # Equally weigh securities in portfolio, based on insights
         self.SetPortfolioConstruction(EqualWeightingPortfolioConstructionModel())
+
+        # Set Immediate Execution Model
         self.SetExecution(ImmediateExecutionModel())
+
+        # Set Null Risk Management Model
         self.SetRiskManagement(NullRiskManagementModel())
 
 class FxCalendarTrigger(AlphaModel):

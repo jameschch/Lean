@@ -67,10 +67,8 @@
   "ib-host": "127.0.0.1",
   "ib-port": "4002",
   "ib-agent-description": "Individual",
-  "ib-use-tws": false,
   "ib-tws-dir": "C:\\Jts",
   "ib-trading-mode": "paper",
-  "ib-controller-dir": "C:\\IBController",
   "ib-enable-delayed-streaming-data": false,
 
   // tradier configuration
@@ -115,6 +113,10 @@
   // Required to access data from Tiingo
   // To get your access token go to https://www.tiingo.com
   "tiingo-auth-token": "",
+
+  // Required to access data from US Energy Information Administration
+  // To get your access token go to https://www.eia.gov/opendata
+  "us-energy-information-auth-token": "",
 
   // alpaca configuration
   // available trading mode: 'paper', 'live'

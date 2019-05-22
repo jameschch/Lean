@@ -22,6 +22,7 @@ using System.Threading;
 using NUnit.Framework;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
+using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
@@ -40,7 +41,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         private static bool LogsEnabled = false; // this is for travis log no to fill up and reach the max size.
         private ManualTimeProvider _manualTimeProvider;
         private AlgorithmStub _algorithm;
-        private Synchronizer _synchronizer;
+        private LiveSynchronizer _synchronizer;
         private readonly DateTime _startDate = new DateTime(2018, 08, 1, 11, 0, 0);
         private DataManager _dataManager;
 
@@ -59,7 +60,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var feed = RunDataFeed(forex: new List<string> { Symbols.EURUSD });
 
             var emittedData = false;
-            ConsumeBridge(feed, TimeSpan.FromSeconds(10), true, ts =>
+            ConsumeBridge(feed, TimeSpan.FromSeconds(5), true, ts =>
             {
                 if (ts.Slice.HasData)
                 {
@@ -82,7 +83,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var feed = RunDataFeed(equities: equities, forex: forex);
 
             var emittedData = false;
-            ConsumeBridge(feed, TimeSpan.FromSeconds(5), ts =>
+            ConsumeBridge(feed, TimeSpan.FromSeconds(2), ts =>
             {
                 var delta = (DateTime.UtcNow - ts.Time).TotalMilliseconds;
                 var values = ts.Slice.Keys.Select(x => x.Value).ToList();
@@ -209,7 +210,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Console.WriteLine("newDataCount: " + newDataCount);
             Assert.AreEqual(2, securityChanges);
 
-            Assert.GreaterOrEqual(newDataCount, 1000);
+            Assert.GreaterOrEqual(newDataCount, 5);
             Assert.IsTrue(emittedData);
         }
 
@@ -262,7 +263,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Console.WriteLine("newDataCount: " + newDataCount);
             Assert.AreEqual(3, securityChanges);
 
-            Assert.GreaterOrEqual(newDataCount, 490);
+            Assert.GreaterOrEqual(newDataCount, 5);
             Assert.IsTrue(firstTime);
         }
 
@@ -314,7 +315,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
             });
 
-            Assert.GreaterOrEqual(newDataCount, 1000);
+            Assert.GreaterOrEqual(newDataCount, 5);
             Assert.IsTrue(emittedData);
             Assert.AreEqual(2, securityChanges + _algorithm.SecurityChangesRecord.Count);
             Assert.AreEqual(Symbols.AAPL, _algorithm.SecurityChangesRecord.First().AddedSecurities.First().Symbol);
@@ -323,10 +324,10 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         [Test]
         public void Unsubscribes()
         {
-            var customMockedFileBaseData = SymbolCache.GetSymbol("CustomMockedFileBaseData");
             FuncDataQueueHandler dataQueueHandler;
             var feed = RunDataFeed(out dataQueueHandler, equities: new List<string> { "SPY" }, forex: new List<string> { "EURUSD" });
             _algorithm.AddData<CustomMockedFileBaseData>("CustomMockedFileBaseData");
+            var customMockedFileBaseData = SymbolCache.GetSymbol("CustomMockedFileBaseData");
 
             var emittedData = false;
             var currentSubscriptionCount = 0;
@@ -358,10 +359,10 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         {
             _algorithm.SetFinishedWarmingUp();
             _algorithm.Transactions.SetOrderProcessor(new FakeOrderProcessor());
-            var customMockedFileBaseData = SymbolCache.GetSymbol("CustomMockedFileBaseData");
             FuncDataQueueHandler dataQueueHandler;
             var feed = RunDataFeed(out dataQueueHandler, equities: new List<string> { "SPY" }, forex: new List<string> { "EURUSD" });
             _algorithm.AddData<CustomMockedFileBaseData>("CustomMockedFileBaseData");
+            var customMockedFileBaseData = SymbolCache.GetSymbol("CustomMockedFileBaseData");
 
             var emittedData = false;
             var currentSubscriptionCount = 0;
@@ -457,7 +458,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
 
             var previousTime = DateTime.Now;
             Console.WriteLine("start: " + previousTime.ToString("o"));
-            ConsumeBridge(feed, TimeSpan.FromSeconds(5), false, ts =>
+            ConsumeBridge(feed, TimeSpan.FromSeconds(3), false, ts =>
             {
                 // because this is a remote file we may skip data points while the newest
                 // version of the file is downloading [internet speed] and also we decide
@@ -467,6 +468,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
 
                 emittedData = true;
                 count++;
+
                 // make sure within 2 seconds
                 var delta = DateTime.Now.Subtract(previousTime);
                 previousTime = DateTime.Now;
@@ -479,7 +481,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Console.WriteLine("Count: " + count);
             Console.WriteLine("Spool up time: " + stopwatch.Elapsed);
 
-            Assert.That(count, Is.GreaterThan(20));
+            Assert.That(count, Is.GreaterThan(5));
             Assert.IsTrue(emittedData);
         }
 
@@ -487,10 +489,10 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         public void HandlesRestApi()
         {
             var resolution = Resolution.Second;
-            var symbol = SymbolCache.GetSymbol("RestApi");
             FuncDataQueueHandler dqgh;
             var feed = RunDataFeed(out dqgh);
             _algorithm.AddData<RestApiBaseData>("RestApi", resolution);
+            var symbol = SymbolCache.GetSymbol("RestApi");
 
             var count = 0;
             var receivedData = false;
@@ -520,6 +522,128 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Assert.That(RestApiBaseData.ReaderCount, Is.LessThanOrEqualTo(30)); // we poll at 10x frequency
 
             Console.WriteLine("Count: " + count + " ReaderCount: " + RestApiBaseData.ReaderCount);
+        }
+
+        [Test]
+        public void CoarseFundamentalDataGetsPipedCorrectly()
+        {
+            var lck = new object();
+            BaseDataCollection list = null;
+            var timer = new Timer(state =>
+            {
+                var currentTime = DateTime.UtcNow.ConvertFromUtc(TimeZones.NewYork);
+                lock (state)
+                {
+                    list = new BaseDataCollection { Symbol = CoarseFundamental.CreateUniverseSymbol(Market.USA, false) };
+                    list.Data.Add(new CoarseFundamental
+                    {
+                        Symbol = Symbols.SPY,
+                        Time = currentTime - Time.OneDay, // hard-coded coarse period of one day
+                    });
+                }
+            }, lck, TimeSpan.FromSeconds(0.5), TimeSpan.FromMilliseconds(-1));
+
+            var yieldedUniverseData = false;
+            var feed = RunDataFeed(getNextTicksFunction: fdqh =>
+            {
+                lock (lck)
+                {
+                    if (list != null)
+                        try
+                        {
+                            var tmp = list;
+                            return new List<BaseData> { tmp };
+                        }
+                        finally
+                        {
+                            list = null;
+                            yieldedUniverseData = true;
+                        }
+                }
+                return Enumerable.Empty<BaseData>();
+            });
+
+            _algorithm.AddUniverse(coarse => coarse.Take(10).Select(x => x.Symbol));
+
+            var receivedCoarseData = false;
+            ConsumeBridge(feed, TimeSpan.FromSeconds(2), ts =>
+            {
+                if (ts.UniverseData.Count > 0 &&
+                    ts.UniverseData.First().Value.Data.First() is CoarseFundamental)
+                {
+                    receivedCoarseData = true;
+                }
+            }, sendUniverseData: true);
+
+            timer.Dispose();
+            Assert.IsTrue(yieldedUniverseData);
+            Assert.IsTrue(receivedCoarseData);
+        }
+
+        [Test]
+        public void FineCoarseFundamentalDataGetsPipedCorrectly()
+        {
+            var lck = new object();
+            BaseDataCollection list = null;
+            var timer = new Timer(state =>
+            {
+                lock (state)
+                {
+                    list = new BaseDataCollection { Symbol = CoarseFundamental.CreateUniverseSymbol(Market.USA, false) };
+                    list.Data.Add(new CoarseFundamental
+                    {
+                        Symbol = Symbols.AAPL,
+                        Time = new DateTime(2014, 04, 24)
+                    });
+                }
+            }, lck, TimeSpan.FromSeconds(0.5), TimeSpan.FromMilliseconds(-1));
+
+            var yieldedUniverseData = false;
+            var feed = RunDataFeed(getNextTicksFunction: fdqh =>
+            {
+                lock (lck)
+                {
+                    if (list != null)
+                        try
+                        {
+                            var tmp = list;
+                            return new List<BaseData> { tmp };
+                        }
+                        finally
+                        {
+                            list = null;
+                            yieldedUniverseData = true;
+                        }
+                }
+                return Enumerable.Empty<BaseData>();
+            });
+
+            var fineWasCalled = false;
+            _algorithm.AddUniverse(coarse => coarse.Take(1).Select(x => x.Symbol),
+                fine =>
+                {
+                    var symbol = fine.First().Symbol;
+                    if (symbol == Symbols.AAPL)
+                    {
+                        fineWasCalled = true;
+                    }
+                    return new[] {symbol};
+                });
+
+            var receivedFundamentalsData = false;
+            ConsumeBridge(feed, TimeSpan.FromSeconds(2), ts =>
+            {
+                if (ts.UniverseData.Count > 0 &&
+                    ts.UniverseData.First().Value.Data.First() is Fundamentals)
+                {
+                    receivedFundamentalsData = true;
+                }
+            }, sendUniverseData: true);
+
+            timer.Dispose();
+            Assert.IsTrue(yieldedUniverseData);
+            Assert.IsTrue(receivedFundamentalsData);
+            Assert.IsTrue(fineWasCalled);
         }
 
         [Test]
@@ -607,9 +731,11 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 new UniverseSelection(algorithm, securityService),
                 algorithm,
                 algorithm.TimeKeeper,
-                marketHoursDatabase);
+                marketHoursDatabase,
+                true);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
-            var synchronizer = new TestableSynchronizer(_algorithm, dataManager, true);
+            var synchronizer = new TestableLiveSynchronizer();
+            synchronizer.Initialize(algorithm, dataManager);
             algorithm.AddSecurities(Resolution.Tick, Enumerable.Range(0, 20).Select(x => x.ToString()).ToList());
             var getNextTicksFunction = Enumerable.Range(0, 20).Select(x => new Tick { Symbol = SymbolCache.GetSymbol(x.ToString()) }).ToList();
             feed.DataQueueHandler = new FuncDataQueueHandler(handler => getNextTicksFunction);
@@ -640,17 +766,55 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Assert.IsFalse(unhandledExceptionWasThrown);
         }
 
+        [Test]
+        public void HandlesAllTickTypesAtTickResolution()
+        {
+            var symbol = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX);
+
+            var feed = RunDataFeed(
+                Resolution.Tick,
+                crypto: new List<string> { symbol.Value },
+                getNextTicksFunction: dqh => Enumerable.Range(0, 2)
+                    .Select(x => new Tick
+                    {
+                        Symbol = symbol,
+                        TickType = x % 2 == 0 ? TickType.Trade : TickType.Quote
+                    })
+                    .ToList());
+
+            var emittedData = false;
+            ConsumeBridge(feed, TimeSpan.FromSeconds(1), true, ts =>
+            {
+                if (ts.Slice.HasData)
+                {
+                    emittedData = true;
+                    foreach (var security in _algorithm.Securities.Values)
+                    {
+                        foreach (var config in security.Subscriptions)
+                        {
+                            Assert.IsTrue(ts.ConsolidatorUpdateData.Count == 2); // Trades + Quotes
+                            Assert.IsTrue(ts.ConsolidatorUpdateData.Select(x => x.Target).Contains(config));
+                            Assert.IsTrue(ts.ConsolidatorUpdateData.All(x => x.Data.Count > 0));
+                        }
+                    }
+                }
+            });
+
+            Assert.IsTrue(emittedData);
+        }
+
         private IDataFeed RunDataFeed(Resolution resolution = Resolution.Second,
                                     List<string> equities = null,
                                     List<string> forex = null,
+                                    List<string> crypto = null,
                                     Func<FuncDataQueueHandler, IEnumerable<BaseData>> getNextTicksFunction = null)
         {
             FuncDataQueueHandler dataQueueHandler;
-            return RunDataFeed(out dataQueueHandler, getNextTicksFunction, resolution, equities, forex);
+            return RunDataFeed(out dataQueueHandler, getNextTicksFunction, resolution, equities, forex, crypto);
         }
 
         private IDataFeed RunDataFeed(out FuncDataQueueHandler dataQueueHandler, Func<FuncDataQueueHandler, IEnumerable<BaseData>> getNextTicksFunction = null,
-            Resolution resolution = Resolution.Second, List<string> equities = null, List<string> forex = null)
+            Resolution resolution = Resolution.Second, List<string> equities = null, List<string> forex = null, List<string> crypto = null)
         {
             _algorithm.SetStartDate(_startDate);
 
@@ -660,13 +824,14 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 var time = _manualTimeProvider.GetUtcNow();
                 if (time == lastTime) return Enumerable.Empty<BaseData>();
                 lastTime = time;
+                var tickTime = lastTime.AddMinutes(-1).ConvertFromUtc(TimeZones.NewYork);
                 return fdqh.Subscriptions.Where(symbol => !_algorithm.UniverseManager.ContainsKey(symbol)) // its not a universe
-                    .Select(symbol => new Tick(lastTime.ConvertFromUtc(TimeZones.NewYork), symbol, 1, 2)
+                    .Select(symbol => new Tick(tickTime, symbol, 1, 2)
                     {
                         Quantity = 1,
                         // Symbol could not be in the Securities collections for the custom Universe tests. AlgorithmManager is in charge of adding them, and we are not executing that code here.
                         TickType = _algorithm.Securities.ContainsKey(symbol) ? _algorithm.Securities[symbol].SubscriptionDataConfig.TickType : TickType.Trade
-                    });
+                    }).ToList();
             });
 
             // job is used to send into DataQueueHandler
@@ -687,30 +852,32 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 new UniverseSelection(_algorithm, securityService),
                 _algorithm,
                 _algorithm.TimeKeeper,
-                marketHoursDatabase);
+                marketHoursDatabase,
+                true);
             _algorithm.SubscriptionManager.SetDataManager(_dataManager);
-            _algorithm.AddSecurities(resolution, equities, forex);
-            _synchronizer = new TestableSynchronizer(_algorithm, _dataManager, true, _manualTimeProvider);
+            _algorithm.AddSecurities(resolution, equities, forex, crypto);
+            _synchronizer = new TestableLiveSynchronizer(_manualTimeProvider);
+            _synchronizer.Initialize(_algorithm, _dataManager);
 
             feed.Initialize(_algorithm, job, resultHandler, mapFileProvider,
                 new LocalDiskFactorFileProvider(mapFileProvider), fileProvider, _dataManager, _synchronizer);
 
             _algorithm.PostInitialize();
             Thread.Sleep(150); // small handicap for the data to be pumped so TimeSlices have data of all subscriptions
-
             return feed;
         }
 
-        private void ConsumeBridge(IDataFeed feed, TimeSpan timeout, Action<TimeSlice> handler)
+        private void ConsumeBridge(IDataFeed feed, TimeSpan timeout, Action<TimeSlice> handler, bool sendUniverseData = false)
         {
-            ConsumeBridge(feed, timeout, false, handler);
+            ConsumeBridge(feed, timeout, false, handler, sendUniverseData: sendUniverseData);
         }
 
         private void ConsumeBridge(IDataFeed feed,
             TimeSpan timeout,
             bool alwaysInvoke,
             Action<TimeSlice> handler,
-            bool noOutput = true)
+            bool noOutput = true,
+            bool sendUniverseData = false)
         {
             var endTime = DateTime.UtcNow.Add(timeout);
             bool startedReceivingata = false;
@@ -723,7 +890,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                                      $". TimeSlice.Time (EDT): {timeSlice.Time.ConvertFromUtc(TimeZones.NewYork):o}");
                 }
 
-                if (!startedReceivingata && timeSlice.Slice.Count != 0)
+                if (!startedReceivingata
+                    && (timeSlice.Slice.Count != 0
+                        || sendUniverseData && timeSlice.UniverseData.Count > 0))
                 {
                     startedReceivingata = true;
                 }
@@ -733,6 +902,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 }
                 _algorithm.OnEndOfTimeStep();
                 _manualTimeProvider.AdvanceSeconds(1);
+                Thread.Sleep(1);
                 if (endTime <= DateTime.UtcNow)
                 {
                     feed.Exit();
@@ -783,19 +953,13 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         }
     }
 
-    internal class TestableSynchronizer : Synchronizer
+    internal class TestableLiveSynchronizer : LiveSynchronizer
     {
         private readonly ITimeProvider _timeProvider;
-        public TestableSynchronizer(
-            IAlgorithm algorithm,
-            IDataFeedSubscriptionManager subscriptionManager,
-            bool liveMode,
-            ITimeProvider timeProvider = null)
+
+        public TestableLiveSynchronizer(ITimeProvider timeProvider = null)
         {
             _timeProvider = timeProvider ?? new RealTimeProvider();
-            Initialize(algorithm,
-                subscriptionManager,
-                liveMode);
         }
 
         protected override ITimeProvider GetTimeProvider()

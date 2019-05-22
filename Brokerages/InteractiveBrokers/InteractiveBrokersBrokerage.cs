@@ -18,7 +18,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,6 +34,7 @@ using Order = QuantConnect.Orders.Order;
 using IB = QuantConnect.Brokerages.InteractiveBrokers.Client;
 using IBApi;
 using NodaTime;
+using QuantConnect.IBAutomater;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Orders.TimeInForces;
 using Bar = QuantConnect.Data.Market.Bar;
@@ -48,6 +48,12 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
     [BrokerageFactory(typeof(InteractiveBrokersBrokerageFactory))]
     public sealed class InteractiveBrokersBrokerage : Brokerage, IDataQueueHandler, IDataQueueUniverseProvider
     {
+        private readonly IBAutomater.IBAutomater _ibAutomater;
+        private readonly AutoResetEvent _ibAutomaterInitializeEvent = new AutoResetEvent(false);
+        private bool _loginFailed;
+        private bool _existingSessionDetected;
+        private bool _securityDialogDetected;
+
         // next valid order id for this client
         private int _nextValidId;
         // next valid client id for the gateway/tws
@@ -123,13 +129,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         /// <summary>
         /// Returns true if we're currently connected to the broker
         /// </summary>
-        public override bool IsConnected
-        {
-            get
-            {
-                return _client != null && _client.Connected && !_disconnected1100Fired;
-            }
-        }
+        public override bool IsConnected => _client != null && _client.Connected && !_disconnected1100Fired;
 
         /// <summary>
         /// Returns true if the connected user is a financial advisor
@@ -154,6 +154,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 Config.Get("ib-account"),
                 Config.Get("ib-host", "LOCALHOST"),
                 Config.GetInt("ib-port", 4001),
+                Config.Get("ib-tws-dir"),
+                Config.Get("ib-version", "974"),
+                Config.Get("ib-user-name"),
+                Config.Get("ib-password"),
+                Config.Get("ib-trading-mode"),
                 Config.GetValue("ib-agent-description", IB.AgentDescription.Individual)
                 )
         {
@@ -174,6 +179,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 account,
                 Config.Get("ib-host", "LOCALHOST"),
                 Config.GetInt("ib-port", 4001),
+                Config.Get("ib-tws-dir"),
+                Config.Get("ib-version", "974"),
+                Config.Get("ib-user-name"),
+                Config.Get("ib-password"),
+                Config.Get("ib-trading-mode"),
                 Config.GetValue("ib-agent-description", IB.AgentDescription.Individual)
                 )
         {
@@ -188,8 +198,25 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         /// <param name="account">The Interactive Brokers account name</param>
         /// <param name="host">host name or IP address of the machine where TWS is running. Leave blank to connect to the local host.</param>
         /// <param name="port">must match the port specified in TWS on the Configure&gt;API&gt;Socket Port field.</param>
+        /// <param name="twsDirectory">The IB TWS root directory</param>
+        /// <param name="ibVersion">The IB Gateway version</param>
+        /// <param name="userName">The login user name</param>
+        /// <param name="password">The login password</param>
+        /// <param name="tradingMode">The trading mode: 'live' or 'paper'</param>
         /// <param name="agentDescription">Used for Rule 80A describes the type of trader.</param>
-        public InteractiveBrokersBrokerage(IAlgorithm algorithm, IOrderProvider orderProvider, ISecurityProvider securityProvider, string account, string host, int port, string agentDescription = IB.AgentDescription.Individual)
+        public InteractiveBrokersBrokerage(
+            IAlgorithm algorithm,
+            IOrderProvider orderProvider,
+            ISecurityProvider securityProvider,
+            string account,
+            string host,
+            int port,
+            string twsDirectory,
+            string ibVersion,
+            string userName,
+            string password,
+            string tradingMode,
+            string agentDescription = IB.AgentDescription.Individual)
             : base("Interactive Brokers Brokerage")
         {
             _algorithm = algorithm;
@@ -200,6 +227,25 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             _port = port;
             _clientId = IncrementClientId();
             _agentDescription = agentDescription;
+
+            Log.Trace("InteractiveBrokersBrokerage.InteractiveBrokersBrokerage(): Starting IB Automater...");
+
+            // start IB Gateway
+            _ibAutomater = new IBAutomater.IBAutomater(twsDirectory, ibVersion, userName, password, tradingMode, port);
+            _ibAutomater.OutputDataReceived += OnIbAutomaterOutputDataReceived;
+            _ibAutomater.ErrorDataReceived += OnIbAutomaterErrorDataReceived;
+            _ibAutomater.Exited += OnIbAutomaterExited;
+            _ibAutomater.Start(false);
+
+            // wait for IB to start up
+            if (!_ibAutomaterInitializeEvent.WaitOne(TimeSpan.FromSeconds(60)))
+            {
+                Log.Trace("InteractiveBrokersBrokerage.InteractiveBrokersBrokerage(): IB Automater initialization timeout.");
+            }
+
+            Log.Trace("InteractiveBrokersBrokerage.InteractiveBrokersBrokerage(): IB Automater initialized.");
+
+            CheckIbAutomaterErrors();
 
             Log.Trace($"InteractiveBrokersBrokerage.InteractiveBrokersBrokerage(): Host: {host}, Port: {port}, Account: {account}, AgentDescription: {agentDescription}");
 
@@ -262,7 +308,8 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 {
                     Log.Error("InteractiveBrokersBrokerage.ResetHandler(): Error in reset handler thread: " + exception);
                 }
-            }) { IsBackground = true }.Start();
+            })
+            { IsBackground = true }.Start();
         }
 
         /// <summary>
@@ -412,8 +459,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         /// <returns>The current holdings from the account</returns>
         public override List<Holding> GetAccountHoldings()
         {
-            CheckIbGateway();
-
             if (!IsConnected)
             {
                 Log.Trace("InteractiveBrokersBrokerage.GetAccountHoldings(): not connected, connecting now");
@@ -431,19 +476,28 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         /// <returns>The current cash balance for each currency available for trading</returns>
         public override List<CashAmount> GetCashBalance()
         {
-            CheckIbGateway();
-
             if (!IsConnected)
             {
-                Log.Trace("InteractiveBrokersBrokerage.GetCashBalance(): not connected, connecting now");
-                Connect();
+                if (IsWithinScheduledServerResetTimes())
+                {
+                    // Occasionally the disconnection due to the IB reset period might last
+                    // much longer than expected during weekends (even up to the cash sync time).
+                    // In this case we do not try to reconnect (since this would fail anyway)
+                    // but we return the existing balances instead.
+                    Log.Trace("InteractiveBrokersBrokerage.GetCashBalance(): not connected within reset times, returning existing balances");
+                }
+                else
+                {
+                    Log.Trace("InteractiveBrokersBrokerage.GetCashBalance(): not connected, connecting now");
+                    Connect();
+                }
             }
 
             var balances = _accountData.CashBalances.Select(x => new CashAmount(x.Value, x.Key)).ToList();
 
             if (balances.Count == 0)
             {
-                Log.Trace($"InteractiveBrokersBrokerage.GetCashBalance(): no balances found, IsConnected: {IsConnected}");
+                Log.Trace($"InteractiveBrokersBrokerage.GetCashBalance(): no balances found, IsConnected: {IsConnected}, _disconnected1100Fired: {_disconnected1100Fired}");
             }
 
             return balances;
@@ -516,8 +570,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
             var attempt = 1;
             const int maxAttempts = 5;
-            var existingSessionDetected = false;
-            var securityDialogDetected = false;
 
             var subscribedSymbolsCount = _subscribedSymbols.Skip(0).Count();
             if (subscribedSymbolsCount > 0)
@@ -546,7 +598,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
                     _messageProcessingThread = new Thread(() =>
                     {
-                        Log.Trace("IB message processing thread started: #" + Thread.CurrentThread.ManagedThreadId);
+                        Log.Trace("InteractiveBrokersBrokerage.Connect(): IB message processing thread started: #" + Thread.CurrentThread.ManagedThreadId);
 
                         while (_client.ClientSocket.IsConnected())
                         {
@@ -558,11 +610,11 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                             catch (Exception error)
                             {
                                 // error in message processing thread, log error and disconnect
-                                Log.Error("Error in message processing thread #" + Thread.CurrentThread.ManagedThreadId + ": " + error);
+                                Log.Error("InteractiveBrokersBrokerage.Connect(): Error in message processing thread #" + Thread.CurrentThread.ManagedThreadId + ": " + error);
                             }
                         }
 
-                        Log.Trace("IB message processing thread ended: #" + Thread.CurrentThread.ManagedThreadId);
+                        Log.Trace("InteractiveBrokersBrokerage.Connect(): IB message processing thread ended: #" + Thread.CurrentThread.ManagedThreadId);
                     }) { IsBackground = true };
 
                     _messageProcessingThread.Start();
@@ -575,22 +627,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                         // no response, disconnect and retry
                         Disconnect();
 
-                        var ibcLogContent = LoadCurrentIbControllerLogFile();
-
-                        // if existing session detected from IBController log file, log error and throw exception
-                        if (ExistingSessionDetected(ibcLogContent))
-                        {
-                            existingSessionDetected = true;
-                            throw new Exception("InteractiveBrokersBrokerage.Connect(): An existing session was detected and will not be automatically disconnected. Please close the existing session manually.");
-                        }
-
-                        // if security dialog detected from IBController log file, log error and throw exception
-                        if (SecurityDialogDetected(ibcLogContent))
-                        {
-                            securityDialogDetected = true;
-                            throw new Exception("InteractiveBrokersBrokerage.Connect(): A security dialog was detected for Second Factor/Code Card Authentication. Please opt out of the Secure Login System: Manage Account > Security > Secure Login System > SLS Opt Out");
-                        }
-
                         // max out at 5 attempts to connect ~1 minute
                         if (attempt++ < maxAttempts)
                         {
@@ -601,7 +637,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                         throw new TimeoutException("InteractiveBrokersBrokerage.Connect(): Operation took longer than 15 seconds.");
                     }
 
-                    Log.Trace("IB next valid id received.");
+                    Log.Trace("InteractiveBrokersBrokerage.Connect(): IB next valid id received.");
 
                     if (!_client.Connected) throw new Exception("InteractiveBrokersBrokerage.Connect(): Connection returned but was not in connected state.");
 
@@ -661,13 +697,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 }
                 catch (Exception err)
                 {
-                    // if existing session or security dialog detected from IBController log file, log error and throw exception
-                    if (existingSessionDetected || securityDialogDetected)
-                    {
-                        Log.Error(err);
-                        throw;
-                    }
-
                     // max out at 5 attempts to connect ~1 minute
                     if (attempt++ < maxAttempts)
                     {
@@ -719,7 +748,10 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         /// </summary>
         private bool DownloadAccount(string account)
         {
+            Log.Trace($"InteractiveBrokersBrokerage.DownloadAccount(): Downloading account data for {account}");
+
             _accountHoldingsLastException = null;
+            _accountHoldingsResetEvent.Reset();
 
             // define our event handler, this acts as stop to make sure when we leave Connect we have downloaded the full account
             EventHandler<IB.AccountDownloadEndEventArgs> clientOnAccountDownloadEnd = (sender, args) =>
@@ -794,6 +826,8 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 Disconnect();
                 _client.Dispose();
             }
+
+            _ibAutomater?.Stop();
 
             _messagingRateLimiter.Dispose();
 
@@ -1121,10 +1155,19 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             Disconnect();
 
             Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): Stopping IB Gateway...");
-            InteractiveBrokersGatewayRunner.Stop();
+            _ibAutomater.Stop();
 
             Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): Restarting IB Gateway...");
-            InteractiveBrokersGatewayRunner.Restart();
+            _ibAutomater.Start(false);
+
+            // wait for IB to start up
+            if (!_ibAutomaterInitializeEvent.WaitOne(TimeSpan.FromSeconds(60)))
+            {
+                Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): IB Automater initialization timeout.");
+            }
+
+            Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): IB Automater initialized.");
+            CheckIbAutomaterErrors();
 
             Log.Trace("InteractiveBrokersBrokerage.ResetGatewayConnection(): Reconnecting...");
             Connect();
@@ -2588,6 +2631,15 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 yield break;
             }
 
+            // tick resolution not supported for now
+            if (request.Resolution == Resolution.Tick)
+            {
+                // TODO: upgrade IB C# API DLL
+                // In IB API version 973.04, the reqHistoricalTicks function has been added,
+                // which would now enable us to support history requests at Tick resolution.
+                yield break;
+            }
+
             // preparing the data for IB request
             var contract = CreateContract(request.Symbol);
             var resolution = ConvertResolution(request.Resolution);
@@ -2756,82 +2808,6 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             return history;
         }
 
-        /// <summary>
-        /// Returns true if an existing session was detected and IBController clicked the "Exit Application" button
-        /// </summary>
-        /// <remarks>
-        /// For this method to work, the following setting is required in the IBController.ini file:
-        /// ExistingSessionDetectedAction=secondary
-        /// </remarks>
-        private static bool ExistingSessionDetected(List<string> ibcLogLines)
-        {
-            return IbControllerLogContainsMessage(ibcLogLines, "End this session and let the other session proceed");
-        }
-
-        /// <summary>
-        /// Returns true if an IB security dialog (2FA/code card) was detected by IBController
-        /// </summary>
-        private static bool SecurityDialogDetected(List<string> ibcLogLines)
-        {
-            return IbControllerLogContainsMessage(ibcLogLines, "Second Factor Authentication") ||
-                   IbControllerLogContainsMessage(ibcLogLines, "Security Code Card Authentication");
-        }
-
-        /// <summary>
-        /// Reads the current IBController log file
-        /// </summary>
-        /// <returns>A list containing the lines of the file</returns>
-        private static List<string> LoadCurrentIbControllerLogFile()
-        {
-            // find the current IBController log file name
-            var ibControllerLogPath = Path.Combine(Config.Get("ib-controller-dir"), "Logs");
-            var files = Directory.GetFiles(ibControllerLogPath, "ibc-*.txt");
-            var lastLogUpdateTime = DateTime.MinValue;
-            var ibControllerLogFileName = string.Empty;
-            foreach (var file in files)
-            {
-                var time = File.GetLastWriteTimeUtc(file);
-                if (time > lastLogUpdateTime)
-                {
-                    lastLogUpdateTime = time;
-                    ibControllerLogFileName = file;
-                }
-            }
-
-            return ibControllerLogFileName.IsNullOrEmpty()
-                ? new List<string>()
-                : File.ReadAllLines(ibControllerLogFileName).ToList();
-        }
-
-        /// <summary>
-        /// Searches for a message in the IBController log file
-        /// </summary>
-        /// <param name="lines">The lines of text of the IBController log file</param>
-        /// <param name="message">The message text to find</param>
-        /// <returns>true if the message was found</returns>
-        private static bool IbControllerLogContainsMessage(List<string> lines, string message)
-        {
-            // read the lines and find the message
-            var separatorLine = new string('-', 60);
-            var index = lines.FindLastIndex(x => x.Contains(separatorLine));
-
-            return index >= 0 && lines.Skip(index + 1).Any(line => line.Contains(message));
-        }
-
-        /// <summary>
-        /// Check if IB Gateway running, restart if not
-        /// </summary>
-        public void CheckIbGateway()
-        {
-            Log.Trace("InteractiveBrokersBrokerage.CheckIbGateway(): start");
-            if (!InteractiveBrokersGatewayRunner.IsRunning())
-            {
-                Log.Trace("InteractiveBrokersBrokerage.CheckIbGateway(): IB Gateway not running. Restarting...");
-                _resetEventRestartGateway.Set();
-            }
-            Log.Trace("InteractiveBrokersBrokerage.CheckIbGateway(): end");
-        }
-
         private void CheckRateLimiting()
         {
             if (!_messagingRateLimiter.WaitToProceed(TimeSpan.Zero))
@@ -2840,6 +2816,81 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     "The API request has been rate limited. To avoid this message, please reduce the frequency of API calls."));
 
                 _messagingRateLimiter.WaitToProceed();
+            }
+        }
+
+        private void OnIbAutomaterOutputDataReceived(object sender, OutputDataReceivedEventArgs e)
+        {
+            if (e.Data == null) return;
+
+            Log.Trace($"InteractiveBrokersBrokerage.OnIbAutomaterOutputDataReceived(): {e.Data}");
+
+            // login failed
+            if (e.Data.Contains("Login failed"))
+            {
+                _loginFailed = true;
+                _ibAutomaterInitializeEvent.Set();
+            }
+
+            // an existing session was detected and IBAutomater clicked the "Exit Application" button
+            else if (e.Data.Contains("Existing session detected"))
+            {
+                _existingSessionDetected = true;
+                _ibAutomaterInitializeEvent.Set();
+            }
+
+            // a security dialog (2FA/code card) was detected by IBAutomater
+            else if (e.Data.Contains("Second Factor Authentication") ||
+                e.Data.Contains("Security Code Card Authentication") ||
+                e.Data.Contains("Enter security code"))
+            {
+                _securityDialogDetected = true;
+                _ibAutomaterInitializeEvent.Set();
+            }
+
+            // initialization completed
+            else if (e.Data.Contains("Configuration settings updated"))
+            {
+                _ibAutomaterInitializeEvent.Set();
+            }
+        }
+
+        private void OnIbAutomaterErrorDataReceived(object sender, ErrorDataReceivedEventArgs e)
+        {
+            if (e.Data == null) return;
+
+            Log.Trace($"InteractiveBrokersBrokerage.OnIbAutomaterErrorDataReceived(): {e.Data}");
+        }
+
+        private void OnIbAutomaterExited(object sender, ExitedEventArgs e)
+        {
+            Log.Trace($"InteractiveBrokersBrokerage.OnIbAutomaterExited(): Exit code: {e.ExitCode}");
+        }
+
+        private void CheckIbAutomaterErrors()
+        {
+            if (_loginFailed)
+            {
+                throw new Exception(
+                    "InteractiveBrokersBrokerage.CheckIbAutomaterErrors(): " +
+                    "Login failed. " +
+                    "Please check the validity of your login credentials.");
+            }
+
+            if (_existingSessionDetected)
+            {
+                throw new Exception(
+                    "InteractiveBrokersBrokerage.CheckIbAutomaterErrors(): " +
+                    "An existing session was detected and will not be automatically disconnected. " +
+                    "Please close the existing session manually.");
+            }
+
+            if (_securityDialogDetected)
+            {
+                throw new Exception(
+                    "InteractiveBrokersBrokerage.CheckIbAutomaterErrors(): " +
+                    "A security dialog was detected for Second Factor/Code Card Authentication. " +
+                    "Please opt out of the Secure Login System: Manage Account > Security > Secure Login System > SLS Opt Out");
             }
         }
 

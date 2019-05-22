@@ -64,6 +64,22 @@ namespace QuantConnect.Tests.Algorithm.Framework
         }
 
         [Test]
+        public void SerializationUsingJsonConvertTrimsEstimatedValue()
+        {
+            var time = new DateTime(2000, 01, 02, 03, 04, 05, 06);
+            var insight = new Insight(time, Symbols.SPY, Time.OneMinute, InsightType.Volatility, InsightDirection.Up, 1, 2, "source-model");
+            insight.EstimatedValue = 0.00001m;
+            insight.Score.SetScore(InsightScoreType.Direction, 0.00001, DateTime.UtcNow);
+            insight.Score.SetScore(InsightScoreType.Magnitude, 0.00001, DateTime.UtcNow);
+            var serialized = JsonConvert.SerializeObject(insight);
+            var deserialized = JsonConvert.DeserializeObject<Insight>(serialized);
+
+            Assert.AreEqual(0, deserialized.EstimatedValue);
+            Assert.AreEqual(0, deserialized.Score.Direction);
+            Assert.AreEqual(0, deserialized.Score.Magnitude);
+        }
+
+        [Test]
         public void SurvivesRoundTripCopy()
         {
             var time = new DateTime(2000, 01, 02, 03, 04, 05, 06);
@@ -210,6 +226,65 @@ namespace QuantConnect.Tests.Algorithm.Framework
 
             Assert.AreEqual(baseline.Period, insight.Period);
             Assert.AreEqual(baseline.CloseTimeUtc, insight.CloseTimeUtc);
+        }
+
+        [Test]
+        [TestCase("SPY", SecurityType.Equity, Market.USA, 2018, 12, 4, 9, 30)]
+        [TestCase("EURUSD", SecurityType.Forex, Market.FXCM, 2018, 12, 4, 0, 0)]
+        public void SetPeriodAndCloseTimeUsingExpiryEndOfDay(string ticker, SecurityType securityType, string market, int year, int month, int day, int hour, int minute)
+        {
+            var symbol = Symbol.Create(ticker, securityType, market);
+
+            SetPeriodAndCloseTimeUsingExpiryFunc(
+                Insight.Price(symbol, Expiry.EndOfDay, InsightDirection.Up),
+                new DateTime(year, month, day, hour, minute, 0).ConvertToUtc(TimeZones.NewYork));
+        }
+
+        [Test]
+        [TestCase("SPY", SecurityType.Equity, Market.USA, 2018, 12, 10, 9, 30)]
+        [TestCase("EURUSD", SecurityType.Forex, Market.FXCM, 2018, 12, 10, 0, 0)]
+        public void SetPeriodAndCloseTimeUsingExpiryEndOfWeek(string ticker, SecurityType securityType, string market, int year, int month, int day, int hour, int minute)
+        {
+            var symbol = Symbol.Create(ticker, securityType, market);
+
+            SetPeriodAndCloseTimeUsingExpiryFunc(
+                Insight.Price(symbol, Expiry.EndOfWeek, InsightDirection.Up),
+                new DateTime(year, month, day, hour, minute, 0).ConvertToUtc(TimeZones.NewYork));
+        }
+
+        [Test]
+        [TestCase("SPY", SecurityType.Equity, Market.USA, 2019, 1, 2, 9, 30)]
+        [TestCase("EURUSD", SecurityType.Forex, Market.FXCM, 2019, 1, 2, 0, 0)]
+        public void SetPeriodAndCloseTimeUsingExpiryEndOfMonth(string ticker, SecurityType securityType, string market, int year, int month, int day, int hour, int minute)
+        {
+            var symbol = Symbol.Create(ticker, securityType, market);
+
+            SetPeriodAndCloseTimeUsingExpiryFunc(
+                Insight.Price(symbol, Expiry.EndOfMonth, InsightDirection.Up),
+                new DateTime(year, month, day, hour, minute, 0).ConvertToUtc(TimeZones.NewYork));
+        }
+
+        [Test]
+        [TestCase("SPY", SecurityType.Equity, Market.USA, 2019, 1, 3, 9, 31)]
+        [TestCase("EURUSD", SecurityType.Forex, Market.FXCM, 2019, 1, 3, 9, 31)]
+        public void SetPeriodAndCloseTimeUsingExpiryOneMonth(string ticker, SecurityType securityType, string market, int year, int month, int day, int hour, int minute)
+        {
+            var symbol = Symbol.Create(ticker, securityType, market);
+
+            SetPeriodAndCloseTimeUsingExpiryFunc(
+                Insight.Price(symbol, Expiry.OneMonth, InsightDirection.Up),
+                new DateTime(year, month, day, hour, minute, 0).ConvertToUtc(TimeZones.NewYork));
+        }
+
+        private void SetPeriodAndCloseTimeUsingExpiryFunc(Insight insight, DateTime expected)
+        {
+            var symbol = insight.Symbol;
+            insight.GeneratedTimeUtc = new DateTime(2018, 12, 3, 9, 31, 0).ConvertToUtc(TimeZones.NewYork);
+
+            var exchangeHours = MarketHoursDatabase.FromDataFolder().GetExchangeHours(symbol.ID.Market, symbol, symbol.SecurityType);
+            insight.SetPeriodAndCloseTime(exchangeHours);
+
+            Assert.AreEqual(expected, insight.CloseTimeUtc);
         }
 
         [Test]
