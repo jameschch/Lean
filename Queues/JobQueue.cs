@@ -179,8 +179,8 @@ namespace QuantConnect.Queues
         public void AcknowledgeJob(AlgorithmNodePacket job)
         {
             // Make the console window pause so we can read log output before exiting and killing the application completely
-            Console.WriteLine("Engine.Main(): Analysis Complete. Press any key to continue.");
-            System.Console.Read();
+            //Console.WriteLine("Engine.Main(): Analysis Complete. Press any key to continue.");
+            //System.Console.Read();
         }
     }
 

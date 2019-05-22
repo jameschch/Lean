@@ -110,6 +110,7 @@
     </Compile>
     <Compile Include="Api.cs" />
     <Compile Include="ApiConnection.cs" />
+    <Compile Include="EmptyApiHandler.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
