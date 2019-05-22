@@ -272,7 +272,7 @@ namespace QuantConnect.Statistics
 
             var listBenchmark = new List<double>();
 
-            var minDate = equity.Keys.FirstOrDefault().AddDays(-1);
+            var minDate = equity.Keys.FirstOrDefault() > DateTime.MinValue ? equity.Keys.FirstOrDefault().AddDays(-1) : equity.Keys.FirstOrDefault();
             var maxDate = equity.Keys.LastOrDefault();
 
             // Get benchmark performance array for same period:
