@@ -92,11 +92,11 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (Time.Day == 6 && holdings != 1)
                 {
-                    throw new Exception(string.Format("Expected position quantity of 1 but was {0}", holdings));
+                    throw new Exception($"Expected position quantity of 1 but was {holdings.ToStringInvariant()}");
                 }
                 if (Time.Day == 9 && holdings != 7)
                 {
-                    throw new Exception(string.Format("Expected position quantity of 7 but was {0}", holdings));
+                    throw new Exception($"Expected position quantity of 7 but was {holdings.ToStringInvariant()}");
                 }
             }
         }
@@ -129,7 +129,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Total Trades", "2"},
             {"Average Win", "0%"},
             {"Average Loss", "-0.02%"},
-            {"Compounding Annual Return", "-1.578%"},
+            {"Compounding Annual Return", "-1.512%"},
             {"Drawdown", "0.000%"},
             {"Expectancy", "-1"},
             {"Net Profit", "-0.017%"},
@@ -137,13 +137,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-0.014"},
-            {"Beta", "0"},
+            {"Alpha", "-0.013"},
+            {"Beta", "0.003"},
             {"Annual Standard Deviation", "0.001"},
             {"Annual Variance", "0"},
-            {"Information Ratio", "7.935"},
-            {"Tracking Error", "6.786"},
-            {"Treynor Ratio", "161.568"},
+            {"Information Ratio", "-6.238"},
+            {"Tracking Error", "0.136"},
+            {"Treynor Ratio", "-4.178"},
             {"Total Fees", "$2.00"}
         };
     }

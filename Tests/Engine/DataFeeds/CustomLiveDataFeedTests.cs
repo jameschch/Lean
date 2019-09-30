@@ -16,7 +16,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -32,6 +31,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Lean.Engine.DataFeeds.Transport;
 using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
@@ -48,6 +48,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         [Test]
         public void EmitsDailyQuandlFutureDataOverWeekends()
         {
+            RemoteFileSubscriptionStreamReader.SetDownloadProvider(new Api.Api());
             var tickers = new[] { "CHRIS/CME_ES1", "CHRIS/CME_ES2" };
             var startDate = new DateTime(2018, 4, 1);
             var endDate = new DateTime(2018, 4, 20);
@@ -80,70 +81,91 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var timer = Ref.Create<Timer>(null);
             timer.Value = new Timer(state =>
             {
-                var currentTime = timeProvider.GetUtcNow().ConvertFromUtc(TimeZones.NewYork);
-
-                if (currentTime.Date > endDate.Date)
+                try
                 {
-                    Log.Trace($"Total data points emitted: {dataPointsEmitted}");
+                    var currentTime = timeProvider.GetUtcNow().ConvertFromUtc(TimeZones.NewYork);
 
-                    _feed.Exit();
-                    cancellationTokenSource.Cancel();
-                    return;
-                }
-
-                if (currentTime.Date > lastFileWriteDate.Date)
-                {
-                    foreach (var ticker in tickers)
+                    if (currentTime.Date > endDate.Date)
                     {
-                        var source = TestableQuandlFuture.GetLocalFileName(ticker, "csv");
+                        Log.Trace($"Total data points emitted: {dataPointsEmitted.ToStringInvariant()}");
 
-                        // write new local file including only rows up to current date
-                        var outputFileName = TestableQuandlFuture.GetLocalFileName(ticker, "test");
+                        _feed.Exit();
+                        cancellationTokenSource.Cancel();
+                        return;
+                    }
 
-                        var sb = new StringBuilder();
+                    if (currentTime.Date > lastFileWriteDate.Date)
+                    {
+                        foreach (var ticker in tickers)
                         {
-                            using (var reader = new StreamReader(source))
+                            var source = TestableQuandlFuture.GetLocalFileName(ticker, "csv");
+
+                            // write new local file including only rows up to current date
+                            var outputFileName = TestableQuandlFuture.GetLocalFileName(ticker, "test");
+
+                            var sb = new StringBuilder();
                             {
-                                var firstLine = true;
-                                string line;
-                                while ((line = reader.ReadLine()) != null)
+                                using (var reader = new StreamReader(source))
                                 {
-                                    if (firstLine)
+                                    var firstLine = true;
+                                    string line;
+                                    while ((line = reader.ReadLine()) != null)
                                     {
+                                        if (firstLine)
+                                        {
+                                            sb.AppendLine(line);
+                                            firstLine = false;
+                                            continue;
+                                        }
+
+                                        var csv = line.Split(',');
+                                        var time = Parse.DateTimeExact(csv[0], "yyyy-MM-dd");
+                                        if (time.Date >= currentTime.Date)
+                                            break;
+
                                         sb.AppendLine(line);
-                                        firstLine = false;
-                                        continue;
                                     }
-
-                                    var csv = line.Split(',');
-                                    var time = DateTime.ParseExact(csv[0], "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                                    if (time.Date >= currentTime.Date)
-                                        break;
-
-                                    sb.AppendLine(line);
                                 }
+                            }
+
+                            if (currentTime.Date.DayOfWeek != DayOfWeek.Saturday && currentTime.Date.DayOfWeek != DayOfWeek.Sunday)
+                            {
+                                var fileContent = sb.ToString();
+                                try
+                                {
+                                    File.WriteAllText(outputFileName, fileContent);
+                                }
+                                catch (IOException)
+                                {
+                                    Log.Error("IOException: will sleep 200ms and retry once more");
+                                    // lets sleep 200ms and retry once more, consumer could be reading the file
+                                    // this exception happens in travis intermittently, GH issue 3273
+                                    Thread.Sleep(200);
+                                    File.WriteAllText(outputFileName, fileContent);
+                                }
+
+                                Log.Trace($"Time:{currentTime} - Ticker:{ticker} - Files written:{++_countFilesWritten}");
                             }
                         }
 
-                        if (currentTime.Date.DayOfWeek != DayOfWeek.Saturday && currentTime.Date.DayOfWeek != DayOfWeek.Sunday)
-                        {
-                            File.WriteAllText(outputFileName, sb.ToString());
-
-                            Log.Trace($"Time:{currentTime} - Ticker:{ticker} - Files written:{++_countFilesWritten}");
-                        }
+                        lastFileWriteDate = currentTime;
                     }
 
-                    lastFileWriteDate = currentTime;
+                    // 30 minutes is the check interval for daily remote files, so we choose a smaller one to advance time
+                    timeProvider.Advance(TimeSpan.FromMinutes(20));
+
+                    //Log.Trace($"Time advanced to: {timeProvider.GetUtcNow().ConvertFromUtc(TimeZones.NewYork)}");
+
+                    // restart the timer
+                    timer.Value.Change(timerInterval.Milliseconds, Timeout.Infinite);
+
                 }
-
-                // 30 minutes is the check interval for daily remote files, so we choose a smaller one to advance time
-                timeProvider.Advance(TimeSpan.FromMinutes(20));
-
-                //Log.Trace($"Time advanced to: {timeProvider.GetUtcNow().ConvertFromUtc(TimeZones.NewYork)}");
-
-                // restart the timer
-                timer.Value.Change(timerInterval.Milliseconds, Timeout.Infinite);
-
+                catch (Exception exception)
+                {
+                    Log.Error(exception);
+                    _feed.Exit();
+                    cancellationTokenSource.Cancel();
+                }
             }, null, timerInterval.Milliseconds, Timeout.Infinite);
 
             try
@@ -152,7 +174,11 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 {
                     foreach (var dataPoint in timeSlice.Slice.Values)
                     {
-                        Log.Trace($"Data point emitted at {timeSlice.Slice.Time}: {dataPoint.Symbol.Value} {dataPoint.Value} {dataPoint.EndTime}");
+                        Log.Trace($"Data point emitted at {timeSlice.Slice.Time.ToStringInvariant()}: " +
+                            $"{dataPoint.Symbol.Value} {dataPoint.Value.ToStringInvariant()} " +
+                            $"{dataPoint.EndTime.ToStringInvariant()}"
+                        );
+
                         dataPointsEmitted++;
                     }
                 }
@@ -163,6 +189,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             }
 
             timer.Value.Dispose();
+            dataManager.RemoveAllSubscriptions();
             Assert.AreEqual(14 * tickers.Length, dataPointsEmitted);
         }
 
@@ -257,6 +284,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             }
 
             timer.Value.Dispose();
+            dataManager.RemoveAllSubscriptions();
             Assert.AreEqual(14, slicesEmitted);
             Assert.AreEqual(14 * symbols.Count, dataPointsEmitted);
         }
@@ -308,7 +336,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
 
             public static string GetLocalFileName(string ticker, string fileExtension)
             {
-                return $"./TestData/quandl_future_{ticker.Replace("/", "_").ToLower()}.{fileExtension}";
+                return $"./TestData/quandl_future_{ticker.Replace("/", "_").ToLowerInvariant()}.{fileExtension}";
             }
         }
     }

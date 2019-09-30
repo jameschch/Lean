@@ -19,6 +19,7 @@ using System.Globalization;
 using NodaTime;
 using QuantConnect.Logging;
 using QuantConnect.Securities;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect
 {
@@ -53,6 +54,12 @@ namespace QuantConnect
         /// we can still do math against it without checking everywhere for <see cref="TimeSpan.MaxValue"/>
         /// </summary>
         public static readonly TimeSpan MaxTimeSpan = TimeSpan.FromDays(1000*365);
+
+        /// <summary>
+        /// One Year TimeSpan Period Constant
+        /// </summary>
+        /// <remarks>365 days</remarks>
+        public static readonly TimeSpan OneYear = TimeSpan.FromDays(365);
 
         /// <summary>
         /// One Day TimeSpan Period Constant
@@ -140,7 +147,7 @@ namespace QuantConnect
             }
             catch (Exception err)
             {
-                Log.Error(err, "UnixTimeStamp: " + unixTimeStamp);
+                Log.Error(err, Invariant($"UnixTimeStamp: {unixTimeStamp}"));
                 time = DateTime.Now;
             }
             return time;
@@ -161,7 +168,7 @@ namespace QuantConnect
             }
             catch (Exception err)
             {
-                Log.Error(err, "UnixTimeStamp: " + unixTimeStamp);
+                Log.Error(err, Invariant($"UnixTimeStamp: {unixTimeStamp}"));
                 time = DateTime.Now;
             }
             return time;
@@ -181,7 +188,7 @@ namespace QuantConnect
             }
             catch (Exception err)
             {
-                Log.Error(err, time.ToString("o"));
+                Log.Error(err, Invariant($"{time:o}"));
             }
             return timestamp;
         }
@@ -365,20 +372,21 @@ namespace QuantConnect
                 var currentInTimeZone = currentExchangeTime.ConvertTo(exchange.TimeZone, timeZone);
                 var currentInTimeZoneEod = currentInTimeZone.Date.AddDays(1);
 
+                var currentExchangeTimeEod = currentInTimeZoneEod.ConvertTo(timeZone, exchange.TimeZone);
+
                 // don't pass the end
-                if (currentInTimeZoneEod.ConvertTo(timeZone, exchange.TimeZone) > thru)
+                if (currentExchangeTimeEod > thru)
                 {
-                    currentInTimeZoneEod = thru.ConvertTo(exchange.TimeZone, timeZone);
+                    currentExchangeTimeEod = thru;
                 }
 
                 // perform market open checks in the exchange time zone
-                var currentExchangeTimeEod = currentInTimeZoneEod.ConvertTo(timeZone, exchange.TimeZone);
                 if (exchange.IsOpen(currentExchangeTime, currentExchangeTimeEod, includeExtendedMarketHours))
                 {
                     yield return currentInTimeZone.Date;
                 }
 
-                currentExchangeTime = currentInTimeZoneEod.ConvertTo(timeZone, exchange.TimeZone);
+                currentExchangeTime = currentExchangeTimeEod;
             }
         }
 
@@ -415,7 +423,7 @@ namespace QuantConnect
         public static int TradeableDates(ICollection<Security> securities, DateTime start, DateTime finish)
         {
             var count = 0;
-            Log.Trace("Time.TradeableDates(): Security Count: " + securities.Count);
+            Log.Trace(Invariant($"Time.TradeableDates(): Security Count: {securities.Count}"));
             try
             {
                 foreach (var day in EachDay(start, finish))

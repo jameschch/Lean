@@ -30,8 +30,10 @@ namespace QuantConnect.Algorithm.CSharp
     /// <meta name="tag" content="using data" />
     /// <meta name="tag" content="universes" />
     /// <meta name="tag" content="custom universes" />
-    public class DropboxBaseDataUniverseSelectionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
+    public class DropboxBaseDataUniverseSelectionAlgorithm : QCAlgorithm//, IRegressionAlgorithmDefinition
     {
+        // Regression algorithm disabled due to dropbox file missing
+
         // the changes from the previous universe selection
         private SecurityChanges _changes = SecurityChanges.None;
 
@@ -195,13 +197,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Loss Rate", "30%"},
             {"Win Rate", "70%"},
             {"Profit-Loss Ratio", "1.96"},
-            {"Alpha", "0.119"},
-            {"Beta", "2.617"},
+            {"Alpha", "0.071"},
+            {"Beta", "0.362"},
             {"Annual Standard Deviation", "0.086"},
             {"Annual Variance", "0.007"},
-            {"Information Ratio", "1.764"},
-            {"Tracking Error", "0.086"},
-            {"Treynor Ratio", "0.065"},
+            {"Information Ratio", "-1.021"},
+            {"Tracking Error", "0.103"},
+            {"Treynor Ratio", "0.471"},
             {"Total Fees", "$251.12"}
         };
     }

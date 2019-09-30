@@ -79,6 +79,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Console.WriteLine("Count: " + count);
             stopwatch.Stop();
             feed.Exit();
+            dataManager.RemoveAllSubscriptions();
             Console.WriteLine($"Elapsed time: {stopwatch.Elapsed}   KPS: {count/1000d/stopwatch.Elapsed.TotalSeconds}");
         }
 
@@ -93,7 +94,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var resultHandler = new BacktestingResultHandler();
             var mapFileProvider = new LocalDiskMapFileProvider();
             var factorFileProvider = new LocalDiskFactorFileProvider(mapFileProvider);
-            var factory = new SubscriptionDataReaderSubscriptionEnumeratorFactory(resultHandler, mapFileProvider, factorFileProvider, dataProvider, false, true);
+            var factory = new SubscriptionDataReaderSubscriptionEnumeratorFactory(resultHandler, mapFileProvider, factorFileProvider, dataProvider, true);
 
             var universe = algorithm.UniverseManager.Single().Value;
             var security = algorithm.Securities.Single().Value;
@@ -125,6 +126,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             Console.WriteLine("Count: " + count);
 
             stopwatch.Stop();
+            enumerator.Dispose();
             Console.WriteLine($"Elapsed time: {stopwatch.Elapsed}   KPS: {count / 1000d / stopwatch.Elapsed.TotalSeconds}");
         }
     }

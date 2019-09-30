@@ -27,7 +27,6 @@ using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds.Enumerators;
 using QuantConnect.Logging;
 using QuantConnect.Securities.Option;
-using QuantConnect.Util;
 
 namespace QuantConnect.Lean.Engine.DataFeeds
 {
@@ -168,25 +167,16 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
 
             //Save the type of data we'll be getting from the source.
-
-            //Create the dynamic type-activators:
-            var objectActivator = ObjectActivator.GetActivator(_config.Type);
-
-            if (objectActivator == null)
+            try
             {
-                OnInvalidConfigurationDetected(
-                    new InvalidConfigurationDetectedEventArgs(
-                        $"Custom data type \'{_config.Type.Name}\' missing parameterless constructor " +
-                        $"E.g. public {_config.Type.Name}() {{ }}"));
-
+                _dataFactory = _config.GetBaseDataInstance();
+            }
+            catch (ArgumentException exception)
+            {
+                OnInvalidConfigurationDetected(new InvalidConfigurationDetectedEventArgs(exception.Message));
                 _endOfStream = true;
                 return;
             }
-
-            //Create an instance of the "Type":
-            var userObj = objectActivator.Invoke(new object[] { _config.Type });
-
-            _dataFactory = userObj as BaseData;
 
             //If its quandl set the access token in data factory:
             var quandl = _dataFactory as Quandl;
@@ -221,33 +211,37 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             _factorFile = new FactorFile(_config.Symbol.Value, new List<FactorFileRow>());
             _mapFile = new MapFile(_config.Symbol.Value, new List<MapFileRow>());
 
-            // load up the map and factor files for equities
-            if (!_config.IsCustomData && _config.SecurityType == SecurityType.Equity)
+            // load up the map files for equities, options, and custom data if it supports it.
+            // Only load up factor files for equities
+            if (_dataFactory.RequiresMapping())
             {
                 try
                 {
-                    var mapFile = _mapFileResolver.ResolveMapFile(_config.Symbol.ID.Symbol, _config.Symbol.ID.Date);
+                    var mapFile = _mapFileResolver.ResolveMapFile(_config.Symbol, _config.Type);
 
                     // only take the resolved map file if it has data, otherwise we'll use the empty one we defined above
                     if (mapFile.Any()) _mapFile = mapFile;
 
-                    var factorFile = _factorFileProvider.Get(_config.Symbol);
-                    _hasScaleFactors = factorFile != null;
-                    if (_hasScaleFactors)
+                    if (!_config.IsCustomData && _config.SecurityType != SecurityType.Option)
                     {
-                        _factorFile = factorFile;
-
-                        // if factor file has minimum date, update start period if before minimum date
-                        if (!_isLiveMode && _factorFile != null && _factorFile.FactorFileMinimumDate.HasValue)
+                        var factorFile = _factorFileProvider.Get(_config.Symbol);
+                        _hasScaleFactors = factorFile != null;
+                        if (_hasScaleFactors)
                         {
-                            if (_periodStart < _factorFile.FactorFileMinimumDate.Value)
-                            {
-                                _periodStart = _factorFile.FactorFileMinimumDate.Value;
+                            _factorFile = factorFile;
 
-                                OnNumericalPrecisionLimited(
-                                    new NumericalPrecisionLimitedEventArgs(
-                                        $"Data for symbol {_config.Symbol.Value} has been limited due to numerical precision issues in the factor file. " +
-                                        $"The starting date has been set to {_factorFile.FactorFileMinimumDate.Value.ToShortDateString()}."));
+                            // if factor file has minimum date, update start period if before minimum date
+                            if (!_isLiveMode && _factorFile != null && _factorFile.FactorFileMinimumDate.HasValue)
+                            {
+                                if (_periodStart < _factorFile.FactorFileMinimumDate.Value)
+                                {
+                                    _periodStart = _factorFile.FactorFileMinimumDate.Value;
+
+                                    OnNumericalPrecisionLimited(
+                                        new NumericalPrecisionLimitedEventArgs(
+                                            $"Data for symbol {_config.Symbol.Value} has been limited due to numerical precision issues in the factor file. " +
+                                            $"The starting date has been set to {_factorFile.FactorFileMinimumDate.Value.ToShortDateString()}."));
+                                }
                             }
                         }
                     }
@@ -255,22 +249,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 catch (Exception err)
                 {
                     Log.Error(err, "Fetching Price/Map Factors: " + _config.Symbol.ID + ": ");
-                }
-            }
-
-            // load up the map and factor files for underlying of equity option
-            if (!_config.IsCustomData && _config.SecurityType == SecurityType.Option)
-            {
-                try
-                {
-                    var mapFile = _mapFileResolver.ResolveMapFile(_config.Symbol.Underlying.ID.Symbol, _config.Symbol.Underlying.ID.Date);
-
-                    // only take the resolved map file if it has data, otherwise we'll use the empty one we defined above
-                    if (mapFile.Any()) _mapFile = mapFile;
-                }
-                catch (Exception err)
-                {
-                    Log.Error(err, "Map Factors: " + _config.Symbol.ID + ": ");
                 }
             }
 
@@ -306,6 +284,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         {
             if (!_initialized)
             {
+                // Late initialization so it is performed in the data feed stack
+                // and not in the algorithm thread
                 Initialize();
             }
 
@@ -468,6 +448,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
         private void AttachEventHandlers(ISubscriptionDataSourceReader dataSourceReader, SubscriptionDataSource source)
         {
+            // NOTE: There seems to be some overlap in InvalidSource and CreateStreamReaderError
+            //       this may be worthy of further investigation and potential consolidation of events.
+
             // handle missing files
             dataSourceReader.InvalidSource += (sender, args) =>
             {
@@ -499,7 +482,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 var textSubscriptionFactory = (TextSubscriptionDataSourceReader)dataSourceReader;
                 textSubscriptionFactory.CreateStreamReaderError += (sender, args) =>
                 {
-                    //Log.Error(string.Format("Failed to get StreamReader for data source({0}), symbol({1}). Skipping date({2}). Reader is null.", args.Source.Source, _mappedSymbol, args.Date.ToShortDateString()));
                     if (_config.IsCustomData)
                     {
                         OnDownloadFailed(

@@ -16,12 +16,8 @@
 
 using System;
 using System.ComponentModel.Composition;
-using System.Diagnostics;
-using System.IO;
 using System.Threading;
-using System.Windows.Forms;
 using QuantConnect.Configuration;
-using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
@@ -37,7 +33,7 @@ namespace QuantConnect.Lean.Launcher
         {
             AppDomain.CurrentDomain.AssemblyLoad += (sender, e) =>
             {
-                if (e.LoadedAssembly.FullName.ToLower().Contains("python"))
+                if (e.LoadedAssembly.FullName.ToLowerInvariant().Contains("python"))
                 {
                     Log.Trace($"Python for .NET Assembly: {e.LoadedAssembly.GetName()}");
                 }
@@ -54,7 +50,7 @@ namespace QuantConnect.Lean.Launcher
 
             if (OS.IsWindows)
             {
-                Console.OutputEncoding = System.Text.Encoding.Unicode;
+                Console.OutputEncoding = System.Text.Encoding.UTF8;
             }
 
             // expect first argument to be config file name
@@ -106,17 +102,6 @@ namespace QuantConnect.Lean.Launcher
             {
                 Log.Error("Engine.Main(): Failed to load library: " + compositionException);
                 throw;
-            }
-
-            if (environment.EndsWith("-desktop"))
-            {
-                var info = new ProcessStartInfo
-                {
-                    UseShellExecute = false,
-                    FileName  = Config.Get("desktop-exe"),
-                    Arguments = Config.Get("desktop-http-port")
-                };
-                Process.Start(info);
             }
 
             // if the job version doesn't match this instance version then we can't process it

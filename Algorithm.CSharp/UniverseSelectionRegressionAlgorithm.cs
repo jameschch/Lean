@@ -153,7 +153,7 @@ namespace QuantConnect.Algorithm.CSharp
             if (actual != expected)
             {
                 var symbol = security.Symbol;
-                throw new Exception(string.Format("{0}({1}) expected {2}, but received {3}.", symbol, symbol.ID, expected, actual));
+                throw new Exception($"{symbol}({symbol.ID}) expected {expected.ToStringInvariant()}, but received {actual.ToStringInvariant()}.");
             }
         }
 
@@ -183,13 +183,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-0.704"},
-            {"Beta", "-28.684"},
+            {"Alpha", "-0.848"},
+            {"Beta", "1.987"},
             {"Annual Standard Deviation", "0.316"},
             {"Annual Variance", "0.1"},
-            {"Information Ratio", "-4.069"},
-            {"Tracking Error", "0.316"},
-            {"Treynor Ratio", "0.044"},
+            {"Information Ratio", "-4.134"},
+            {"Tracking Error", "0.255"},
+            {"Treynor Ratio", "-0.636"},
             {"Total Fees", "$5.00"}
         };
     }

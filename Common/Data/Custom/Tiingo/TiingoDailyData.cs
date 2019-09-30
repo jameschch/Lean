@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Data.Custom.Tiingo
 {
@@ -149,7 +150,7 @@ namespace QuantConnect.Data.Custom.Tiingo
                 _startDates.TryAdd(config.Symbol.Value, startDate);
             }
 
-            var source = $"https://api.tiingo.com/tiingo/daily/{config.Symbol.Value}/prices?startDate={startDate:yyyy-MM-dd}&token={Tiingo.AuthCode}";
+            var source = Invariant($"https://api.tiingo.com/tiingo/daily/{config.Symbol.Value}/prices?startDate={startDate:yyyy-MM-dd}&token={Tiingo.AuthCode}");
             return new SubscriptionDataSource(source, SubscriptionTransportMedium.RemoteFile, FileFormat.Collection);
         }
 
@@ -177,6 +178,15 @@ namespace QuantConnect.Data.Custom.Tiingo
             }
 
             return new BaseDataCollection(date, config.Symbol, list);
+        }
+
+        /// <summary>
+        /// Indicates if there is support for mapping
+        /// </summary>
+        /// <returns>True indicates mapping should be used</returns>
+        public override bool RequiresMapping()
+        {
+            return true;
         }
     }
 }

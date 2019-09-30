@@ -28,6 +28,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.Alpha;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
+using QuantConnect.Statistics;
 using QuantConnect.Util;
 
 namespace QuantConnect.Lean.Engine.Alphas
@@ -37,17 +38,23 @@ namespace QuantConnect.Lean.Engine.Alphas
     /// </summary>
     public class DefaultAlphaHandler : IAlphaHandler
     {
-        private DateTime _lastSecurityValuesSnapshotTime;
-
-        private ChartingInsightManagerExtension _charting;
+        private DateTime _lastStepTime;
+        private List<Insight> _insights;
         private ISecurityValuesProvider _securityValuesProvider;
-        private CancellationTokenSource _cancellationTokenSource;
+        private FitnessScoreManager _fitnessScore;
+        private DateTime _lastFitnessScoreCalculation;
         private readonly object _lock = new object();
+        private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
+
+        /// <summary>
+        /// The cancellation token that will be cancelled when requested to exit
+        /// </summary>
+        protected CancellationToken CancellationToken => _cancellationTokenSource.Token;
 
         /// <summary>
         /// Gets a flag indicating if this handler's thread is still running and processing messages
         /// </summary>
-        public bool IsActive { get; private set; }
+        public virtual bool IsActive { get; private set; }
 
         /// <summary>
         /// Gets the current alpha runtime statistics
@@ -93,26 +100,41 @@ namespace QuantConnect.Lean.Engine.Alphas
         /// <param name="api">Api instance</param>
         public virtual void Initialize(AlgorithmNodePacket job, IAlgorithm algorithm, IMessagingHandler messagingHandler, IApi api)
         {
-            // initializing these properties just in case, doens't hurt to have them populated
+            // initializing these properties just in case, doesn't hurt to have them populated
             Job = job;
             Algorithm = algorithm;
             MessagingHandler = messagingHandler;
 
+            _fitnessScore = new FitnessScoreManager();
+            _insights = new List<Insight>();
             _securityValuesProvider = new AlgorithmSecurityValuesProvider(algorithm);
 
             InsightManager = CreateInsightManager();
 
-            // send scored insights to messaging handler
-            InsightManager.AddExtension(CreateAlphaResultPacketSender());
-
             var statistics = new StatisticsInsightManagerExtension(algorithm);
             RuntimeStatistics = statistics.Statistics;
             InsightManager.AddExtension(statistics);
-            _charting = new ChartingInsightManagerExtension(algorithm, statistics);
-            InsightManager.AddExtension(_charting);
+
+            AddInsightManagerCustomExtensions(statistics);
 
             // when insight is generated, take snapshot of securities and place in queue for insight manager to process on alpha thread
-            algorithm.InsightsGenerated += (algo, collection) => InsightManager.Step(collection.DateTimeUtc, CreateSecurityValuesSnapshot(), collection);
+            algorithm.InsightsGenerated += (algo, collection) =>
+            {
+                lock (_insights)
+                {
+                    _insights.AddRange(collection.Insights);
+                }
+            };
+        }
+
+        /// <summary>
+        /// Allows each alpha handler implementation to add there own optional extensions
+        /// </summary>
+        protected virtual void AddInsightManagerCustomExtensions(StatisticsInsightManagerExtension statistics)
+        {
+            // send scored insights to messaging handler
+            InsightManager.AddExtension(new AlphaResultPacketSender(Job, MessagingHandler, TimeSpan.FromSeconds(1), 50));
+            InsightManager.AddExtension(new ChartingInsightManagerExtension(Algorithm, statistics));
         }
 
         /// <summary>
@@ -122,6 +144,7 @@ namespace QuantConnect.Lean.Engine.Alphas
         /// <param name="algorithm">The algorithm instance</param>
         public void OnAfterAlgorithmInitialized(IAlgorithm algorithm)
         {
+            _fitnessScore.Initialize(algorithm);
             // send date ranges to extensions for initialization -- this data wasn't available when the handler was
             // initialzied, so we need to invoke it here
             InsightManager.InitializeExtensionsForRange(algorithm.StartDate, algorithm.EndDate, algorithm.UtcTime);
@@ -132,10 +155,26 @@ namespace QuantConnect.Lean.Engine.Alphas
         /// </summary>
         public virtual void ProcessSynchronousEvents()
         {
-            // check the last snap shot time, we may have already produced a snapshot via OnInsightssGenerated
-            if (_lastSecurityValuesSnapshotTime != Algorithm.UtcTime)
+            // check the last snap shot time, we may have already produced a snapshot via OnInsightsGenerated
+            if (_lastStepTime != Algorithm.UtcTime)
             {
-                InsightManager.Step(Algorithm.UtcTime, CreateSecurityValuesSnapshot(), new GeneratedInsightsCollection(Algorithm.UtcTime, Enumerable.Empty<Insight>()));
+                _lastStepTime = Algorithm.UtcTime;
+                lock (_insights)
+                {
+                    InsightManager.Step(_lastStepTime, _securityValuesProvider.GetAllValues(), new GeneratedInsightsCollection(_lastStepTime, _insights, clone: false));
+                    _insights.Clear();
+                }
+            }
+
+            if (_lastFitnessScoreCalculation.Date != Algorithm.UtcTime.Date)
+            {
+                _lastFitnessScoreCalculation = Algorithm.UtcTime.Date;
+                _fitnessScore.UpdateScores();
+
+                RuntimeStatistics.FitnessScore = _fitnessScore.FitnessScore;
+                RuntimeStatistics.PortfolioTurnover = _fitnessScore.PortfolioTurnover;
+                RuntimeStatistics.SortinoRatio = _fitnessScore.SortinoRatio;
+                RuntimeStatistics.ReturnOverMaxDrawdown = _fitnessScore.ReturnOverMaxDrawdown;
             }
         }
 
@@ -145,7 +184,6 @@ namespace QuantConnect.Lean.Engine.Alphas
         public virtual void Run()
         {
             IsActive = true;
-            _cancellationTokenSource = new CancellationTokenSource();
 
             using (LiveMode ? new Timer(_ => StoreInsights(),
                 null,
@@ -153,7 +191,7 @@ namespace QuantConnect.Lean.Engine.Alphas
                 TimeSpan.FromMinutes(10)) : null)
             {
                 // run main loop until canceled, will clean out work queues separately
-                while (!_cancellationTokenSource.IsCancellationRequested)
+                while (!CancellationToken.IsCancellationRequested)
                 {
                     try
                     {
@@ -198,6 +236,7 @@ namespace QuantConnect.Lean.Engine.Alphas
         /// <summary>
         /// Save insight results to persistent storage
         /// </summary>
+        /// <remarks>Method called by <see cref="Run"/></remarks>
         protected virtual void StoreInsights()
         {
             // avoid reentrancy
@@ -231,21 +270,6 @@ namespace QuantConnect.Lean.Engine.Alphas
         {
             var scoreFunctionProvider = new DefaultInsightScoreFunctionProvider();
             return new InsightManager(scoreFunctionProvider, 0);
-        }
-
-        /// <summary>
-        /// Creates the <see cref="AlphaResultPacketSender"/> to manage sending finalized insights via the messaging handler
-        /// </summary>
-        /// <returns>A new <see cref="CreateAlphaResultPacketSender"/> instance</returns>
-        protected virtual AlphaResultPacketSender CreateAlphaResultPacketSender()
-        {
-            return new AlphaResultPacketSender(Job, MessagingHandler, TimeSpan.FromSeconds(1), 50);
-        }
-
-        private ReadOnlySecurityValuesCollection CreateSecurityValuesSnapshot()
-        {
-            _lastSecurityValuesSnapshotTime = Algorithm.UtcTime;
-            return _securityValuesProvider.GetAllValues();
         }
 
         /// <summary>

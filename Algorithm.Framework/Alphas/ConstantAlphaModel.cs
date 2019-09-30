@@ -31,6 +31,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         private readonly TimeSpan _period;
         private readonly double? _magnitude;
         private readonly double? _confidence;
+        private readonly double? _weight;
         private readonly HashSet<Security> _securities;
         private readonly Dictionary<Symbol, DateTime> _insightsTimeBySymbol;
 
@@ -53,7 +54,8 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// <param name="period">The period over which the insight with come to fruition</param>
         /// <param name="magnitude">The predicted change in magnitude as a +- percentage</param>
         /// <param name="confidence">The confidence in the insight</param>
-        public ConstantAlphaModel(InsightType type, InsightDirection direction, TimeSpan period, double? magnitude, double? confidence)
+        /// <param name="weight">The portfolio weight of the insights</param>
+        public ConstantAlphaModel(InsightType type, InsightDirection direction, TimeSpan period, double? magnitude, double? confidence, double? weight = null)
         {
             _type = type;
             _direction = direction;
@@ -62,6 +64,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
             // Optional
             _magnitude = magnitude;
             _confidence = confidence;
+            _weight = weight;
 
             _securities = new HashSet<Security>();
             _insightsTimeBySymbol = new Dictionary<Symbol, DateTime>();
@@ -90,9 +93,12 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         {
             foreach (var security in _securities)
             {
-                if (ShouldEmitInsight(algorithm.UtcTime, security.Symbol))
+                // security price could be zero until we get the first data point. e.g. this could happen
+                // when adding both forex and equities, we will first get a forex data point
+                if (security.Price != 0
+                    && ShouldEmitInsight(algorithm.UtcTime, security.Symbol))
                 {
-                    yield return new Insight(security.Symbol, _period, _type, _direction, _magnitude, _confidence);
+                    yield return new Insight(security.Symbol, _period, _type, _direction, _magnitude, _confidence, weight: _weight);
                 }
             }
         }

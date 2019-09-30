@@ -82,7 +82,7 @@ namespace QuantConnect.Algorithm.CSharp
                 // we'll submit the next type of order from the queue
                 var orderType = _orderTypesQueue.Dequeue();
                 //Log("");
-                Log("\r\n--------------MONTH: " + Time.ToString("MMMM") + ":: " + orderType + "\r\n");
+                Log($"\r\n--------------MONTH: {Time.ToStringInvariant("MMMM")}:: {orderType}\r\n");
                 //Log("");
                 LastMonth = Time.Month;
                 Log("ORDER TYPE:: " + orderType);
@@ -204,13 +204,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-0.074"},
-            {"Beta", "-0.27"},
+            {"Alpha", "0.014"},
+            {"Beta", "-0.443"},
             {"Annual Standard Deviation", "0.058"},
             {"Annual Variance", "0.003"},
-            {"Information Ratio", "-1.701"},
-            {"Tracking Error", "0.058"},
-            {"Treynor Ratio", "0.293"},
+            {"Information Ratio", "-1.759"},
+            {"Tracking Error", "0.164"},
+            {"Treynor Ratio", "0.178"},
             {"Total Fees", "$21.00"}
         };
     }

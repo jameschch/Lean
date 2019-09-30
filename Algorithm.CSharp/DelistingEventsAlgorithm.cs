@@ -66,7 +66,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 var symbol = kvp.Key;
                 var tradeBar = kvp.Value;
-                Debug($"OnData(Slice): {Time}: {symbol}: {tradeBar.Close.ToString("0.00")}");
+                Debug($"OnData(Slice): {Time}: {symbol}: {tradeBar.Close.ToStringInvariant("0.00")}");
             }
 
             // the slice can also contain delisting data: data.Delistings in a dictionary string->Delisting
@@ -154,13 +154,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-1.953"},
-            {"Beta", "23.587"},
+            {"Alpha", "-1.297"},
+            {"Beta", "-1.062"},
             {"Annual Standard Deviation", "0.156"},
             {"Annual Variance", "0.024"},
-            {"Information Ratio", "-10.33"},
-            {"Tracking Error", "0.156"},
-            {"Treynor Ratio", "-0.067"},
+            {"Information Ratio", "-8.704"},
+            {"Tracking Error", "0.215"},
+            {"Treynor Ratio", "1.499"},
             {"Total Fees", "$36.70"}
         };
     }

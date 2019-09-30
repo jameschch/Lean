@@ -57,7 +57,7 @@ namespace QuantConnect.Data.Auxiliary
         /// </summary>
         public MapFile(string permtick, IEnumerable<MapFileRow> data)
         {
-            Permtick = permtick.ToUpper();
+            Permtick = permtick.LazyToUpper();
             _data = new SortedDictionary<DateTime, MapFileRow>(data.Distinct().ToDictionary(x => x.Date));
 
             // for performance we set first and last date on ctr
@@ -152,7 +152,7 @@ namespace QuantConnect.Data.Auxiliary
         /// Writes the map file to a CSV file
         /// </summary>
         /// <param name="market">The market to save the MapFile to</param>
-        public void WriteToCsv(string market) 
+        public void WriteToCsv(string market)
         {
             var filePath = GetMapFilePath(Permtick, market);
             var fileDir = Path.GetDirectoryName(filePath);
@@ -174,7 +174,7 @@ namespace QuantConnect.Data.Auxiliary
         /// <returns>The file path to the requested map file</returns>
         public static string GetMapFilePath(string permtick, string market)
         {
-            return Path.Combine(Globals.CacheDataFolder, "equity", market, "map_files", permtick.ToLower() + ".csv");
+            return Path.Combine(Globals.CacheDataFolder, "equity", market, "map_files", permtick.ToLowerInvariant() + ".csv");
         }
 
         #region Implementation of IEnumerable
@@ -236,7 +236,7 @@ namespace QuantConnect.Data.Auxiliary
             }
             catch (Exception err)
             {
-                Log.Error(err, "File: " + file);
+                Log.Error(err, $"File: {file}");
                 return new List<MapFileRow>();
             }
         }

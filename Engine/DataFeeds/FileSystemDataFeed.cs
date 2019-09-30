@@ -79,7 +79,6 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 _mapFileProvider,
                 _factorFileProvider,
                 _dataProvider,
-                isLiveMode: false,
                 includeAuxiliaryData: true);
 
             IsActive = true;
@@ -196,8 +195,10 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             if (config.Type == typeof (CoarseFundamental))
             {
                 firstLoopCount = 2;
-                lowerThreshold = 5;
-                upperThreshold = 100000;
+                // the lower threshold will be when we start the worker again, if he is stopped
+                lowerThreshold = 200;
+                // the upper threshold will stop the worker from loading more data. This is roughly 1 GB
+                upperThreshold = 500;
             }
 
             var enqueueable = new EnqueueableEnumerator<SubscriptionData>(true);

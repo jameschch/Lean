@@ -28,9 +28,13 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NodaTime;
 using Python.Runtime;
+using QuantConnect.Data.UniverseSelection;
+using QuantConnect.Data;
 using QuantConnect.Orders;
 using QuantConnect.Securities;
+using QuantConnect.Util;
 using Timer = System.Timers.Timer;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect
 {
@@ -39,6 +43,38 @@ namespace QuantConnect
     /// </summary>
     public static class Extensions
     {
+        /// <summary>
+        /// Given a type will create a new instance using the parameterless constructor
+        /// and assert the type implements <see cref="BaseData"/>
+        /// </summary>
+        /// <remarks>One of the objectives of this method is to normalize the creation of the
+        /// BaseData instances while reducing code duplication</remarks>
+        public static BaseData GetBaseDataInstance(this Type type)
+        {
+            var objectActivator = ObjectActivator.GetActivator(type);
+            if (objectActivator == null)
+            {
+                throw new ArgumentException($"Data type \'{type.Name}\' missing parameterless constructor " +
+                    $"E.g. public {type.Name}() {{ }}");
+            }
+
+            var instance = objectActivator.Invoke(new object[] { type });
+            if(instance == null)
+            {
+                // shouldn't happen but just in case...
+                throw new ArgumentException($"Failed to create instance of type \'{type.Name}\'");
+            }
+
+            // we expect 'instance' to inherit BaseData in most cases so we use 'as' versus 'IsAssignableFrom'
+            // since it is slightly cheaper
+            var result = instance as BaseData;
+            if (result == null)
+            {
+                throw new ArgumentException($"Data type \'{type.Name}\' does not inherit required {nameof(BaseData)}");
+            }
+            return result;
+        }
+
         /// <summary>
         /// Helper method that will cast the provided <see cref="PyObject"/>
         /// to a T type and dispose of it.
@@ -124,7 +160,7 @@ namespace QuantConnect
             using (var md5Hash = MD5.Create())
             {
                 var data = md5Hash.ComputeHash(Encoding.UTF8.GetBytes(str));
-                foreach (var t in data) builder.Append(t.ToString("x2"));
+                foreach (var t in data) builder.Append(t.ToStringInvariant("x2"));
             }
             return builder.ToString();
         }
@@ -141,9 +177,27 @@ namespace QuantConnect
             var crypto = crypt.ComputeHash(Encoding.UTF8.GetBytes(data), 0, Encoding.UTF8.GetByteCount(data));
             foreach (var theByte in crypto)
             {
-                hash.Append(theByte.ToString("x2"));
+                hash.Append(theByte.ToStringInvariant("x2"));
             }
             return hash.ToString();
+        }
+
+        /// <summary>
+        /// Lazy string to upper implementation.
+        /// Will first verify the string is not already upper and avoid
+        /// the call to <see cref="string.ToUpper()"/> if possible.
+        /// </summary>
+        /// <param name="data">The string to upper</param>
+        /// <returns>The upper string</returns>
+        public static string LazyToUpper(this string data)
+        {
+            // for performance only call to upper if required
+            var alreadyUpper = true;
+            for (int i = 0; i < data.Length && alreadyUpper; i++)
+            {
+                alreadyUpper = char.IsUpper(data[i]);
+            }
+            return alreadyUpper ? data : data.ToUpperInvariant();
         }
 
         /// <summary>
@@ -224,6 +278,22 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Will truncate the provided decimal, without rounding, to 3 decimal places
+        /// </summary>
+        /// <param name="value">The value to truncate</param>
+        /// <returns>New instance with just 3 decimal places</returns>
+        public static decimal TruncateTo3DecimalPlaces(this decimal value)
+        {
+            if (value == decimal.MaxValue
+                || value == decimal.MinValue
+                || value == 0)
+            {
+                return value;
+            }
+            return Math.Truncate(1000 * value) / 1000;
+        }
+
+        /// <summary>
         /// Provides global smart rounding, numbers larger than 1000 will round to 4 decimal places,
         /// while numbers smaller will round to 7 significant digits
         /// </summary>
@@ -250,6 +320,7 @@ namespace QuantConnect
         /// as a decimal, then the closest decimal value will be returned</returns>
         public static decimal SafeDecimalCast(this double input)
         {
+            if (input.IsNaNOrZero()) return 0;
             if (input <= (double) decimal.MinValue) return decimal.MinValue;
             if (input >= (double) decimal.MaxValue) return decimal.MaxValue;
             return (decimal) input;
@@ -529,7 +600,13 @@ namespace QuantConnect
                 // divide by zero exception
                 return dateTime;
             }
-            return dateTime.AddTicks(-(dateTime.Ticks % interval.Ticks));
+
+            var amount = dateTime.Ticks % interval.Ticks;
+            if (amount > 0)
+            {
+                return dateTime.AddTicks(-amount);
+            }
+            return dateTime;
         }
 
         /// <summary>
@@ -766,7 +843,7 @@ namespace QuantConnect
             {
                 var genericArguments = type.GetGenericArguments();
                 var toBeReplaced = "`" + (genericArguments.Length);
-                name = name.Replace(toBeReplaced, "<" + string.Join(", ", genericArguments.Select(x => x.GetBetterTypeName())) + ">");
+                name = name.Replace(toBeReplaced, $"<{string.Join(", ", genericArguments.Select(x => x.GetBetterTypeName()))}>");
             }
             return name;
         }
@@ -813,7 +890,7 @@ namespace QuantConnect
                 if (Time.OneMinute == timeSpan) return Resolution.Minute;
                 if (Time.OneHour   == timeSpan) return Resolution.Hour;
                 if (Time.OneDay    == timeSpan) return Resolution.Daily;
-                throw new InvalidOperationException($"Unable to exactly convert time span ('{timeSpan}') to resolution.");
+                throw new InvalidOperationException(Invariant($"Unable to exactly convert time span ('{timeSpan}') to resolution."));
             }
 
             // for non-perfect matches
@@ -939,7 +1016,7 @@ namespace QuantConnect
             var matches = regx.Matches(source);
             foreach (Match match in matches)
             {
-                source = source.Replace(match.Value, "<a href='" + match.Value + "' target='blank'>" + match.Value + "</a>");
+                source = source.Replace(match.Value, $"<a href=\'{match.Value}\' target=\'blank\'>{match.Value}</a>");
             }
             return source;
         }
@@ -984,7 +1061,7 @@ namespace QuantConnect
         /// <returns>A lower-case string representation of the specified enumeration value</returns>
         public static string ToLower(this Enum @enum)
         {
-            return @enum.ToString().ToLower();
+            return @enum.ToString().ToLowerInvariant();
         }
 
         /// <summary>
@@ -1265,8 +1342,9 @@ namespace QuantConnect
                 {
                     for (var i = 0; i < types.Length; i++)
                     {
-                        code += $",t{i}";
-                        locals.SetItem($"t{i}", types[i].ToPython());
+                        var iString = i.ToStringInvariant();
+                        code += $",t{iString}";
+                        locals.SetItem($"t{iString}", types[i].ToPython());
                     }
 
                     locals.SetItem("pyObject", pyObject);
@@ -1290,6 +1368,40 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Wraps the provided universe selection selector checking if it returned <see cref="Universe.Unchanged"/>
+        /// and returns it instead, else enumerates result as <see cref="IEnumerable{Symbol}"/>
+        /// </summary>
+        /// <remarks>This method is a work around for the fact that currently we can not create a delegate which returns
+        /// an <see cref="IEnumerable{Symbol}"/> from a python method returning an array, plus the fact that
+        /// <see cref="Universe.Unchanged"/> can not be cast to an array</remarks>
+        public static Func<T, IEnumerable<Symbol>> ConvertToUniverseSelectionSymbolDelegate<T>(this Func<T, object> selector)
+        {
+            return data =>
+            {
+                var result = selector(data);
+                return ReferenceEquals(result, Universe.Unchanged)
+                    ? Universe.Unchanged : ((object[])result).Select(x => (Symbol)x);
+            };
+        }
+
+        /// <summary>
+        /// Wraps the provided universe selection selector checking if it returned <see cref="Universe.Unchanged"/>
+        /// and returns it instead, else enumerates result as <see cref="IEnumerable{String}"/>
+        /// </summary>
+        /// <remarks>This method is a work around for the fact that currently we can not create a delegate which returns
+        /// an <see cref="IEnumerable{String}"/> from a python method returning an array, plus the fact that
+        /// <see cref="Universe.Unchanged"/> can not be cast to an array</remarks>
+        public static Func<T, IEnumerable<string>> ConvertToUniverseSelectionStringDelegate<T>(this Func<T, object> selector)
+        {
+            return data =>
+            {
+                var result = selector(data);
+                return ReferenceEquals(result, Universe.Unchanged)
+                    ? Universe.Unchanged : ((object[])result).Select(x => (string)x);
+            };
+        }
+
+        /// <summary>
         /// Convert a <see cref="PyObject"/> into a managed object
         /// </summary>
         /// <typeparam name="T">Target type of the resulting managed object</typeparam>
@@ -1309,6 +1421,48 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Gets Enumerable of <see cref="Symbol"/> from a PyObject
+        /// </summary>
+        /// <param name="pyObject">PyObject containing Symbol or Array of Symbol</param>
+        /// <returns>Enumerable of Symbol</returns>
+        public static IEnumerable<Symbol> ConvertToSymbolEnumerable(this PyObject pyObject)
+        {
+            using (Py.GIL())
+            {
+                if (!PyList.IsListType(pyObject))
+                {
+                    pyObject = new PyList(new[] {pyObject});
+                }
+
+                foreach (PyObject item in pyObject)
+                {
+                    if (PyString.IsStringType(item))
+                    {
+                        yield return SymbolCache.GetSymbol(item.GetAndDispose<string>());
+                    }
+                    else
+                    {
+                        Symbol symbol;
+                        try
+                        {
+                            symbol = item.GetAndDispose<Symbol>();
+                        }
+                        catch (Exception e)
+                        {
+                            throw new ArgumentException(
+                                "Argument type should be Symbol or a list of Symbol. " +
+                                $"Object: {item}. Type: {item.GetPythonType()}",
+                                e
+                            );
+                        }
+
+                        yield return symbol;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Converts the numeric value of one or more enumerated constants to an equivalent enumerated string.
         /// </summary>
         /// <param name="value">Numeric value</param>
@@ -1319,7 +1473,7 @@ namespace QuantConnect
             Type type;
             if (pyObject.TryConvert(out type))
             {
-                return value.ToString().ConvertTo(type).ToString();
+                return value.ToStringInvariant().ConvertTo(type).ToString();
             }
             else
             {
@@ -1385,6 +1539,24 @@ namespace QuantConnect
         public static void SynchronouslyAwaitTask(this Task task)
         {
             task.ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Returns a new string in which specified ending in the current instance is removed.
+        /// </summary>
+        /// <param name="s">original string value</param>
+        /// <param name="ending">the string to be removed</param>
+        /// <returns></returns>
+        public static string RemoveFromEnd(this string s, string ending)
+        {
+            if (s.EndsWith(ending))
+            {
+                return s.Substring(0, s.Length - ending.Length);
+            }
+            else
+            {
+                return s;
+            }
         }
     }
 }

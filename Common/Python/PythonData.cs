@@ -26,6 +26,7 @@ namespace QuantConnect.Python
     public class PythonData : DynamicData
     {
         private readonly dynamic _pythonData;
+        private readonly bool _requiresMapping;
 
         /// <summary>
         /// Constructor for initialising the PythonData class
@@ -42,6 +43,13 @@ namespace QuantConnect.Python
         public PythonData(PyObject pythonData)
         {
             _pythonData = pythonData;
+            using (Py.GIL())
+            {
+                if (pythonData.HasAttr("RequiresMapping"))
+                {
+                    _requiresMapping = _pythonData.RequiresMapping();
+                }
+            }
         }
 
         /// <summary>
@@ -78,6 +86,15 @@ namespace QuantConnect.Python
         }
 
         /// <summary>
+        /// Indicates if there is support for mapping
+        /// </summary>
+        /// <returns>True indicates mapping should be used</returns>
+        public override bool RequiresMapping()
+        {
+            return _requiresMapping;
+        }
+
+        /// <summary>
         /// Indexes into this PythonData, where index is key to the dynamic property
         /// </summary>
         /// <param name="index">the index</param>
@@ -91,7 +108,7 @@ namespace QuantConnect.Python
 
             set
             {
-                SetProperty(index, value is double ? Convert.ToDecimal(value) : value);
+                SetProperty(index, value is double ? value.ConvertInvariant<decimal>() : value);
             }
         }
     }

@@ -16,7 +16,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Xml.Linq;
 using NUnit.Framework;
@@ -42,7 +41,7 @@ namespace QuantConnect.Tests.Common.Securities
     public class SecurityPortfolioManagerTests
     {
         private static readonly SecurityExchangeHours SecurityExchangeHours = SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork);
-        private static readonly Symbol CASH = new Symbol(SecurityIdentifier.GenerateBase("CASH", Market.USA), "CASH");
+        private static readonly Symbol CASH = new Symbol(SecurityIdentifier.GenerateBase(null, "CASH", Market.USA), "CASH");
         private static readonly Symbol MCHJWB = new Symbol(SecurityIdentifier.GenerateForex("MCHJWB", Market.FXCM), "MCHJWB");
         private static readonly Symbol MCHUSD = new Symbol(SecurityIdentifier.GenerateForex("MCHUSD", Market.FXCM), "MCHUSD");
         private static readonly Symbol USDJWB = new Symbol(SecurityIdentifier.GenerateForex("USDJWB", Market.FXCM), "USDJWB");
@@ -80,7 +79,7 @@ namespace QuantConnect.Tests.Common.Securities
                 ).ToList();
 
             var equity = XDocument.Load(equityFile).Descendants("decimal")
-                .Select(x => decimal.Parse(x.Value, CultureInfo.InvariantCulture))
+                .Select(x => Parse.Decimal(x.Value))
                 .ToList();
 
             Assert.AreEqual(fills.Count + 1, equity.Count);
@@ -143,15 +142,15 @@ namespace QuantConnect.Tests.Common.Securities
                 ).ToList();
 
             var equity = XDocument.Load(equityFile).Descendants("decimal")
-                .Select(x => decimal.Parse(x.Value, CultureInfo.InvariantCulture))
+                .Select(x => Parse.Decimal(x.Value))
                 .ToList();
 
             var mchQuantity = XDocument.Load(mchQuantityFile).Descendants("decimal")
-                .Select(x => decimal.Parse(x.Value, CultureInfo.InvariantCulture))
+                .Select(x => Parse.Decimal(x.Value))
                 .ToList();
 
             var jwbQuantity = XDocument.Load(jwbQuantityFile).Descendants("decimal")
-                .Select(x => decimal.Parse(x.Value, CultureInfo.InvariantCulture))
+                .Select(x => Parse.Decimal(x.Value))
                 .ToList();
 
             Assert.AreEqual(fills.Count + 1, equity.Count);
@@ -251,7 +250,7 @@ namespace QuantConnect.Tests.Common.Securities
                 //}
                 //Console.WriteLine("CashValue: " + portfolio.CashBook.TotalValueInAccountCurrency);
 
-                Console.WriteLine(i + 1 + "   " + portfolio.TotalPortfolioValue.ToString("C"));
+                Console.WriteLine(i + 1 + "   " + portfolio.TotalPortfolioValue.ToStringInvariant("C"));
                 //Assert.AreEqual((double) equity[i + 1], (double)portfolio.TotalPortfolioValue, 2e-2);
                 Assert.AreEqual((double) mchQuantity[i + 1], (double)portfolio.CashBook["MCH"].Amount);
                 Assert.AreEqual((double) jwbQuantity[i + 1], (double)portfolio.CashBook["JWB"].Amount);
@@ -314,6 +313,7 @@ namespace QuantConnect.Tests.Common.Securities
             time = time.AddDays(1);
             const decimal highPrice = buyPrice * 2;
             security.SetMarketPrice(new TradeBar(time, Symbols.AAPL, highPrice, highPrice, highPrice, highPrice, 1));
+            portfolio.InvalidateTotalPortfolioValue();
 
             Assert.AreEqual(quantity, portfolio.MarginRemaining);
             Assert.AreEqual(quantity, portfolio.TotalMarginUsed);
@@ -329,6 +329,7 @@ namespace QuantConnect.Tests.Common.Securities
             time = time.AddDays(1);
             const decimal lowPrice = buyPrice/2;
             security.SetMarketPrice(new TradeBar(time, Symbols.AAPL, lowPrice, lowPrice, lowPrice, lowPrice, 1));
+            portfolio.InvalidateTotalPortfolioValue();
 
             Assert.AreEqual(-quantity/2m, portfolio.MarginRemaining);
             Assert.AreEqual(quantity, portfolio.TotalMarginUsed);
@@ -347,6 +348,7 @@ namespace QuantConnect.Tests.Common.Securities
             // Stock price increase by minimum variation
             const decimal newPrice = lowPrice + 0.01m;
             security.SetMarketPrice(new TradeBar(time, Symbols.AAPL, newPrice, newPrice, newPrice, newPrice, 1));
+            portfolio.InvalidateTotalPortfolioValue();
 
             // this would not cause a margin call, only a margin call warning
             marginCallOrders = portfolio.MarginCallModel.GetMarginCallOrders(out issueMarginCallWarning);
@@ -355,6 +357,7 @@ namespace QuantConnect.Tests.Common.Securities
 
             // Price drops again to previous low, margin call orders will be issued
             security.SetMarketPrice(new TradeBar(time, Symbols.AAPL, lowPrice, lowPrice, lowPrice, lowPrice, 1));
+            portfolio.InvalidateTotalPortfolioValue();
 
             order = new MarketOrder(Symbols.AAPL, quantity, time) { Price = buyPrice };
             fill = new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero) { FillPrice = buyPrice, FillQuantity = quantity };
@@ -529,12 +532,13 @@ namespace QuantConnect.Tests.Common.Securities
             var fillBuy = new OrderEvent(1, Symbols.Fut_SPY_Feb19_2016, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Buy, 100, 100, OrderFee.Zero);
             portfolio.ProcessFill(fillBuy);
 
-            Assert.AreEqual(100 * 100, securities[Symbols.Fut_SPY_Feb19_2016].Holdings.TotalSaleVolume);
+            var security = securities[Symbols.Fut_SPY_Feb19_2016];
+            Assert.AreEqual(100 * 100 * security.SymbolProperties.ContractMultiplier, security.Holdings.TotalSaleVolume);
 
             var fillSell = new OrderEvent(2, Symbols.Fut_SPY_Feb19_2016, DateTime.MinValue, OrderStatus.Filled, OrderDirection.Sell, 100, -100, OrderFee.Zero);
             portfolio.ProcessFill(fillSell);
 
-            Assert.AreEqual(2 * 100 * 100, securities[Symbols.Fut_SPY_Feb19_2016].Holdings.TotalSaleVolume);
+            Assert.AreEqual(2 * 100 * 100 * security.SymbolProperties.ContractMultiplier, security.Holdings.TotalSaleVolume);
         }
 
         [Test]
@@ -904,6 +908,7 @@ namespace QuantConnect.Tests.Common.Securities
             time = time.AddDays(1);
             const decimal lowPrice = buyPrice / 2;
             security.SetMarketPrice(new TradeBar(time, Symbols.AAPL, lowPrice, lowPrice, lowPrice, lowPrice, 1));
+            portfolio.InvalidateTotalPortfolioValue();
 
             // we still should be able to place sell to zero
             newOrder = new MarketOrder(Symbols.AAPL, -quantity, time.AddSeconds(1)) { Price = lowPrice };
@@ -970,6 +975,7 @@ namespace QuantConnect.Tests.Common.Securities
             time = time.AddDays(1);
             const decimal highPrice = sellPrice * 2;
             security.SetMarketPrice(new TradeBar(time, Symbols.AAPL, highPrice, highPrice, highPrice, highPrice, 1));
+            portfolio.InvalidateTotalPortfolioValue();
 
             // we still shouldn be able to place cover to zero
             newOrder = new MarketOrder(Symbols.AAPL, quantity, time.AddSeconds(1)) { Price = highPrice };

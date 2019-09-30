@@ -13,8 +13,10 @@
  * limitations under the License.
 */
 
+using System;
 using QuantConnect.Interfaces;
 using QuantConnect.Securities;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Algorithm.Framework.Portfolio
 {
@@ -54,7 +56,7 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// <returns>A portfolio target for the specified symbol/percent</returns>
         public static IPortfolioTarget Percent(IAlgorithm algorithm, Symbol symbol, double percent)
         {
-            return Percent(algorithm, symbol, (decimal) percent);
+            return Percent(algorithm, symbol, percent.SafeDecimalCast());
         }
 
         /// <summary>
@@ -68,10 +70,25 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// <returns>A portfolio target for the specified symbol/percent</returns>
         public static IPortfolioTarget Percent(IAlgorithm algorithm, Symbol symbol, decimal percent, bool returnDeltaQuantity = false)
         {
+            var absolutePercentage = Math.Abs(percent);
+            if (absolutePercentage > algorithm.Settings.MaxAbsolutePortfolioTargetPercentage
+                || absolutePercentage != 0 && absolutePercentage < algorithm.Settings.MinAbsolutePortfolioTargetPercentage)
+            {
+                algorithm.Error(
+                    Invariant($"The portfolio target percent: {percent}, does not comply with the current ") +
+                    Invariant($"'Algorithm.Settings' 'MaxAbsolutePortfolioTargetPercentage': {algorithm.Settings.MaxAbsolutePortfolioTargetPercentage}") +
+                    Invariant($" or 'MinAbsolutePortfolioTargetPercentage': {algorithm.Settings.MinAbsolutePortfolioTargetPercentage}. Skipping")
+                );
+                return null;
+            }
+
             var security = algorithm.Securities[symbol];
             if (security.Price == 0)
             {
-                algorithm.Error($"The order quantity for {symbol.Value} cannot be calculated: the price of the security is zero.");
+                algorithm.Error(Invariant(
+                    $"The order quantity for {symbol.Value} cannot be calculated: the price of the security is zero."
+                ));
+
                 return null;
             }
 
@@ -84,7 +101,10 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
 
             if (result.IsError)
             {
-                algorithm.Error($"Unable to compute order quantity of {symbol}. Reason: {result.Reason} Returning null.");
+                algorithm.Error(Invariant(
+                    $"Unable to compute order quantity of {symbol}. Reason: {result.Reason} Returning null."
+                ));
+
                 return null;
             }
 

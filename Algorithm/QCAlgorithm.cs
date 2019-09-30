@@ -39,7 +39,6 @@ using QuantConnect.Util;
 using System.Collections.Concurrent;
 using QuantConnect.Securities.Future;
 using QuantConnect.Securities.Crypto;
-using System.Net;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Algorithm.Framework.Alphas.Analysis.Providers;
 using QuantConnect.Algorithm.Framework.Execution;
@@ -544,31 +543,17 @@ namespace QuantConnect.Algorithm
             // if the benchmark hasn't been set yet, set it
             if (Benchmark == null)
             {
-                if (_benchmarkSymbol != null)
+                if (_benchmarkSymbol == null)
                 {
-                    // if the requested benchmark symbol wasn't already added, then add it now
-                    // we do a simple compare here for simplicity, also it avoids confusion over
-                    // the desired market.
-                    Security security;
-                    if (!Securities.TryGetValue(_benchmarkSymbol, out security))
-                    {
-                        // add the security as an internal feed so the algorithm doesn't receive the data
-                        security = CreateBenchmarkSecurity();
-                    }
+                    _benchmarkSymbol = QuantConnect.Symbol.Create("SPY", SecurityType.Equity, Market.USA);
+                }
 
-                    // just return the current price
-                    Benchmark = new SecurityBenchmark(security);
-                }
-                else
-                {
-                    var start = StartDate;
-                    var startingCapital = Portfolio.TotalPortfolioValue;
-                    Benchmark = new FuncBenchmark(dt =>
-                    {
-                        var years = (dt - start).TotalDays / 365.25;
-                        return startingCapital * (decimal) Math.Exp(0.02 * years);
-                    });
-                }
+                var security = Securities.CreateSecurity(_benchmarkSymbol,
+                    new List<SubscriptionDataConfig>(),
+                    leverage: 1,
+                    addToSymbolCache:false);
+
+                Benchmark = new SecurityBenchmark(security);
             }
             // perform end of time step checks, such as enforcing underlying securities are in raw data mode
             OnEndOfTimeStep();
@@ -831,6 +816,9 @@ namespace QuantConnect.Algorithm
         /// End of a trading day event handler. This method is called at the end of the algorithm day (or multiple times if trading multiple assets).
         /// </summary>
         /// <remarks>Method is called 10 minutes before closing to allow user to close out position.</remarks>
+        /// <remarks>Deprecated because different assets have different market close times,
+        /// and because Python does not support two methods with the same name</remarks>
+        [Obsolete("This method is deprecated. Please use this overload: OnEndOfDay(Symbol symbol)")]
         public virtual void OnEndOfDay()
         {
 
@@ -932,7 +920,7 @@ namespace QuantConnect.Algorithm
             }
             catch (DateTimeZoneNotFoundException)
             {
-                throw new ArgumentException(string.Format("TimeZone with id '{0}' was not found. For a complete list of time zones please visit: http://en.wikipedia.org/wiki/List_of_tz_database_time_zones", timeZone));
+                throw new ArgumentException($"TimeZone with id '{timeZone}' was not found. For a complete list of time zones please visit: http://en.wikipedia.org/wiki/List_of_tz_database_time_zones");
             }
 
             SetTimeZone(tz);
@@ -946,7 +934,7 @@ namespace QuantConnect.Algorithm
         {
             if (_locked)
             {
-                throw new Exception("Algorithm.SetTimeZone(): Cannot change time zone after algorithm running.");
+                throw new InvalidOperationException("Algorithm.SetTimeZone(): Cannot change time zone after algorithm running.");
             }
 
             if (timeZone == null) throw new ArgumentNullException("timeZone");
@@ -1043,9 +1031,16 @@ namespace QuantConnect.Algorithm
         [Obsolete("Symbol implicit operator to string is provided for algorithm use only.")]
         public void SetBenchmark(SecurityType securityType, string symbol)
         {
-            string market = Market.USA;
+            if (_locked)
+            {
+                throw new InvalidOperationException("Algorithm.SetBenchmark(): Cannot change Benchmark after algorithm initialized.");
+            }
 
-            this.BrokerageModel.DefaultMarkets.TryGetValue(securityType, out market);
+            string market;
+            if (!BrokerageModel.DefaultMarkets.TryGetValue(securityType, out market))
+            {
+                market = Market.USA;
+            }
 
             _benchmarkSymbol = QuantConnect.Symbol.Create(symbol, securityType, market);
         }
@@ -1060,13 +1055,18 @@ namespace QuantConnect.Algorithm
         /// </remarks>
         public void SetBenchmark(string symbol)
         {
+            if (_locked)
+            {
+                throw new InvalidOperationException("Algorithm.SetBenchmark(): Cannot change Benchmark after algorithm initialized.");
+            }
+
             // check existence
-            symbol = symbol.ToUpper();
+            symbol = symbol.LazyToUpper();
             var security = Securities.FirstOrDefault(x => x.Key.Value == symbol).Value;
+
             if (security == null)
             {
                 Debug($"Warning: SetBenchmark({symbol}): no existing security found, benchmark security will be added with {SecurityType.Equity} type.");
-
                 _benchmarkSymbol = QuantConnect.Symbol.Create(symbol, SecurityType.Equity, Market.USA);
             }
             else
@@ -1081,6 +1081,10 @@ namespace QuantConnect.Algorithm
         /// <param name="symbol">symbol to use as the benchmark</param>
         public void SetBenchmark(Symbol symbol)
         {
+            if (_locked)
+            {
+                throw new InvalidOperationException("Algorithm.SetBenchmark(): Cannot change Benchmark after algorithm initialized.");
+            }
             _benchmarkSymbol = symbol;
         }
 
@@ -1091,6 +1095,10 @@ namespace QuantConnect.Algorithm
         /// <param name="benchmark">The benchmark producing function</param>
         public void SetBenchmark(Func<DateTime, decimal> benchmark)
         {
+            if (_locked)
+            {
+                throw new InvalidOperationException("Algorithm.SetBenchmark(): Cannot change Benchmark after algorithm initialized.");
+            }
             Benchmark = new FuncBenchmark(benchmark);
         }
 
@@ -1157,7 +1165,7 @@ namespace QuantConnect.Algorithm
             }
             else
             {
-                throw new Exception("Algorithm.SetCash(): Cannot change cash available after algorithm initialized.");
+                throw new InvalidOperationException("Algorithm.SetCash(): Cannot change cash available after algorithm initialized.");
             }
         }
 
@@ -1175,7 +1183,7 @@ namespace QuantConnect.Algorithm
             }
             else
             {
-                throw new Exception("Algorithm.SetCash(): Cannot change cash available after algorithm initialized.");
+                throw new InvalidOperationException("Algorithm.SetCash(): Cannot change cash available after algorithm initialized.");
             }
         }
 
@@ -1203,7 +1211,7 @@ namespace QuantConnect.Algorithm
             }
             catch (Exception err)
             {
-                throw new Exception("Date Invalid: " + err.Message);
+                throw new ArgumentException($"Date Invalid: {err.Message}");
             }
         }
 
@@ -1228,7 +1236,7 @@ namespace QuantConnect.Algorithm
             }
             catch (Exception err)
             {
-                throw new Exception("Date Invalid: " + err.Message);
+                throw new ArgumentException($"Date Invalid: {err.Message}");
             }
         }
 
@@ -1260,14 +1268,14 @@ namespace QuantConnect.Algorithm
             //1. Check range;
             if (start < (new DateTime(1900, 01, 01)))
             {
-                throw new Exception("Please select a start date after January 1st, 1900.");
+                throw new ArgumentOutOfRangeException(nameof(start), "Please select a start date after January 1st, 1900.");
             }
 
             //2. Check future date
             var todayInAlgorithmTimeZone = DateTime.UtcNow.ConvertFromUtc(TimeZone).Date;
             if (start > todayInAlgorithmTimeZone)
             {
-                throw new Exception("Please select start date less than today");
+                throw new ArgumentOutOfRangeException(nameof(start), "Please select start date less than today");
             }
 
             //3. Check end date greater:
@@ -1275,7 +1283,7 @@ namespace QuantConnect.Algorithm
             {
                 if (start > _endDate)
                 {
-                    throw new Exception("Please select start date less than end date.");
+                    throw new ArgumentOutOfRangeException(nameof(start), "Please select start date less than end date.");
                 }
             }
 
@@ -1291,7 +1299,7 @@ namespace QuantConnect.Algorithm
             }
             else
             {
-                throw new Exception("Algorithm.SetStartDate(): Cannot change start date after algorithm initialized.");
+                throw new InvalidOperationException("Algorithm.SetStartDate(): Cannot change start date after algorithm initialized.");
             }
         }
 
@@ -1318,7 +1326,7 @@ namespace QuantConnect.Algorithm
             {
                 if (end < _startDate)
                 {
-                    throw new Exception("Please select end date greater than start date.");
+                    throw new ArgumentOutOfRangeException(nameof(end), "Please select end date greater than start date.");
                 }
             }
 
@@ -1332,7 +1340,7 @@ namespace QuantConnect.Algorithm
             }
             else
             {
-                throw new Exception("Algorithm.SetEndDate(): Cannot change end date after algorithm initialized.");
+                throw new InvalidOperationException("Algorithm.SetEndDate(): Cannot change end date after algorithm initialized.");
             }
         }
 
@@ -1438,7 +1446,7 @@ namespace QuantConnect.Algorithm
                 {
                     if (!BrokerageModel.DefaultMarkets.TryGetValue(securityType, out market))
                     {
-                        throw new Exception("No default market set for security type: " + securityType);
+                        throw new KeyNotFoundException($"No default market set for security type: {securityType}");
                     }
                 }
 
@@ -1493,7 +1501,7 @@ namespace QuantConnect.Algorithm
             {
                 if (!BrokerageModel.DefaultMarkets.TryGetValue(SecurityType.Option, out market))
                 {
-                    throw new Exception("No default market set for security type: " + SecurityType.Option);
+                    throw new KeyNotFoundException($"No default market set for security type: {SecurityType.Option}");
                 }
             }
 
@@ -1543,7 +1551,7 @@ namespace QuantConnect.Algorithm
             {
                 if (!BrokerageModel.DefaultMarkets.TryGetValue(SecurityType.Future, out market))
                 {
-                    throw new Exception("No default market set for security type: " + SecurityType.Future);
+                    throw new KeyNotFoundException($"No default market set for security type: {SecurityType.Future}");
                 }
             }
 
@@ -1626,8 +1634,10 @@ namespace QuantConnect.Algorithm
                 {
                     // We check the "locked" flag here because during initialization we need to load existing open orders and holdings from brokerages.
                     // There is no data streaming yet, so it is safe to change the data normalization mode to Raw.
-                    throw new ArgumentException($"The underlying equity asset ({underlying.Value}) is set to {dataNormalizationMode}, " +
-                                                "please change this to DataNormalizationMode.Raw with the SetDataNormalization() method");
+                    throw new ArgumentException($"The underlying equity asset ({underlying.Value}) is set to " +
+                        $"{dataNormalizationMode}, please change this to DataNormalizationMode.Raw with the " +
+                        "SetDataNormalization() method"
+                    );
                 }
             }
             underlyingConfigs.SetDataNormalizationMode(DataNormalizationMode.Raw);
@@ -1743,18 +1753,7 @@ namespace QuantConnect.Algorithm
             else
             {
                 var universe = UniverseManager.Select(x => x.Value).OfType<UserDefinedUniverse>().FirstOrDefault(x => x.Members.ContainsKey(symbol));
-                if (universe != null)
-                {
-                    universe.Remove(symbol);
-
-                    // if we are removing the symbol which is also the benchmark, add it back as internal feed
-                    if (symbol == _benchmarkSymbol)
-                    {
-                        Securities.Remove(symbol);
-
-                        security = CreateBenchmarkSecurity();
-                    }
-                }
+                universe?.Remove(symbol);
             }
 
             return true;
@@ -1782,6 +1781,25 @@ namespace QuantConnect.Algorithm
         /// AddData<typeparam name="T"/> a new user defined data source, requiring only the minimum config options.
         /// The data is added with a default time zone of NewYork (Eastern Daylight Savings Time)
         /// </summary>
+        /// <param name="underlying">The underlying symbol for the custom data</param>
+        /// <param name="resolution">Resolution of the data</param>
+        /// <returns>The new <see cref="Security"/></returns>
+        /// <remarks>Generic type T must implement base data</remarks>
+        public Security AddData<T>(Symbol underlying, Resolution resolution = Resolution.Minute)
+            where T : IBaseData, new()
+        {
+            //Add this new generic data as a tradeable security:
+            // Defaults:extended market hours"      = true because we want events 24 hours,
+            //          fillforward                 = false because only want to trigger when there's new custom data.
+            //          leverage                    = 1 because no leverage on nonmarket data?
+            return AddData<T>(underlying, resolution, fillDataForward: false, leverage: 1m);
+        }
+
+
+        /// <summary>
+        /// AddData<typeparam name="T"/> a new user defined data source, requiring only the minimum config options.
+        /// The data is added with a default time zone of NewYork (Eastern Daylight Savings Time)
+        /// </summary>
         /// <param name="ticker">Key/Ticker for data</param>
         /// <param name="resolution">Resolution of the Data Required</param>
         /// <param name="fillDataForward">When no data available on a tradebar, return the last data that was generated</param>
@@ -1792,6 +1810,22 @@ namespace QuantConnect.Algorithm
             where T : IBaseData, new()
         {
             return AddData<T>(ticker, resolution, TimeZones.NewYork, fillDataForward, leverage);
+        }
+
+        /// <summary>
+        /// AddData<typeparam name="T"/> a new user defined data source, requiring only the minimum config options.
+        /// The data is added with a default time zone of NewYork (Eastern Daylight Savings Time)
+        /// </summary>
+        /// <param name="underlying">The underlying symbol for the custom data</param>
+        /// <param name="resolution">Resolution of the Data Required</param>
+        /// <param name="fillDataForward">When no data available on a tradebar, return the last data that was generated</param>
+        /// <param name="leverage">Custom leverage per security</param>
+        /// <returns>The new <see cref="Security"/></returns>
+        /// <remarks>Generic type T must implement base data</remarks>
+        public Security AddData<T>(Symbol underlying, Resolution resolution, bool fillDataForward, decimal leverage = 1.0m)
+            where T : IBaseData, new()
+        {
+            return AddData<T>(underlying, resolution, TimeZones.NewYork, fillDataForward, leverage);
         }
 
         /// <summary>
@@ -1807,23 +1841,23 @@ namespace QuantConnect.Algorithm
         public Security AddData<T>(string ticker, Resolution resolution, DateTimeZone timeZone, bool fillDataForward = false, decimal leverage = 1.0m)
             where T : IBaseData, new()
         {
-            //Add this custom symbol to our market hours database
-            MarketHoursDatabase.SetEntryAlwaysOpen(Market.USA, ticker, SecurityType.Base, timeZone);
+            return AddData(typeof(T), ticker, resolution, timeZone, fillDataForward, leverage);
+        }
 
-            //Add this to the data-feed subscriptions
-            var symbol = new Symbol(SecurityIdentifier.GenerateBase(ticker, Market.USA), ticker);
-
-            //Add this new generic data as a tradeable security:
-            var config = SubscriptionManager.SubscriptionDataConfigService.Add(typeof(T),
-                symbol,
-                resolution,
-                fillDataForward,
-                extendedMarketHours: true,
-                isCustomData: true);
-            var security = Securities.CreateSecurity(symbol, config, leverage);
-
-            AddToUserDefinedUniverse(security, new List<SubscriptionDataConfig>{ config });
-            return security;
+        /// <summary>
+        /// AddData<typeparam name="T"/> a new user defined data source, requiring only the minimum config options.
+        /// </summary>
+        /// <param name="underlying">The underlying symbol for the custom data</param>
+        /// <param name="resolution">Resolution of the Data Required</param>
+        /// <param name="timeZone">Specifies the time zone of the raw data</param>
+        /// <param name="fillDataForward">When no data available on a tradebar, return the last data that was generated</param>
+        /// <param name="leverage">Custom leverage per security</param>
+        /// <returns>The new <see cref="Security"/></returns>
+        /// <remarks>Generic type T must implement base data</remarks>
+        public Security AddData<T>(Symbol underlying, Resolution resolution, DateTimeZone timeZone, bool fillDataForward = false, decimal leverage = 1.0m)
+            where T : IBaseData, new()
+        {
+            return AddData(typeof(T), underlying, resolution, timeZone, fillDataForward, leverage);
         }
 
         /// <summary>
@@ -1847,7 +1881,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Error(int)"/>
         public void Debug(int message)
         {
-            Debug(message.ToString());
+            Debug(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1858,7 +1892,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Error(double)"/>
         public void Debug(double message)
         {
-            Debug(message.ToString());
+            Debug(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1869,7 +1903,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Error(decimal)"/>
         public void Debug(decimal message)
         {
-            Debug(message.ToString());
+            Debug(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1892,7 +1926,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Error(int)"/>
         public void Log(int message)
         {
-            Log(message.ToString());
+            Log(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1903,7 +1937,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Error(double)"/>
         public void Log(double message)
         {
-            Log(message.ToString());
+            Log(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1914,7 +1948,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Error(decimal)"/>
         public void Log(decimal message)
         {
-            Log(message.ToString());
+            Log(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1938,7 +1972,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Log(int)"/>
         public void Error(int message)
         {
-            Error(message.ToString());
+            Error(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1949,7 +1983,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Log(double)"/>
         public void Error(double message)
         {
-            Error(message.ToString());
+            Error(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -1960,7 +1994,7 @@ namespace QuantConnect.Algorithm
         /// <seealso cref="Log(decimal)"/>
         public void Error(decimal message)
         {
-            Error(message.ToString());
+            Error(message.ToStringInvariant());
         }
 
         /// <summary>
@@ -2043,38 +2077,6 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Creates and returns a <see cref="Security"/> object to be used as the benchmark
-        /// </summary>
-        private Security CreateBenchmarkSecurity()
-        {
-            // add the security as an internal feed so the algorithm doesn't receive the data
-            Resolution resolution;
-            if (_liveMode)
-            {
-                resolution = Resolution.Second;
-            }
-            else
-            {
-                // check to see if any universes arn't the ones added via AddSecurity
-                var hasNonAddSecurityUniverses = (
-                    from universe in UniverseManager.Select(kvp => kvp.Value).Union(_pendingUniverseAdditions)
-                    let config = universe.Configuration
-                    let symbol = UserDefinedUniverse.CreateSymbol(config.SecurityType, config.Market)
-                    where config.Symbol != symbol
-                    select universe).Any();
-
-                resolution = hasNonAddSecurityUniverses ? UniverseSettings.Resolution : Resolution.Daily;
-            }
-
-            var configs = SubscriptionManager.SubscriptionDataConfigService.Add(_benchmarkSymbol, resolution, isInternalFeed:true);
-            var security = Securities.CreateSecurity(_benchmarkSymbol, configs, 1m);
-
-            AddToUserDefinedUniverse(security, configs);
-
-            return security;
-        }
-
-        /// <summary>
         /// Set the historical data provider
         /// </summary>
         /// <param name="historyProvider">Historical data provider</param>
@@ -2082,7 +2084,7 @@ namespace QuantConnect.Algorithm
         {
             if (historyProvider == null)
             {
-                throw new ArgumentNullException("Algorithm.SetHistoryProvider(): Historical data provider cannot be null.");
+                throw new ArgumentNullException(nameof(historyProvider), "Algorithm.SetHistoryProvider(): Historical data provider cannot be null.");
             }
             HistoryProvider = historyProvider;
         }
@@ -2095,7 +2097,7 @@ namespace QuantConnect.Algorithm
         {
             if (exception == null)
             {
-                throw new ArgumentNullException("Algorithm.SetRunTimeError(): Algorithm.RunTimeError cannot be set to null.");
+                throw new ArgumentNullException(nameof(exception), "Algorithm.SetRunTimeError(): Algorithm.RunTimeError cannot be set to null.");
             }
 
             RunTimeError = exception;

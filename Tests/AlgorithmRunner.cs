@@ -50,6 +50,8 @@ namespace QuantConnect.Tests
             var algorithmManager = new AlgorithmManager(false);
 
             Composer.Instance.Reset();
+            SymbolCache.Clear();
+
             var ordersLogFile = string.Empty;
             var logFile = $"./regression/{algorithm}.{language.ToLower()}.log";
             Directory.CreateDirectory(Path.GetDirectoryName(logFile));
@@ -98,6 +100,9 @@ namespace QuantConnect.Tests
                             string algorithmPath;
                             var job = systemHandlers.JobQueue.NextJob(out algorithmPath);
                             ((BacktestNodePacket)job).BacktestId = algorithm;
+
+                            systemHandlers.LeanManager.Initialize(systemHandlers, algorithmHandlers, job, algorithmManager);
+
                             engine.Run(job, algorithmManager, algorithmPath);
                             ordersLogFile = ((RegressionResultHandler)algorithmHandlers.Results).OrdersLogFilePath;
                         }

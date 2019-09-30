@@ -35,12 +35,21 @@ namespace QuantConnect.Util
     /// </summary>
     public class Composer
     {
-        private static readonly string PluginDirectory = Config.Get("plugin-directory");
+        private static string PluginDirectory;
+        private static readonly Lazy<Composer> LazyComposer = new Lazy<Composer>(
+            () =>
+            {
+                PluginDirectory = Config.Get("plugin-directory");
+                return new Composer();
+            });
 
         /// <summary>
         /// Gets the singleton instance
         /// </summary>
-        public static readonly Composer Instance = new Composer();
+        /// <remarks>Intentionally using a property so that when its gotten it will
+        /// trigger the lazy construction which will be after the right configuration
+        /// is loaded. See GH issue 3258</remarks>
+        public static Composer Instance => LazyComposer.Value;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Composer"/> class. This type
@@ -123,7 +132,7 @@ namespace QuantConnect.Util
         {
             if (predicate == null)
             {
-                throw new ArgumentNullException("predicate");
+                throw new ArgumentNullException(nameof(predicate));
             }
 
             return GetExportedValues<T>().Single(predicate);
@@ -199,7 +208,7 @@ namespace QuantConnect.Util
                         if (selectedPart == null)
                         {
                             throw new ArgumentException(
-                                "Unable to locate any exports matching the requested typeName: " + typeName, "typeName");
+                                $"Unable to locate any exports matching the requested typeName: {typeName}", nameof(typeName));
                         }
 
                         var exportDefinition =

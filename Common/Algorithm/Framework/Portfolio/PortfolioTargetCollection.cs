@@ -318,11 +318,6 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
         /// <param name="algorithm">The algorithm instance</param>
         public IEnumerable<IPortfolioTarget> OrderByMarginImpact(IAlgorithm algorithm)
         {
-            if (Count == 0)
-            {
-                // shortcut for performance
-                return Enumerable.Empty<IPortfolioTarget>();
-            }
             return _targets
                 .Select(x => x.Value)
                 .Where(x => {
@@ -334,8 +329,8 @@ namespace QuantConnect.Algorithm.Framework.Portfolio
                     PortfolioTarget = x,
                     TargetQuantity = x.Quantity,
                     ExistingQuantity = algorithm.Portfolio[x.Symbol].Quantity
-                                       + algorithm.Transactions.GetOpenOrders(o => o.Symbol == x.Symbol)
-                                           .Aggregate(0m, (d, o) => d + o.Quantity),
+                                       + algorithm.Transactions.GetOpenOrderTickets(x.Symbol)
+                                           .Aggregate(0m, (d, t) => d + t.Quantity - t.QuantityFilled),
                     Price = algorithm.Securities[x.Symbol].Price
                 })
                 .Select(x => new {

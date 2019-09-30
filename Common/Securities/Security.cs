@@ -329,7 +329,7 @@ namespace QuantConnect.Securities
         {
             if (symbolProperties == null)
             {
-                throw new ArgumentNullException("symbolProperties", "Security requires a valid SymbolProperties instance.");
+                throw new ArgumentNullException(nameof(symbolProperties), "Security requires a valid SymbolProperties instance.");
             }
 
             if (symbolProperties.QuoteCurrency != quoteCurrency.Symbol)
@@ -420,8 +420,9 @@ namespace QuantConnect.Securities
             {
                 if (_localTimeKeeper == null)
                 {
-                    throw new Exception("Security.SetLocalTimeKeeper(LocalTimeKeeper) must be called in order to use the LocalTime property.");
+                    throw new InvalidOperationException("Security.SetLocalTimeKeeper(LocalTimeKeeper) must be called in order to use the LocalTime property.");
                 }
+
                 return _localTimeKeeper.LocalTime;
             }
         }

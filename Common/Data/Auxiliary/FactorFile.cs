@@ -23,6 +23,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Logging;
 using QuantConnect.Securities;
 using QuantConnect.Util;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Data.Auxiliary
 {
@@ -69,14 +70,14 @@ namespace QuantConnect.Data.Auxiliary
         /// </summary>
         public FactorFile(string permtick, IEnumerable<FactorFileRow> data, DateTime? factorFileMinimumDate = null)
         {
-            Permtick = permtick.ToUpper();
+            Permtick = permtick.LazyToUpper();
 
             var dictionary = new Dictionary<DateTime, FactorFileRow>();
             foreach (var row in data)
             {
                 if (dictionary.ContainsKey(row.Date))
                 {
-                    Log.Trace($"Skipping duplicate factor file row for symbol: {permtick}, date: {row.Date:yyyyMMdd}");
+                    Log.Trace(Invariant($"Skipping duplicate factor file row for symbol: {permtick}, date: {row.Date:yyyyMMdd}"));
                     continue;
                 }
 
@@ -164,12 +165,12 @@ namespace QuantConnect.Data.Auxiliary
         public static bool HasScalingFactors(string permtick, string market)
         {
             // check for factor files
-            var path = Path.Combine(Globals.DataFolder, "equity", market, "factor_files", permtick.ToLower() + ".csv");
+            var path = Path.Combine(Globals.DataFolder, "equity", market, "factor_files", permtick.ToLowerInvariant() + ".csv");
             if (File.Exists(path))
             {
                 return true;
             }
-            Log.Trace("FactorFile.HasScalingFactors(): Factor file not found: " + permtick);
+            Log.Trace($"FactorFile.HasScalingFactors(): Factor file not found: {permtick}");
             return false;
         }
 

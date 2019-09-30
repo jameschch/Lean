@@ -104,7 +104,7 @@ namespace QuantConnect.Tests.Common.Securities
         [Test]
         public void CanCreate_CustomSecurities_WithCorrectSubscriptions()
         {
-            var symbol = new Symbol(SecurityIdentifier.GenerateBase("BTC", Market.USA), "BTC");
+            var symbol = new Symbol(SecurityIdentifier.GenerateBase(null, "BTC", Market.USA), "BTC");
             _marketHoursDatabase.SetEntryAlwaysOpen(Market.USA, "BTC", SecurityType.Base, TimeZones.NewYork);
 
             var configs = _subscriptionManager.SubscriptionDataConfigService.Add(typeof(LiveTradingFeaturesAlgorithm.Bitcoin), symbol, Resolution.Second, false, false, false);
@@ -113,6 +113,16 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.AreEqual(security.Subscriptions.Count(), 1);
             Assert.AreEqual(security.Subscriptions.First().Type, typeof(LiveTradingFeaturesAlgorithm.Bitcoin));
             Assert.AreEqual(security.Subscriptions.First().TickType, TickType.Trade);
+        }
+
+        [Test]
+        [ExpectedException(typeof(ArgumentException), MatchType = MessageMatch.Contains, ExpectedMessage = "Symbol can't be found in the Symbol Properties Database")]
+        public void ThrowOnCreateCryptoNotDescribedInCSV()
+        {
+            var symbol = Symbol.Create("ABCDEFG", SecurityType.Crypto, Market.GDAX);
+
+            var configs = _subscriptionManager.SubscriptionDataConfigService.Add(typeof(QuoteBar), symbol, Resolution.Minute, false, false, false);
+            var actual = _securityService.CreateSecurity(symbol, configs, 1.0m, false);
         }
 
         [Test]

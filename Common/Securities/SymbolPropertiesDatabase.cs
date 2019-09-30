@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using QuantConnect.Util;
@@ -34,6 +35,32 @@ namespace QuantConnect.Securities
         private SymbolPropertiesDatabase(IReadOnlyDictionary<SecurityDatabaseKey, SymbolProperties> entries)
         {
             _entries = entries.ToDictionary();
+        }
+
+        /// <summary>
+        /// Check whether symbol properties exists for the specified market/symbol/security-type
+        /// </summary>
+        /// <param name="market">The market the exchange resides in, i.e, 'usa', 'fxcm', ect...</param>
+        /// <param name="symbol">The particular symbol being traded</param>
+        /// <param name="securityType">The security type of the symbol</param>
+        public bool ContainsKey(string market, string symbol, SecurityType securityType)
+        {
+            var key = new SecurityDatabaseKey(market, symbol, securityType);
+            return _entries.ContainsKey(key);
+        }
+
+        /// <summary>
+        /// Check whether symbol properties exists for the specified market/symbol/security-type
+        /// </summary>
+        /// <param name="market">The market the exchange resides in, i.e, 'usa', 'fxcm', ect...</param>
+        /// <param name="symbol">The particular symbol being traded (Symbol class)</param>
+        /// <param name="securityType">The security type of the symbol</param>
+        public bool ContainsKey(string market, Symbol symbol, SecurityType securityType)
+        {
+            return ContainsKey(
+                market,
+                MarketHoursDatabase.GetDatabaseSymbolKey(symbol),
+                securityType);
         }
 
         /// <summary>
@@ -72,12 +99,11 @@ namespace QuantConnect.Securities
         /// <returns>The symbol properties matching the specified market/symbol/security-type or null if not found</returns>
         public SymbolProperties GetSymbolProperties(string market, Symbol symbol, SecurityType securityType, string defaultQuoteCurrency)
         {
-            var stringSymbol = symbol == null ? string.Empty :
-                (symbol.ID.SecurityType == SecurityType.Option ? symbol.Underlying.Value :
-                (symbol.ID.SecurityType == SecurityType.Future ? symbol.ID.Symbol :
-                 symbol.Value));
-
-            return GetSymbolProperties(market, stringSymbol, securityType, defaultQuoteCurrency);
+            return GetSymbolProperties(
+                market,
+                MarketHoursDatabase.GetDatabaseSymbolKey(symbol),
+                securityType,
+                defaultQuoteCurrency);
         }
 
         /// <summary>
@@ -119,7 +145,7 @@ namespace QuantConnect.Securities
                 var entry = FromCsvLine(line, out key);
                 if (entries.ContainsKey(key))
                 {
-                    throw new Exception("Encountered duplicate key while processing file: " + file + ". Key: " + key);
+                    throw new DuplicateNameException($"Encountered duplicate key while processing file: {file}. Key: {key}");
                 }
 
                 entries[key] = entry;
@@ -139,12 +165,12 @@ namespace QuantConnect.Securities
             var csv = line.Split(',');
 
             key = new SecurityDatabaseKey(
-                market: csv[0], 
-                symbol: csv[1], 
+                market: csv[0],
+                symbol: csv[1],
                 securityType: (SecurityType)Enum.Parse(typeof(SecurityType), csv[2], true));
 
             return new SymbolProperties(
-                description: csv[3], 
+                description: csv[3],
                 quoteCurrency: csv[4],
                 contractMultiplier: csv[5].ToDecimal(),
                 minimumPriceVariation: csv[6].ToDecimal(),

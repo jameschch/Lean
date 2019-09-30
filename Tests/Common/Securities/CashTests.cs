@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
 using NodaTime;
@@ -44,17 +45,20 @@ namespace QuantConnect.Tests.Common.Securities
         }
 
         [Test]
-        [ExpectedException(typeof(ArgumentException), MatchType = MessageMatch.Contains, ExpectedMessage = "Cash symbols must be exactly 3 characters")]
-        public void ConstructorThrowsOnSymbolTooLong()
+        [TestCase(null, ExpectedException = typeof(ArgumentException), MatchType = MessageMatch.Exact, ExpectedMessage = "Cash symbols cannot be null or empty.")]
+        [TestCase("", ExpectedException = typeof(ArgumentException), MatchType = MessageMatch.Exact, ExpectedMessage = "Cash symbols cannot be null or empty.")]
+        public void ConstructorThrowsOnEmptySymbol(string currency)
         {
-            var cash = new Cash("too long", 0, 0);
+            var cash = new Cash(currency, 0, 0);
         }
 
         [Test]
-        [ExpectedException(typeof(ArgumentException), MatchType = MessageMatch.Contains, ExpectedMessage = "Cash symbols must be exactly 3 characters")]
-        public void ConstructorThrowsOnSymbolTooShort()
+        [TestCase("too long")]
+        [TestCase("s")]
+        public void ConstructorOnCustomSymbolLength(string currency)
         {
-            var cash = new Cash("s", 0, 0);
+            var cash = new Cash(currency, 0, 0);
+            Assert.AreEqual(currency.ToUpper(CultureInfo.InvariantCulture), cash.Symbol);
         }
 
         [Test]
@@ -73,9 +77,9 @@ namespace QuantConnect.Tests.Common.Securities
         public void ComputesValueInBaseCurrency()
         {
             const int quantity = 100;
-            const decimal conversionRate = 1/100m;
+            const decimal conversionRate = 1 / 100m;
             var cash = new Cash("JPY", quantity, conversionRate);
-            Assert.AreEqual(quantity*conversionRate, cash.ValueInAccountCurrency);
+            Assert.AreEqual(quantity * conversionRate, cash.ValueInAccountCurrency);
         }
 
         [Test]
@@ -102,7 +106,7 @@ namespace QuantConnect.Tests.Common.Securities
                     cashBook));
             cash.EnsureCurrencyDataFeed(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService, cashBook.AccountCurrency);
 
-            Assert.AreEqual(1, subscriptions.Subscriptions.Count(x => x.Symbol == Symbols.USDJPY));
+            Assert.AreEqual(1, subscriptions.SubscriptionDataConfigService.GetSubscriptionDataConfigs(Symbols.USDJPY, includeInternalConfigs:true).Count);
             Assert.AreEqual(1, securities.Values.Count(x => x.Symbol == Symbols.USDJPY));
         }
 
@@ -130,7 +134,7 @@ namespace QuantConnect.Tests.Common.Securities
                 )
             );
             var usdjpy = new Security(Symbols.USDJPY, SecurityExchangeHours, new Cash("JPY", 0, 0), SymbolProperties.GetDefault("JPY"), ErrorCurrencyConverter.Instance);
-            var changes = new SecurityChanges(new[] {usdjpy}, Enumerable.Empty<Security>());
+            var changes = new SecurityChanges(new[] { usdjpy }, Enumerable.Empty<Security>());
             var addedSecurity = cash.EnsureCurrencyDataFeed(securities, subscriptions, MarketMap, changes, dataManager.SecurityService, cashBook.AccountCurrency);
 
             // the security exists in SecurityChanges so it is NOT added to the security manager or subscriptions
@@ -174,7 +178,7 @@ namespace QuantConnect.Tests.Common.Securities
             );
 
             cash.EnsureCurrencyDataFeed(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService, cashBook.AccountCurrency);
-            Assert.AreEqual(minimumResolution, subscriptions.Subscriptions.Single(x => x.Symbol == Symbols.USDJPY).Resolution);
+            Assert.AreEqual(minimumResolution, subscriptions.SubscriptionDataConfigService.GetSubscriptionDataConfigs(Symbols.USDJPY, includeInternalConfigs: true).Single().Resolution);
         }
 
         [Test]
@@ -202,7 +206,7 @@ namespace QuantConnect.Tests.Common.Securities
             );
 
             cash.EnsureCurrencyDataFeed(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService, cashBook.AccountCurrency);
-            var config = subscriptions.Subscriptions.Single(x => x.Symbol == Symbols.USDJPY);
+            var config = subscriptions.SubscriptionDataConfigService.GetSubscriptionDataConfigs(Symbols.USDJPY, includeInternalConfigs: true).Single();
             Assert.IsTrue(config.IsInternalFeed);
         }
 
@@ -404,7 +408,7 @@ namespace QuantConnect.Tests.Common.Securities
 
             book.EnsureCurrencyDataFeeds(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService);
 
-            var symbols = subscriptions.Subscriptions.Select(sdc => sdc.Symbol).ToHashSet();
+            var symbols = dataManager.SubscriptionManagerSubscriptions.Select(sdc => sdc.Symbol).ToHashSet();
 
             Assert.IsTrue(symbols.Contains(Symbols.BTCUSD));
             Assert.IsTrue(symbols.Contains(Symbols.LTCUSD));
@@ -497,6 +501,45 @@ namespace QuantConnect.Tests.Common.Securities
         {
             var cash = new Cash(symbol, 1, 1);
             Assert.AreEqual(currencySymbol, cash.CurrencySymbol);
+        }
+
+        [Test]
+        public void UpdateEventCalledForUpdateMethod()
+        {
+            var called = false;
+            var cash = new Cash(Currencies.USD, 1, 1);
+            cash.Updated += (sender, args) =>
+            {
+                called = true;
+            };
+            cash.Update(new Tick { Value = 10 } );
+            Assert.IsTrue(called);
+        }
+
+        [Test]
+        public void UpdateEventCalledForSetAmountMethod()
+        {
+            var called = false;
+            var cash = new Cash(Currencies.USD, 1, 1);
+            cash.Updated += (sender, args) =>
+            {
+                called = true;
+            };
+            cash.SetAmount(10m);
+            Assert.IsTrue(called);
+        }
+
+        [Test]
+        public void UpdateEventCalledForAddAmountMethod()
+        {
+            var called = false;
+            var cash = new Cash(Currencies.USD, 1, 1);
+            cash.Updated += (sender, args) =>
+            {
+                called = true;
+            };
+            cash.AddAmount(10m);
+            Assert.IsTrue(called);
         }
 
         [Test]

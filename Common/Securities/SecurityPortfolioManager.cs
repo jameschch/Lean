@@ -16,7 +16,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Python.Runtime;
 using QuantConnect.Data.Market;
@@ -24,6 +23,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Orders;
 using QuantConnect.Python;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Securities
 {
@@ -35,6 +35,8 @@ namespace QuantConnect.Securities
     {
         // flips to true when the user called SetCash(), if true, SetAccountCurrency will throw
         private bool _setCashWasCalled;
+        private bool _isTotalPortfolioValueValid;
+        private decimal _totalPortfolioValue;
 
         /// <summary>
         /// Local access to the securities collection for the portfolio summation.
@@ -49,12 +51,12 @@ namespace QuantConnect.Securities
         /// <summary>
         /// Gets the cash book that keeps track of all currency holdings (only settled cash)
         /// </summary>
-        public CashBook CashBook { get; private set; }
+        public CashBook CashBook { get; }
 
         /// <summary>
         /// Gets the cash book that keeps track of all currency holdings (only unsettled cash)
         /// </summary>
-        public CashBook UnsettledCashBook { get; private set; }
+        public CashBook UnsettledCashBook { get; }
 
         /// <summary>
         /// The list of pending funds waiting for settlement time
@@ -86,6 +88,9 @@ namespace QuantConnect.Securities
 
             // default to $100,000.00
             _baseCurrencyCash.SetAmount(100000);
+
+            CashBook.Updated += (sender, args) => InvalidateTotalPortfolioValue();
+            UnsettledCashBook.Updated += (sender, args) => InvalidateTotalPortfolioValue();
         }
 
         #region IDictionary Implementation
@@ -368,28 +373,47 @@ namespace QuantConnect.Securities
         {
             get
             {
-                // we can't include forex in this calculation since we would be double accounting with respect to the cash book
-                // we also exclude futures and CFD as they are calculated separately
-                decimal totalHoldingsValueWithoutForexCryptoFutureCfd = 0;
-                foreach (var kvp in Securities)
+                if (!_isTotalPortfolioValueValid)
                 {
-                    var position = kvp.Value;
-                    if (position.Type != SecurityType.Forex && position.Type != SecurityType.Crypto &&
-                        position.Type != SecurityType.Future && position.Type != SecurityType.Cfd)
+                    decimal totalHoldingsValueWithoutForexCryptoFutureCfd = 0;
+                    decimal totalFuturesAndCfdHoldingsValue = 0;
+                    foreach (var kvp in Securities)
                     {
-                        totalHoldingsValueWithoutForexCryptoFutureCfd += position.Holdings.HoldingsValue;
+                        var position = kvp.Value;
+                        var securityType = position.Type;
+                        // we can't include forex in this calculation since we would be double accounting with respect to the cash book
+                        // we also exclude futures and CFD as they are calculated separately
+                        if (securityType != SecurityType.Forex && securityType != SecurityType.Crypto &&
+                            securityType != SecurityType.Future && securityType != SecurityType.Cfd)
+                        {
+                            totalHoldingsValueWithoutForexCryptoFutureCfd += position.Holdings.HoldingsValue;
+                        }
+
+                        if (securityType == SecurityType.Future || securityType == SecurityType.Cfd)
+                        {
+                            totalFuturesAndCfdHoldingsValue += position.Holdings.UnrealizedProfit;
+                        }
                     }
-                }
 
-                var totalFuturesAndCfdHoldingsValue = Securities
-                    .Where(x => x.Value.Type == SecurityType.Future || x.Value.Type == SecurityType.Cfd)
-                    .Aggregate(0m, (d, pair) => d + pair.Value.Holdings.UnrealizedProfit);
-
-                return CashBook.TotalValueInAccountCurrency +
+                    _totalPortfolioValue = CashBook.TotalValueInAccountCurrency +
                        UnsettledCashBook.TotalValueInAccountCurrency +
                        totalHoldingsValueWithoutForexCryptoFutureCfd +
                        totalFuturesAndCfdHoldingsValue;
+
+                    _isTotalPortfolioValueValid = true;
+                }
+
+                return _totalPortfolioValue;
             }
+        }
+
+        /// <summary>
+        /// Will flag the current <see cref="TotalPortfolioValue"/> as invalid
+        /// so it is recalculated when gotten
+        /// </summary>
+        public void InvalidateTotalPortfolioValue()
+        {
+            _isTotalPortfolioValueValid = false;
         }
 
         /// <summary>
@@ -515,7 +539,7 @@ namespace QuantConnect.Securities
                     "Cannot change AccountCurrency after setting cash. " +
                     "Please move SetAccountCurrency() before SetCash().");
             }
-            accountCurrency = accountCurrency.ToUpper();
+            accountCurrency = accountCurrency.LazyToUpper();
 
             Log.Trace("SecurityPortfolioManager.SetAccountCurrency():" +
                 $" setting account currency to {accountCurrency}");
@@ -595,6 +619,7 @@ namespace QuantConnect.Securities
         {
             var security = Securities[fill.Symbol];
             security.PortfolioModel.ProcessFill(this, security, fill);
+            InvalidateTotalPortfolioValue();
         }
 
         /// <summary>
@@ -688,6 +713,8 @@ namespace QuantConnect.Securities
             }
 
             security.SetMarketPrice(next);
+            // security price updated
+            InvalidateTotalPortfolioValue();
         }
 
         /// <summary>
@@ -760,8 +787,9 @@ namespace QuantConnect.Securities
         public void LogMarginInformation(OrderRequest orderRequest = null)
         {
             Log.Trace("Total margin information: " +
-                      $"TotalMarginUsed: {TotalMarginUsed.ToString("F2", CultureInfo.InvariantCulture)}, " +
-                      $"MarginRemaining: {MarginRemaining.ToString("F2", CultureInfo.InvariantCulture)}");
+                  Invariant($"TotalMarginUsed: {TotalMarginUsed:F2}, ") +
+                  Invariant($"MarginRemaining: {MarginRemaining:F2}")
+              );
 
             var orderSubmitRequest = orderRequest as SubmitOrderRequest;
             if (orderSubmitRequest != null)
@@ -778,8 +806,9 @@ namespace QuantConnect.Securities
                 );
 
                 Log.Trace("Order request margin information: " +
-                          $"MarginUsed: {marginUsed.Value.ToString("F2", CultureInfo.InvariantCulture)}, " +
-                          $"MarginRemaining: {marginRemaining.Value.ToString("F2", CultureInfo.InvariantCulture)}");
+                    Invariant($"MarginUsed: {marginUsed.Value:F2}, ") +
+                    Invariant($"MarginRemaining: {marginRemaining.Value:F2}")
+                );
             }
         }
 

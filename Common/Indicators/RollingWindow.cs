@@ -17,6 +17,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Indicators
 {
@@ -47,7 +48,7 @@ namespace QuantConnect.Indicators
         {
             if (size < 1)
             {
-                throw new ArgumentException("RollingWindow must have size of at least 1.", "size");
+                throw new ArgumentException("RollingWindow must have size of at least 1.", nameof(size));
             }
             _list = new List<T>(size);
             Size = size;
@@ -137,10 +138,23 @@ namespace QuantConnect.Indicators
                 {
                     _listLock.EnterReadLock();
 
-                    if (i < 0 || i > Count - 1)
+                    if (Count == 0)
                     {
-                        throw new ArgumentOutOfRangeException("i", i, string.Format("Must be between 0 and {0}", Count - 1));
+                        throw new ArgumentOutOfRangeException(nameof(i), "Rolling window is empty");
                     }
+                    else if (i > Size - 1 || i < 0)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(i), i,
+                            Invariant($"Index must be between 0 and {Size - 1} (rolling window is of size {Size})")
+                        );
+                    }
+                    else if (i > Count - 1)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(i), i,
+                            Invariant($"Index must be between 0 and {Count - 1} (entry {i} does not exist yet)")
+                        );
+                    }
+
                     return _list[(Count + _tail - i - 1) % Count];
                 }
                 finally
@@ -156,7 +170,7 @@ namespace QuantConnect.Indicators
 
                     if (i < 0 || i > Count - 1)
                     {
-                        throw new ArgumentOutOfRangeException("i", i, string.Format("Must be between 0 and {0}", Count - 1));
+                        throw new ArgumentOutOfRangeException(nameof(i), i, Invariant($"Must be between 0 and {Count - 1}"));
                     }
                     _list[(Count + _tail - i - 1) % Count] = value;
                 }

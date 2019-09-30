@@ -71,7 +71,7 @@ namespace QuantConnect.Queues
         {
             location = GetAlgorithmLocation();
 
-            Log.Trace("JobQueue.NextJob(): Selected " + location);
+            Log.Trace($"JobQueue.NextJob(): Selected {location}");
 
             // check for parameters in the config
             var parameters = new Dictionary<string, string>();
@@ -90,6 +90,25 @@ namespace QuantConnect.Queues
                 RamAllocation = int.MaxValue,
                 MaximumDataPointsPerChartSeries =  Config.GetInt("maximum-data-points-per-chart-series", 4000)
             };
+
+            if ((Language)Enum.Parse(typeof(Language), Config.Get("algorithm-language")) == Language.Python)
+            {
+                // Set the python path for loading python algorithms.
+                var pythonFile = new FileInfo(location);
+                var pythonPath = new List<string>
+                {
+                    pythonFile.Directory.FullName,
+                    new DirectoryInfo(Environment.CurrentDirectory).FullName,
+                };
+                // Don't include an empty environment variable in pythonPath, otherwise the PYTHONPATH
+                // environment variable won't be used in the module import process
+                var pythonPathEnvironmentVariable = Environment.GetEnvironmentVariable("PYTHONPATH");
+                if (!string.IsNullOrEmpty(pythonPathEnvironmentVariable))
+                {
+                    pythonPath.Add(pythonPathEnvironmentVariable);
+                }
+                Environment.SetEnvironmentVariable("PYTHONPATH", string.Join(OS.IsLinux ? ":" : ";", pythonPath));
+            }
 
             //If this isn't a backtesting mode/request, attempt a live job.
             if (_liveMode)
@@ -120,7 +139,7 @@ namespace QuantConnect.Queues
                 }
                 catch (Exception err)
                 {
-                    Log.Error(err, string.Format("Error resolving BrokerageData for live job for brokerage {0}:", liveJob.Brokerage));
+                    Log.Error(err, $"Error resolving BrokerageData for live job for brokerage {liveJob.Brokerage}");
                 }
 
                 return liveJob;
@@ -165,7 +184,7 @@ namespace QuantConnect.Queues
 
                     if (!File.Exists(pythonSource))
                     {
-                        throw new Exception("JobQueue.TryCreatePythonAlgorithm(): Unable to find py file: " + pythonSource);
+                        throw new FileNotFoundException($"JobQueue.TryCreatePythonAlgorithm(): Unable to find py file: {pythonSource}");
                     }
                 }
             }

@@ -21,7 +21,6 @@ using System.Linq;
 using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds.Transport;
-using QuantConnect.Util;
 using System.Runtime.Caching;
 using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.UniverseSelection;
@@ -82,7 +81,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             _date = date;
             _config = config;
             _isLiveMode = isLiveMode;
-            _factory = (BaseData) ObjectActivator.GetActivator(config.Type).Invoke(new object[] { config.Type });
+            _factory = config.GetBaseDataInstance();
             _shouldCacheDataPoints = !_config.IsCustomData && _config.Resolution >= Resolution.Hour
                 && _config.Type != typeof(FineFundamental) && _config.Type != typeof(CoarseFundamental)
 		&& !_dataCacheProvider.IsDataEphemeral;
@@ -138,6 +137,10 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                                 yield return instance;
                             }
                         }
+                        else if (reader.ShouldBeRateLimited)
+                        {
+                            yield return instance;
+                        }
                     }
                 }
 
@@ -157,7 +160,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
             // Find the first data point 10 days (just in case) before the desired date
             // and subtract one item (just in case there was a time gap and data.Time is after _date)
-            var index = cache.FindIndex(data => data.Time.AddDays(10) > _date);
+            var frontier = _date.AddDays(-10);
+            var index = cache.FindIndex(data => data.Time > frontier);
             index = index > 0 ? (index - 1) : 0;
             foreach (var data in cache.Skip(index))
             {

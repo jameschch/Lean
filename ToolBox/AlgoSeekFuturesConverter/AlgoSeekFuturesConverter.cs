@@ -1,11 +1,11 @@
 ﻿/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,7 +27,7 @@ using QuantConnect.Logging;
 namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
 {
     using Processors = Dictionary<Symbol, List<List<AlgoSeekFuturesProcessor>>>;
-    
+
     /// <summary>
     /// Process a directory of algoseek futures files into separate resolutions.
     /// </summary>
@@ -64,7 +64,8 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
         {
             Log.Trace("AlgoSeekFuturesConverter.Convert(): Copying remote raw data files locally.");
             //Get the list of available raw files, copy from its remote location to a local folder and then for each file open a separate streamer.
-            var files = _remote.EnumerateFiles("*")
+
+            var files = GetFilesInRawFolder()
                 .Where(f => (f.Extension == ".gz" || f.Extension == ".bz2") && !f.Name.Contains("option"))
                 .Select(remote => remote.CopyTo(Path.Combine(Path.GetTempPath(), remote.Name), true))
                 .ToList();
@@ -129,7 +130,7 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
                         }
                     }
 
-                    // setting up local processors 
+                    // setting up local processors
                     var processors = new Processors();
 
                     var reader = new AlgoSeekFuturesReader(csvFile, symbolMultipliers);
@@ -195,10 +196,50 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
         }
 
         /// <summary>
+        /// Gets the files in raw folder.
+        /// </summary>
+        /// <returns>List of files in source folder</returns>
+        private IEnumerable<FileInfo> GetFilesInRawFolder()
+        {
+            var files = new List<FileInfo>();
+
+            var command = OS.IsLinux ? "ls" : "dir";
+            var arguments = OS.IsWindows ? "/b /a-d" : string.Empty;
+
+            var processStartInfo = new ProcessStartInfo(command, arguments)
+            {
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                WorkingDirectory = _remote.FullName
+            };
+
+            using (var process = new Process())
+            {
+
+                process.StartInfo = processStartInfo;
+                process.Start();
+
+                while (!process.StandardOutput.EndOfStream)
+                {
+                    var line = process.StandardOutput.ReadLine();
+                    if (line != null)
+                    {
+                        files.Add(new FileInfo(Path.Combine(_remote.FullName, line)));
+                    }
+                }
+                process.WaitForExit();
+            }
+
+            return files;
+
+        }
+
+        /// <summary>
         /// Private method loads symbol multipliers from algoseek csv file
         /// </summary>
         /// <returns></returns>
-
         private Dictionary<string, decimal> LoadSymbolMultipliers()
         {
             const int columnsCount = 4;
@@ -215,7 +256,7 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
                     // skipping header
                     .Skip(1)
                     .ToDictionary(line => line[columnUnderlying],
-                                  line => System.Convert.ToDecimal(line[columnMultipleFactor]));
+                                  line => line[columnMultipleFactor].ConvertInvariant<decimal>());
         }
 
         private void Flush(Processors processors, DateTime time, bool final)
@@ -237,7 +278,7 @@ namespace QuantConnect.ToolBox.AlgoSeekFuturesConverter
 
             var destination = Path.Combine(_destination, "future");
             Directory.CreateDirectory(destination);
-            var dateMask = date.ToString(DateFormat.EightCharacter);
+            var dateMask = date.ToStringInvariant(DateFormat.EightCharacter);
 
             var files =
                 Directory.EnumerateFiles(destination, dateMask + "*.csv", SearchOption.AllDirectories)

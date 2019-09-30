@@ -21,6 +21,7 @@ using QuantConnect.Orders.Fills;
 using QuantConnect.Orders.Slippage;
 using QuantConnect.Securities;
 using QuantConnect.Util;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Brokerages
 {
@@ -53,7 +54,7 @@ namespace QuantConnect.Brokerages
         {
             if (accountType == AccountType.Margin)
             {
-                throw new Exception("The Alpaca brokerage does not currently support Margin trading.");
+                throw new ArgumentException("The Alpaca brokerage does not currently support Margin trading.");
             }
         }
 
@@ -76,7 +77,7 @@ namespace QuantConnect.Brokerages
             if (security.Type != SecurityType.Equity)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    $"The {nameof(AlpacaBrokerageModel)} does not support {security.Type} security type."
+                    Invariant($"The {nameof(AlpacaBrokerageModel)} does not support {security.Type} security type.")
                 );
 
                 return false;
@@ -86,7 +87,7 @@ namespace QuantConnect.Brokerages
             if (order.Type != OrderType.Limit && order.Type != OrderType.Market && order.Type != OrderType.StopMarket && order.Type != OrderType.StopLimit && order.Type != OrderType.MarketOnOpen)
             {
                 message = new BrokerageMessageEvent(BrokerageMessageType.Warning, "NotSupported",
-                    $"The {nameof(AlpacaBrokerageModel)} does not support {order.Type} order type."
+                    Invariant($"The {nameof(AlpacaBrokerageModel)} does not support {order.Type} order type.")
                 );
 
                 return false;

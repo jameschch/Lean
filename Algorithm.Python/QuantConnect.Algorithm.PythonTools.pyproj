@@ -63,7 +63,6 @@
     <Compile Include="CustomModelsAlgorithm.py" />
     <Compile Include="CustomSecurityInitializerAlgorithm.py" />
     <Compile Include="DailyAlgorithm.py" />
-    <Compile Include="DailyFxAlgorithm.py" />
     <Compile Include="DataConsolidationAlgorithm.py" />
     <Compile Include="DelistingEventsAlgorithm.py" />
     <Compile Include="DisplacedMovingAverageRibbon.py" />
@@ -101,7 +100,6 @@
     <Compile Include="OrderTicketDemoAlgorithm.py" />
     <Compile Include="ParameterizedAlgorithm.py" />
     <Compile Include="PearsonCorrelationPairsTradingAlphaModelFrameworkAlgorithm.py" />
-    <Compile Include="PythonPackageTestAlgorithm.py" />
     <Compile Include="QCUWeatherBasedRebalancing.py" />
     <Compile Include="QuandlFuturesDataAlgorithm.py" />
     <Compile Include="QuandlImporterAlgorithm.py" />

@@ -22,7 +22,6 @@ using Moq;
 using NUnit.Framework;
 using QuantConnect.Algorithm;
 using QuantConnect.Brokerages;
-using QuantConnect.Data;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.RealTime;
@@ -33,7 +32,6 @@ using QuantConnect.Orders;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.Tests.Engine.DataFeeds;
-using HistoryRequest = QuantConnect.Data.HistoryRequest;
 
 namespace QuantConnect.Tests.Engine.Setup
 {
@@ -191,6 +189,50 @@ namespace QuantConnect.Tests.Engine.Setup
             Assert.AreEqual(symbol, security.Symbol);
         }
 
+        [Test]
+        public void AlgorithmTimeIsSetToUtcNowBeforePostInitialize()
+        {
+            var time = DateTime.UtcNow;
+            TestAlgorithm algorithm = null;
+
+            algorithm = new TestAlgorithm(() =>
+            {
+                Assert.That(algorithm.UtcTime > time);
+            });
+
+            Assert.AreEqual(new DateTime(1998, 1, 1), algorithm.UtcTime);
+
+            algorithm.SetHistoryProvider(new BrokerageTransactionHandlerTests.BrokerageTransactionHandlerTests.EmptyHistoryProvider());
+            var job = new LiveNodePacket
+            {
+                UserId = 1,
+                ProjectId = 1,
+                DeployId = "1",
+                Brokerage = "PaperBrokerage",
+                DataQueueHandler = "none"
+            };
+
+            var resultHandler = new Mock<IResultHandler>();
+            var transactionHandler = new Mock<ITransactionHandler>();
+            var realTimeHandler = new Mock<IRealTimeHandler>();
+            var brokerage = new Mock<IBrokerage>();
+
+            brokerage.Setup(x => x.IsConnected).Returns(true);
+            brokerage.Setup(x => x.GetCashBalance()).Returns(new List<CashAmount>());
+            brokerage.Setup(x => x.GetAccountHoldings()).Returns(new List<Holding>());
+            brokerage.Setup(x => x.GetOpenOrders()).Returns(new List<Order>());
+
+            var setupHandler = new BrokerageSetupHandler();
+
+            IBrokerageFactory factory;
+            setupHandler.CreateBrokerage(job, algorithm, out factory);
+
+            Assert.IsTrue(setupHandler.Setup(new SetupHandlerParameters(_dataManager.UniverseSelection, algorithm, brokerage.Object, job, resultHandler.Object,
+                transactionHandler.Object, realTimeHandler.Object)));
+
+            Assert.Greater(algorithm.UtcTime, time);
+        }
+
         public TestCaseData[] GetExistingHoldingsAndOrdersTestCaseData()
         {
             return new[]
@@ -329,12 +371,21 @@ namespace QuantConnect.Tests.Engine.Setup
 
         private class TestAlgorithm : QCAlgorithm
         {
-            public TestAlgorithm()
+            private readonly Action _beforePostInitializeAction;
+
+            public TestAlgorithm(Action beforePostInitializeAction = null)
             {
+                _beforePostInitializeAction = beforePostInitializeAction;
                 SubscriptionManager.SetDataManager(new DataManagerStub(this, new MockDataFeed()));
             }
 
             public override void Initialize() { }
+
+            public override void PostInitialize()
+            {
+                _beforePostInitializeAction?.Invoke();
+                base.PostInitialize();
+            }
         }
 
         private class NonDequeingTestResultsHandler : TestResultHandler
@@ -362,16 +413,20 @@ namespace QuantConnect.Tests.Engine.Setup
         }
     }
 
-    internal class TestBrokerage : IBrokerage
+    internal class TestBrokerage : Brokerage
     {
-        public event EventHandler<OrderEvent> OrderStatusChanged;
-        public event EventHandler<OrderEvent> OptionPositionAssigned;
-        public event EventHandler<AccountEvent> AccountChanged;
-        public event EventHandler<BrokerageMessageEvent> Message;
-        public string Name { get; }
-        public bool IsConnected { get; }
+        public override bool IsConnected { get; } = true;
+        public int GetCashBalanceCallCount;
 
-        public List<Order> GetOpenOrders()
+        public TestBrokerage() : base("Test")
+        {
+        }
+
+        public TestBrokerage(string name) : base(name)
+        {
+        }
+
+        public override List<Order> GetOpenOrders()
         {
             const decimal delta = 1m;
             const decimal price = 1.2345m;
@@ -381,10 +436,12 @@ namespace QuantConnect.Tests.Engine.Setup
             var tz = TimeZones.NewYork;
 
             var time = new DateTime(2016, 2, 4, 16, 0, 0).ConvertToUtc(tz);
-            var marketOrderWithPrice = new MarketOrder(Symbols.SPY, quantity, time);
-            marketOrderWithPrice.Price = price;
+            var marketOrderWithPrice = new MarketOrder(Symbols.SPY, quantity, time)
+            {
+                Price = price
+            };
 
-            return new List<Order>()
+            return new List<Order>
             {
                 marketOrderWithPrice,
                 new LimitOrder(Symbols.SPY, -quantity, pricePlusDelta, time),
@@ -393,47 +450,41 @@ namespace QuantConnect.Tests.Engine.Setup
             };
         }
 
+        public override List<CashAmount> GetCashBalance()
+        {
+            GetCashBalanceCallCount++;
+
+            return new List<CashAmount> { new CashAmount(10, Currencies.USD) };
+        }
+
         #region UnusedMethods
-        public void Dispose()
-        {
-        }
-        public List<Holding> GetAccountHoldings()
+
+        public override List<Holding> GetAccountHoldings()
         {
             throw new NotImplementedException();
         }
 
-        public List<CashAmount> GetCashBalance()
+        public override bool PlaceOrder(Order order)
         {
             throw new NotImplementedException();
         }
 
-        public bool PlaceOrder(Order order)
+        public override bool UpdateOrder(Order order)
         {
             throw new NotImplementedException();
         }
 
-        public bool UpdateOrder(Order order)
+        public override bool CancelOrder(Order order)
         {
             throw new NotImplementedException();
         }
 
-        public bool CancelOrder(Order order)
+        public override void Connect()
         {
             throw new NotImplementedException();
         }
 
-        public void Connect()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Disconnect()
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool AccountInstantlyUpdated { get; }
-        public IEnumerable<BaseData> GetHistory(HistoryRequest request)
+        public override void Disconnect()
         {
             throw new NotImplementedException();
         }

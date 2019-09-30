@@ -79,7 +79,7 @@ namespace QuantConnect.Securities
             LotSize = lotSize;
             if(LotSize <= 0)
             {
-                throw new Exception("SymbolProperties LotSize can not be less than or equal to 0");
+                throw new ArgumentException("SymbolProperties LotSize can not be less than or equal to 0");
             }
         }
 
@@ -90,7 +90,7 @@ namespace QuantConnect.Securities
         /// <returns>A default instance of the<see cref="SymbolProperties"/> class</returns>
         public static SymbolProperties GetDefault(string quoteCurrency)
         {
-            return new SymbolProperties("", quoteCurrency.ToUpper(), 1, 0.01m, 1);
+            return new SymbolProperties("", quoteCurrency.LazyToUpper(), 1, 0.01m, 1);
         }
     }
 }

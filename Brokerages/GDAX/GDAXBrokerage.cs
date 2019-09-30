@@ -54,7 +54,7 @@ namespace QuantConnect.Brokerages.GDAX
             dynamic payload = new ExpandoObject();
 
             payload.size = Math.Abs(order.Quantity);
-            payload.side = order.Direction.ToString().ToLower();
+            payload.side = order.Direction.ToLower();
             payload.type = ConvertOrderType(order.Type);
             payload.price = (order as LimitOrder)?.LimitPrice ?? (order as StopLimitOrder)?.LimitPrice ?? ((order as StopMarketOrder)?.StopPrice ?? 0);
             payload.product_id = ConvertSymbol(order.Symbol);
@@ -79,7 +79,7 @@ namespace QuantConnect.Brokerages.GDAX
                 payload.stop_price = (order as StopLimitOrder).StopPrice;
             }
 
-            req.AddJsonBody(payload);
+            req.AddJsonBody(JsonConvert.SerializeObject(payload));
 
             GetAuthenticationToken(req);
             var response = ExecuteRestRequest(req, GdaxEndpointType.Private);
@@ -288,7 +288,7 @@ namespace QuantConnect.Brokerages.GDAX
             {
                 if (item.Balance > 0)
                 {
-                    list.Add(new CashAmount(item.Balance, item.Currency.ToUpper()));
+                    list.Add(new CashAmount(item.Balance, item.Currency.ToUpperInvariant()));
                 }
             }
 

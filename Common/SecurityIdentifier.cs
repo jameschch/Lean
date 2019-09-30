@@ -14,15 +14,16 @@
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Newtonsoft.Json;
 using QuantConnect.Configuration;
-using QuantConnect.Data.Auxiliary;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Util;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect
 {
@@ -39,10 +40,13 @@ namespace QuantConnect
     {
         #region Empty, DefaultDate Fields
 
+        private static readonly ConcurrentDictionary<string, SecurityIdentifier> SecurityIdentifierCache
+            = new ConcurrentDictionary<string, SecurityIdentifier>();
         private static readonly string MapFileProviderTypeName = Config.Get("map-file-provider", "LocalDiskMapFileProvider");
         private static readonly char[] InvalidCharacters = {'|', ' '};
-        private static IMapFileProvider _mapFileProvider;
-        private static readonly object _mapFileProviderLock = new object();
+        private static readonly Lazy<IMapFileProvider> MapFileProvider = new Lazy<IMapFileProvider>(
+            () => Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(MapFileProviderTypeName)
+        );
 
         /// <summary>
         /// Gets an instance of <see cref="SecurityIdentifier"/> that is empty, that is, one with no symbol specified
@@ -99,6 +103,7 @@ namespace QuantConnect
         private readonly ulong _properties;
         private readonly SidBox _underlying;
         private readonly int _hashCode;
+        private decimal _strikePrice;
 
         #endregion
 
@@ -144,13 +149,14 @@ namespace QuantConnect
                 var stype = SecurityType;
                 switch (stype)
                 {
+                    case SecurityType.Base:
                     case SecurityType.Equity:
                     case SecurityType.Option:
                     case SecurityType.Future:
                         var oadate = ExtractFromProperties(DaysOffset, DaysWidth);
                         return DateTime.FromOADate(oadate);
                     default:
-                        throw new InvalidOperationException("Date is only defined for SecurityType.Equity, SecurityType.Option and SecurityType.Future");
+                        throw new InvalidOperationException("Date is only defined for SecurityType.Equity, SecurityType.Option, SecurityType.Future, and SecurityType.Base");
                 }
             }
         }
@@ -178,7 +184,7 @@ namespace QuantConnect
                 var market = QuantConnect.Market.Decode((int)marketCode);
 
                 // if we couldn't find it, send back the numeric representation
-                return market ?? marketCode.ToString();
+                return market ?? marketCode.ToStringInvariant();
             }
         }
 
@@ -199,10 +205,16 @@ namespace QuantConnect
                 {
                     throw new InvalidOperationException("OptionType is only defined for SecurityType.Option");
                 }
-                var scale = ExtractFromProperties(StrikeScaleOffset, StrikeScaleWidth);
-                var unscaled = ExtractFromProperties(StrikeOffset, StrikeWidth);
-                var pow = Math.Pow(10, (int)scale - StrikeDefaultScale);
-                return unscaled * (decimal)pow;
+
+                // performance: lets calculate strike price once
+                if (_strikePrice == -1)
+                {
+                    var scale = ExtractFromProperties(StrikeScaleOffset, StrikeScaleWidth);
+                    var unscaled = ExtractFromProperties(StrikeOffset, StrikeWidth);
+                    var pow = Math.Pow(10, (int)scale - StrikeDefaultScale);
+                    _strikePrice = unscaled * (decimal)pow;
+                }
+                return _strikePrice;
             }
         }
 
@@ -254,16 +266,21 @@ namespace QuantConnect
         {
             if (symbol == null)
             {
-                throw new ArgumentNullException("symbol", "SecurityIdentifier requires a non-null string 'symbol'");
+                throw new ArgumentNullException(nameof(symbol), "SecurityIdentifier requires a non-null string 'symbol'");
             }
             if (symbol.IndexOfAny(InvalidCharacters) != -1)
             {
-                throw new ArgumentException("symbol must not contain the characters '|' or ' '.", "symbol");
+                throw new ArgumentException("symbol must not contain the characters '|' or ' '.", nameof(symbol));
             }
             _symbol = symbol;
             _properties = properties;
             _underlying = null;
+            _strikePrice = -1;
             SecurityType = (SecurityType)ExtractFromProperties(SecurityTypeOffset, SecurityTypeWidth, properties);
+            if (!Enum.IsDefined(typeof(SecurityType), SecurityType))
+            {
+                throw new ArgumentException($"The provided properties do not match with a valid {nameof(SecurityType)}", "properties");
+            }
             _hashCode = unchecked (symbol.GetHashCode() * 397) ^ properties.GetHashCode();
         }
 
@@ -279,11 +296,12 @@ namespace QuantConnect
         {
             if (symbol == null)
             {
-                throw new ArgumentNullException("symbol", "SecurityIdentifier requires a non-null string 'symbol'");
+                throw new ArgumentNullException(nameof(symbol), "SecurityIdentifier requires a non-null string 'symbol'");
             }
             _symbol = symbol;
             _properties = properties;
-            if (underlying != Empty)
+            // performance: directly call Equals(SecurityIdentifier other), shortcuts Equals(object other)
+            if (!underlying.Equals(Empty))
             {
                 _underlying = new SidBox(underlying);
             }
@@ -338,46 +356,15 @@ namespace QuantConnect
         /// <returns>A new <see cref="SecurityIdentifier"/> representing the specified symbol today</returns>
         public static SecurityIdentifier GenerateEquity(string symbol, string market, bool mapSymbol = true, IMapFileProvider mapFileProvider = null)
         {
+            var firstDate = DefaultDate;
             if (mapSymbol)
             {
-                MapFile mapFile;
-                if (mapFileProvider == null)
-                {
-                    lock (_mapFileProviderLock)
-                    {
-                        if (_mapFileProvider == null)
-                        {
-                            _mapFileProvider = Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(MapFileProviderTypeName);
-                        }
-
-                        mapFile = GetMapFile(_mapFileProvider, market, symbol);
-                    }
-                }
-                else
-                {
-                    mapFile = GetMapFile(mapFileProvider, market, symbol);
-                }
-
-                var firstDate = mapFile.FirstDate;
-                if (mapFile.Any())
-                {
-                    symbol = mapFile.FirstTicker;
-                }
-
-                return GenerateEquity(firstDate, symbol, market);
-            }
-            else
-            {
-                return GenerateEquity(DefaultDate, symbol, market);
+                var firstTickerDate = GetFirstTickerAndDate(mapFileProvider ?? MapFileProvider.Value, symbol, market);
+                firstDate = firstTickerDate.Item2;
+                symbol = firstTickerDate.Item1;
             }
 
-        }
-
-        public static MapFile GetMapFile(IMapFileProvider mapFileProvider, string market, string symbol)
-        {
-            var resolver = mapFileProvider.Get(market);
-            var mapFile = resolver.ResolveMapFile(symbol, DateTime.Today);
-            return mapFile;
+            return GenerateEquity(firstDate, symbol, market);
         }
 
         /// <summary>
@@ -393,14 +380,48 @@ namespace QuantConnect
         }
 
         /// <summary>
-        /// Generates a new <see cref="SecurityIdentifier"/> for a custom security
+        /// Generates the <see cref="Symbol"/> property for <see cref="QuantConnect.SecurityType.Base"/> security identifiers
         /// </summary>
+        /// <param name="dataType">The base data custom data type if namespacing is required, null otherwise</param>
+        /// <param name="symbol">The ticker symbol</param>
+        /// <returns>The value used for the security identifier's <see cref="Symbol"/></returns>
+        public static string GenerateBaseSymbol(Type dataType, string symbol)
+        {
+            if (dataType == null)
+            {
+                return symbol;
+            }
+
+            return $"{symbol.ToUpperInvariant()}.{dataType.Name}";
+        }
+
+        /// <summary>
+        /// Generates a new <see cref="SecurityIdentifier"/> for a custom security with the option of providing the first date
+        /// </summary>
+        /// <param name="dataType">The custom data type</param>
         /// <param name="symbol">The ticker symbol of this security</param>
         /// <param name="market">The security's market</param>
+        /// <param name="mapSymbol">Whether or not we should map this symbol</param>
+        /// <param name="date">First date that the security traded on</param>
         /// <returns>A new <see cref="SecurityIdentifier"/> representing the specified base security</returns>
-        public static SecurityIdentifier GenerateBase(string symbol, string market)
+        public static SecurityIdentifier GenerateBase(Type dataType, string symbol, string market, bool mapSymbol = false, DateTime? date = null)
         {
-            return Generate(DefaultDate, symbol, SecurityType.Base, market);
+            var firstDate = date ?? DefaultDate;
+
+            if (mapSymbol)
+            {
+                var firstTickerDate = GetFirstTickerAndDate(MapFileProvider.Value, symbol, market);
+                firstDate = firstTickerDate.Item2;
+                symbol = firstTickerDate.Item1;
+            }
+
+            return Generate(
+                firstDate,
+                GenerateBaseSymbol(dataType, symbol),
+                SecurityType.Base,
+                market,
+                forceSymbolToUpper: false
+            );
         }
 
         /// <summary>
@@ -447,26 +468,28 @@ namespace QuantConnect
             decimal strike = 0,
             OptionRight optionRight = 0,
             OptionStyle optionStyle = 0,
-            SecurityIdentifier? underlying = null)
+            SecurityIdentifier? underlying = null,
+            bool forceSymbolToUpper = true)
         {
             if ((ulong)securityType >= SecurityTypeWidth || securityType < 0)
             {
-                throw new ArgumentOutOfRangeException("securityType", "securityType must be between 0 and 99");
+                throw new ArgumentOutOfRangeException(nameof(securityType), "securityType must be between 0 and 99");
             }
             if ((int)optionRight > 1 || optionRight < 0)
             {
-                throw new ArgumentOutOfRangeException("optionRight", "optionType must be either 0 or 1");
+                throw new ArgumentOutOfRangeException(nameof(optionRight), "optionType must be either 0 or 1");
             }
 
             // normalize input strings
-            market = market.ToLower();
-            symbol = symbol.ToUpper();
+            market = market.ToLowerInvariant();
+            symbol = forceSymbolToUpper ? symbol.LazyToUpper() : symbol;
 
             var marketIdentifier = QuantConnect.Market.Encode(market);
             if (!marketIdentifier.HasValue)
             {
-                throw new ArgumentOutOfRangeException("market", string.Format("The specified market wasn't found in the markets lookup. Requested: {0}. " +
-                    "You can add markets by calling QuantConnect.Market.AddMarket(string,ushort)", market));
+                throw new ArgumentOutOfRangeException(nameof(market), "The specified market wasn't found in the  markets lookup. " +
+                    $"Requested: {market}. You can add markets by calling QuantConnect.Market.AddMarket(string,ushort)"
+                );
             }
 
             var days = (ulong)date.ToOADate() * DaysOffset;
@@ -481,6 +504,24 @@ namespace QuantConnect
             var otherData = putcall + days + style + strk + strikeScale + marketCode + (ulong)securityType;
 
             return new SecurityIdentifier(symbol, otherData, underlying ?? Empty);
+        }
+
+        /// <summary>
+        /// Resolves the first ticker/date of the security represented by <paramref name="tickerToday"/>
+        /// </summary>
+        /// <param name="mapFileProvider">The IMapFileProvider instance used for resolving map files</param>
+        /// <param name="tickerToday">The security's ticker as it trades today</param>
+        /// <param name="market">The market the security exists in</param>
+        /// <returns>The security's first ticker/date if mapping data available, otherwise, the provided ticker and DefaultDate are returned</returns>
+        private static Tuple<string, DateTime> GetFirstTickerAndDate(IMapFileProvider mapFileProvider, string tickerToday, string market)
+        {
+            var resolver = mapFileProvider.Get(market);
+            var mapFile = resolver.ResolveMapFile(tickerToday, DateTime.Today);
+
+            // if we have mapping data, use the first ticker/date from there, otherwise use provided ticker and DefaultDate
+            return mapFile.Any()
+                ? Tuple.Create(mapFile.FirstTicker, mapFile.FirstDate)
+                : Tuple.Create(tickerToday, DefaultDate);
         }
 
         /// <summary>
@@ -551,7 +592,7 @@ namespace QuantConnect
 
             if (strike >= 1000000)
             {
-                throw new ArgumentException("The specified strike price's precision is too high: " + str);
+                throw new ArgumentException(Invariant($"The specified strike price\'s precision is too high: {str}"));
             }
 
             return (ulong)strike;
@@ -629,12 +670,20 @@ namespace QuantConnect
         private static bool TryParseProperties(string value, out Exception exception, out SecurityIdentifier identifier)
         {
             exception = null;
-            identifier = Empty;
 
             if (string.IsNullOrWhiteSpace(value))
             {
+                identifier = Empty;
                 return true;
             }
+
+            // for performance, we first verify if we already have parsed this SecurityIdentifier
+            if (SecurityIdentifierCache.TryGetValue(value, out identifier))
+            {
+                return true;
+            }
+            // after calling TryGetValue because if it failed it will set identifier to default
+            identifier = Empty;
 
             try
             {
@@ -660,10 +709,11 @@ namespace QuantConnect
             catch (Exception error)
             {
                 exception = error;
-                Log.Error("SecurityIdentifier.TryParseProperties(): Error parsing SecurityIdentifier: '{0}', Exception: {1}", value, exception);
+                Log.Error($"SecurityIdentifier.TryParseProperties(): Error parsing SecurityIdentifier: '{value}', Exception: {exception}");
                 return false;
             }
 
+            SecurityIdentifierCache.TryAdd(value, identifier);
             return true;
         }
 

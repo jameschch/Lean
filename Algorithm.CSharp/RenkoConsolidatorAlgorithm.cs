@@ -85,7 +85,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 SetHoldings(data.Symbol, 1.0);
             }
-            Log($"CLOSE - {data.Time.ToString("o")} - {data.Open} {data.Close}");
+            Log($"CLOSE - {data.Time.ToIso8601Invariant()} - {data.Open} {data.Close}");
         }
 
         /// <summary>
@@ -98,7 +98,7 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 Liquidate(data.Symbol);
             }
-            Log($"7BAR - {data.Time.ToString("o")} - {data.Open} {data.Close}");
+            Log($"7BAR - {data.Time.ToIso8601Invariant()} - {data.Open} {data.Close}");
         }
 
         /// <summary>
@@ -127,13 +127,13 @@ namespace QuantConnect.Algorithm.CSharp
             {"Loss Rate", "43%"},
             {"Win Rate", "57%"},
             {"Profit-Loss Ratio", "0.65"},
-            {"Alpha", "-0.179"},
-            {"Beta", "8.103"},
+            {"Alpha", "-0.106"},
+            {"Beta", "0.575"},
             {"Annual Standard Deviation", "0.098"},
             {"Annual Variance", "0.01"},
-            {"Information Ratio", "-0.368"},
-            {"Tracking Error", "0.097"},
-            {"Treynor Ratio", "-0.002"},
+            {"Information Ratio", "-2.047"},
+            {"Tracking Error", "0.084"},
+            {"Treynor Ratio", "-0.027"},
             {"Total Fees", "$117.47"}
         };
     }

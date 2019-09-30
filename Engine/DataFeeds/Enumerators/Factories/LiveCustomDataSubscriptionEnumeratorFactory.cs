@@ -54,7 +54,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
             // also provides some immediate fast-forward to handle spooling through remote files quickly
             var frontier = Ref.Create(request.StartTimeLocal);
             var lastSourceRefreshTime = DateTime.MinValue;
-            var sourceFactory = (BaseData) ObjectActivator.GetActivator(config.Type).Invoke(new object[] {config.Type});
+            var sourceFactory = config.GetBaseDataInstance();
 
             // this is refreshing the enumerator stack for each new source
             var refresher = new RefreshEnumerator<BaseData>(() =>
@@ -119,12 +119,22 @@ namespace QuantConnect.Lean.Engine.DataFeeds.Enumerators.Factories
                     // always skip past all times emitted on the previous invocation of this enumerator
                     // this allows data at the same time from the same refresh of the source while excluding
                     // data from different refreshes of the source
-                    if (datum.EndTime > localFrontier.Value)
+                    if (datum != null && datum.EndTime > localFrontier.Value)
                     {
                         yield return datum;
                     }
+                    else if (!SourceRequiresFastForward(source))
+                    {
+                        // if the 'source' is Rest and there is no new value,
+                        // we return null, else we will be caught in a tight loop
+                        // because Rest source never ends!
+                        yield return null;
+                    }
 
-                    newLocalFrontier = Time.Max(datum.EndTime, newLocalFrontier);
+                    if (datum != null)
+                    {
+                        newLocalFrontier = Time.Max(datum.EndTime, newLocalFrontier);
+                    }
                 }
 
                 localFrontier.Value = newLocalFrontier;

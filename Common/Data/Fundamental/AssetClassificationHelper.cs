@@ -1,4 +1,19 @@
-﻿namespace QuantConnect.Data.Fundamental
+﻿/*
+ * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
+ * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+
+namespace QuantConnect.Data.Fundamental
 {
     /// <summary>
     /// Helper class for the AssetClassification's StockType field <see cref="AssetClassification.StockType"/>
@@ -110,7 +125,7 @@
         public static int UtilitiesRegulated = 20744;
         public static int CommunicationServices = 30845;
         public static int OilAndGasDrilling = 30946;
-        public static int OilAndGasExplorationAndPropection = 30947;
+        public static int OilAndGasExplorationAndProduction = 30947;
         public static int OilAndGasIntegrated = 30948;
         public static int OilAndGasMidstream = 30949;
         public static int OilAndGasRefiningAndMarketing = 30950;

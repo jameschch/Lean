@@ -1,3 +1,18 @@
+/*
+ * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
+ * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -211,7 +226,7 @@ namespace QuantConnect.Data.Market
                 {
                     return data;
                 }
-                throw new KeyNotFoundException(string.Format("'{0}' wasn't found in the {1} object, likely because there was no-data at this moment in time and it wasn't possible to fillforward historical data. Please check the data exists before accessing it with data.ContainsKey(\"{0}\")", symbol, GetType().GetBetterTypeName()));
+                throw new KeyNotFoundException($"'{symbol}' wasn't found in the {GetType().GetBetterTypeName()} object, likely because there was no-data at this moment in time and it wasn't possible to fillforward historical data. Please check the data exists before accessing it with data.ContainsKey(\"{symbol}\")");
             }
             set
             {
@@ -236,7 +251,7 @@ namespace QuantConnect.Data.Market
                 Symbol symbol;
                 if (!SymbolCache.TryGetSymbol(ticker, out symbol))
                 {
-                    throw new KeyNotFoundException(string.Format("'{0}' wasn't found in the {1} object, likely because there was no-data at this moment in time and it wasn't possible to fillforward historical data. Please check the data exists before accessing it with data.ContainsKey(\"{0}\")", ticker, GetType().GetBetterTypeName()));
+                    throw new KeyNotFoundException($"'{ticker}' wasn't found in the {GetType().GetBetterTypeName()} object, likely because there was no-data at this moment in time and it wasn't possible to fillforward historical data. Please check the data exists before accessing it with data.ContainsKey(\"{ticker}\")");
                 }
                 return this[symbol];
             }
@@ -245,7 +260,7 @@ namespace QuantConnect.Data.Market
                 Symbol symbol;
                 if (!SymbolCache.TryGetSymbol(ticker, out symbol))
                 {
-                    throw new KeyNotFoundException(string.Format("'{0}' wasn't found in the {1} object, likely because there was no-data at this moment in time and it wasn't possible to fillforward historical data. Please check the data exists before accessing it with data.ContainsKey(\"{0}\")", ticker, GetType().GetBetterTypeName()));
+                    throw new KeyNotFoundException($"'{ticker}' wasn't found in the {GetType().GetBetterTypeName()} object, likely because there was no-data at this moment in time and it wasn't possible to fillforward historical data. Please check the data exists before accessing it with data.ContainsKey(\"{ticker}\")");
                 }
                 this[symbol] = value;
             }

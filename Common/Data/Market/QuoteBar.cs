@@ -17,6 +17,7 @@ using System;
 using System.Globalization;
 using QuantConnect.Logging;
 using QuantConnect.Util;
+using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Data.Market
 {
@@ -272,42 +273,33 @@ namespace QuantConnect.Data.Market
         /// <returns>Enumerable iterator for returning each line of the required data.</returns>
         public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode)
         {
-            var csvLength = line.Split(',').Length;
-
             try
             {
-                // "Scaffold" code - simple check to see how the data is formatted and decide how to parse appropriately
-                // TODO: Once all FX is reprocessed to QuoteBars, remove this check
-                if (csvLength > 5)
+                switch (config.SecurityType)
                 {
-                    switch (config.SecurityType)
-                    {
-                        case SecurityType.Equity:
-                            return ParseEquity(config, line, date);
+                    case SecurityType.Equity:
+                        return ParseEquity(config, line, date);
 
-                        case SecurityType.Forex:
-                        case SecurityType.Crypto:
-                            return ParseForex(config, line, date);
+                    case SecurityType.Forex:
+                    case SecurityType.Crypto:
+                        return ParseForex(config, line, date);
 
-                        case SecurityType.Cfd:
-                            return ParseCfd(config, line, date);
+                    case SecurityType.Cfd:
+                        return ParseCfd(config, line, date);
 
-                        case SecurityType.Option:
-                            return ParseOption(config, line, date);
+                    case SecurityType.Option:
+                        return ParseOption(config, line, date);
 
-                        case SecurityType.Future:
-                            return ParseFuture(config, line, date);
+                    case SecurityType.Future:
+                        return ParseFuture(config, line, date);
 
-                    }
                 }
-
-                // Parse as trade
-                return ParseTradeAsQuoteBar(config, date, line);
             }
             catch (Exception err)
             {
-                Log.Error("QuoteBar.Reader(): Error parsing line: '{0}', Symbol: {1}, SecurityType: {2}, Resolution: {3}, Date: {4}, Message: {5}",
-                    line, config.Symbol.Value, config.SecurityType, config.Resolution, date.ToString("yyyy-MM-dd"), err);
+                Log.Error(Invariant($"QuoteBar.Reader(): Error parsing line: '{line}', Symbol: {config.Symbol.Value}, SecurityType: {config.SecurityType}, ") +
+                    Invariant($"Resolution: {config.Resolution}, Date: {date.ToStringInvariant("yyyy-MM-dd")}, Message: {err}")
+                );
             }
 
             // if we couldn't parse it above return a default instance
