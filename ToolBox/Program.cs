@@ -279,8 +279,8 @@ namespace QuantConnect.ToolBox
                 Console.WriteLine("\n" + message);
             }
             Console.WriteLine("\nUse the '--help' parameter for more information");
-            Console.WriteLine("Press any key to quit");
-            Console.ReadLine();
+            //Console.WriteLine("Press any key to quit");
+            //Console.ReadLine();
             Environment.Exit(exitCode);
         }
 
