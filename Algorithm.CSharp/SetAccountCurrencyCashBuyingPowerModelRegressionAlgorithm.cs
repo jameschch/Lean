@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -64,15 +64,11 @@ namespace QuantConnect.Algorithm.CSharp
                 throw new Exception("This regression algorithm is expected to test the CashBuyingPowerModel");
             }
 
-            try
+            // Second call to change account currency will be ignored
+            SetAccountCurrency("ARG");
+            if (AccountCurrency != "EUR")
             {
-                // Change account currency after adding a security will throw
-                SetAccountCurrency("ARG");
-                throw new Exception("Calling SetAccountCurrency() after adding a Security should throw");
-            }
-            catch (InvalidOperationException)
-            {
-                // expected
+                throw new Exception($"Unexpected account currency value {AccountCurrency}");
             }
         }
 
@@ -131,7 +127,7 @@ namespace QuantConnect.Algorithm.CSharp
 
         private void UpdateExpectedOrderQuantity(decimal target)
         {
-            _expectedOrderQuantity = (Portfolio.TotalPortfolioValue * target * (1 - Settings.FreePortfolioValuePercentage) - _btcUsd.Holdings.HoldingsValue)
+            _expectedOrderQuantity = ((Portfolio.TotalPortfolioValue - Settings.FreePortfolioValue) * target - _btcUsd.Holdings.HoldingsValue)
                 / (_btcUsd.Price * _btcUsd.QuoteCurrency.ConversionRate);
             _expectedOrderQuantity--; // minus 1 per fees
             _expectedOrderQuantity -= _expectedOrderQuantity % _btcUsd.SymbolProperties.LotSize;
@@ -241,23 +237,43 @@ namespace QuantConnect.Algorithm.CSharp
         {
             {"Total Trades", "3"},
             {"Average Win", "0%"},
-            {"Average Loss", "-0.62%"},
-            {"Compounding Annual Return", "-90.507%"},
-            {"Drawdown", "0.800%"},
-            {"Expectancy", "-1"},
-            {"Net Profit", "-0.643%"},
-            {"Sharpe Ratio", "-10.671"},
-            {"Loss Rate", "100%"},
+            {"Average Loss", "0%"},
+            {"Compounding Annual Return", "0%"},
+            {"Drawdown", "0%"},
+            {"Expectancy", "0"},
+            {"Net Profit", "0%"},
+            {"Sharpe Ratio", "0"},
+            {"Probabilistic Sharpe Ratio", "0%"},
+            {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-1.662"},
-            {"Beta", "0.568"},
-            {"Annual Standard Deviation", "0.076"},
-            {"Annual Variance", "0.006"},
-            {"Information Ratio", "-40.034"},
-            {"Tracking Error", "0.058"},
-            {"Treynor Ratio", "-1.426"},
-            {"Total Fees", "$48.58"}
+            {"Alpha", "0"},
+            {"Beta", "0"},
+            {"Annual Standard Deviation", "0"},
+            {"Annual Variance", "0"},
+            {"Information Ratio", "0"},
+            {"Tracking Error", "0"},
+            {"Treynor Ratio", "0"},
+            {"Total Fees", "$48.56"},
+            {"Fitness Score", "0.5"},
+            {"Kelly Criterion Estimate", "27133.098"},
+            {"Kelly Criterion Probability Value", "0.357"},
+            {"Sortino Ratio", "79228162514264337593543950335"},
+            {"Return Over Maximum Drawdown", "-142.421"},
+            {"Portfolio Turnover", "2.001"},
+            {"Total Insights Generated", "3"},
+            {"Total Insights Closed", "2"},
+            {"Total Insights Analysis Completed", "2"},
+            {"Long Insight Count", "2"},
+            {"Short Insight Count", "0"},
+            {"Long/Short Ratio", "100%"},
+            {"Estimated Monthly Alpha Value", "€0.1134327"},
+            {"Total Accumulated Estimated Alpha Value", "€0.004411272"},
+            {"Mean Population Estimated Insight Value", "€0.002205636"},
+            {"Mean Population Direction", "50%"},
+            {"Mean Population Magnitude", "0%"},
+            {"Rolling Averaged Population Direction", "50%"},
+            {"Rolling Averaged Population Magnitude", "0%"}
         };
     }
 }

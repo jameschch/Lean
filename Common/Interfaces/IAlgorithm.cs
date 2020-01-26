@@ -28,6 +28,7 @@ using System.Collections.Concurrent;
 using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Securities.Future;
 using QuantConnect.Securities.Option;
+using QuantConnect.Storage;
 
 namespace QuantConnect.Interfaces
 {
@@ -321,6 +322,11 @@ namespace QuantConnect.Interfaces
         }
 
         /// <summary>
+        /// Gets the object store, used for persistence
+        /// </summary>
+        ObjectStore ObjectStore { get; }
+
+        /// <summary>
         /// Returns the current Slice object
         /// </summary>
         Slice CurrentSlice { get; }
@@ -494,6 +500,20 @@ namespace QuantConnect.Interfaces
         void SetDateTime(DateTime time);
 
         /// <summary>
+        /// Set the start date for the backtest
+        /// </summary>
+        /// <param name="start">Datetime Start date for backtest</param>
+        /// <remarks>Must be less than end date and within data available</remarks>
+        void SetStartDate(DateTime start);
+
+        /// <summary>
+        /// Set the end date for a backtest.
+        /// </summary>
+        /// <param name="end">Datetime value for end date</param>
+        /// <remarks>Must be greater than the start date</remarks>
+        void SetEndDate(DateTime end);
+
+        /// <summary>
         /// Set the algorithm Id for this backtest or live run. This can be used to identify the order and equity records.
         /// </summary>
         /// <param name="algorithmId">unique 32 character identifier for backtest or live server</param>
@@ -532,7 +552,7 @@ namespace QuantConnect.Interfaces
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice.</param>
         /// <param name="leverage">leverage for this security</param>
         /// <param name="extendedMarketHours">ExtendedMarketHours send in data from 4am - 8pm, not used for FOREX</param>
-        Security AddSecurity(SecurityType securityType, string symbol, Resolution resolution, string market, bool fillDataForward, decimal leverage, bool extendedMarketHours);
+        Security AddSecurity(SecurityType securityType, string symbol, Resolution? resolution, string market, bool fillDataForward, decimal leverage, bool extendedMarketHours);
 
         /// <summary>
         /// Creates and adds a new single <see cref="Future"/> contract to the algorithm
@@ -542,7 +562,7 @@ namespace QuantConnect.Interfaces
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
         /// <returns>The new <see cref="Future"/> security</returns>
-        Future AddFutureContract(Symbol symbol, Resolution resolution = Resolution.Minute, bool fillDataForward = true, decimal leverage = 0m);
+        Future AddFutureContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m);
 
         /// <summary>
         /// Creates and adds a new single <see cref="Option"/> contract to the algorithm
@@ -552,7 +572,7 @@ namespace QuantConnect.Interfaces
         /// <param name="fillDataForward">If true, returns the last available data even if none in that timeslice. Default is <value>true</value></param>
         /// <param name="leverage">The requested leverage for this equity. Default is set by <see cref="SecurityInitializer"/></param>
         /// <returns>The new <see cref="Option"/> security</returns>
-        Option AddOptionContract(Symbol symbol, Resolution resolution = Resolution.Minute, bool fillDataForward = true, decimal leverage = 0m);
+        Option AddOptionContract(Symbol symbol, Resolution? resolution = null, bool fillDataForward = true, decimal leverage = 0m);
 
         /// <summary>
         /// Removes the security with the specified symbol. This will cancel all
@@ -670,6 +690,12 @@ namespace QuantConnect.Interfaces
         /// </summary>
         /// <param name="api">Initiated API</param>
         void SetApi(IApi api);
+
+        /// <summary>
+        /// Sets the object store
+        /// </summary>
+        /// <param name="objectStore">The object store</param>
+        void SetObjectStore(IObjectStore objectStore);
 
         /// <summary>
         /// Sets the order event provider

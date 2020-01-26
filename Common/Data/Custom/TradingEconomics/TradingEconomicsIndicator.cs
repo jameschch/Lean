@@ -17,6 +17,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using NodaTime;
 using QuantConnect.Data.UniverseSelection;
 using static QuantConnect.StringExtensions;
 
@@ -92,7 +93,7 @@ namespace QuantConnect.Data.Custom.TradingEconomics
         /// <param name="date">Date of the requested data</param>
         /// <param name="isLiveMode">true if we're in live mode, false for backtesting mode</param>
         /// <returns>
-        /// Collection of USEnergyInformation objects
+        /// Collection of TradingEconomicsIndicator objects
         /// </returns>
         public override BaseData Reader(SubscriptionDataConfig config, string content, DateTime date, bool isLiveMode)
         {
@@ -133,5 +134,14 @@ namespace QuantConnect.Data.Custom.TradingEconomics
         /// Formats a string with the Trading Economics Indicator information.
         /// </summary>
         public override string ToString() => Invariant($"{HistoricalDataSymbol} ({Country} - {Category}): {Value}");
+
+        /// <summary>
+        /// Specifies the data time zone for this data type. This is useful for custom data types
+        /// </summary>
+        /// <returns>The <see cref="DateTimeZone"/> of this data type</returns>
+        public override DateTimeZone DataTimeZone()
+        {
+            return TimeZones.Utc;
+        }
     }
 }

@@ -34,6 +34,7 @@ namespace QuantConnect.Securities
     public class SecurityPortfolioManager : IDictionary<Symbol, SecurityHolding>, ISecurityProvider
     {
         // flips to true when the user called SetCash(), if true, SetAccountCurrency will throw
+        private bool _setAccountCurrencyWasCalled;
         private bool _setCashWasCalled;
         private bool _isTotalPortfolioValueValid;
         private decimal _totalPortfolioValue;
@@ -463,6 +464,10 @@ namespace QuantConnect.Securities
                 foreach (var kvp in Securities)
                 {
                     var security = kvp.Value;
+                    if (security.Holdings.Quantity == 0)
+                    {
+                        continue;
+                    }
                     var context = new ReservedBuyingPowerForPositionParameters(security);
                     var reservedBuyingPower = security.BuyingPowerModel.GetReservedBuyingPowerForPosition(context);
                     sum += reservedBuyingPower.Value;
@@ -526,6 +531,22 @@ namespace QuantConnect.Securities
         /// <param name="accountCurrency">The account currency cash symbol to set</param>
         public void SetAccountCurrency(string accountCurrency)
         {
+            accountCurrency = accountCurrency.LazyToUpper();
+
+            // only allow setting account currency once
+            // we could try to set it twice when backtesting and the job packet specifies the initial CashAmount to use
+            if (_setAccountCurrencyWasCalled)
+            {
+                if (accountCurrency != CashBook.AccountCurrency)
+                {
+                    Log.Trace("SecurityPortfolioManager.SetAccountCurrency():" +
+                              $" account currency has already been set to {CashBook.AccountCurrency}." +
+                              $" Will ignore new value {accountCurrency}");
+                }
+                return;
+            }
+            _setAccountCurrencyWasCalled = true;
+
             if (Securities.Count > 0)
             {
                 throw new InvalidOperationException("SecurityPortfolioManager.SetAccountCurrency(): " +
@@ -539,7 +560,6 @@ namespace QuantConnect.Securities
                     "Cannot change AccountCurrency after setting cash. " +
                     "Please move SetAccountCurrency() before SetCash().");
             }
-            accountCurrency = accountCurrency.LazyToUpper();
 
             Log.Trace("SecurityPortfolioManager.SetAccountCurrency():" +
                 $" setting account currency to {accountCurrency}");

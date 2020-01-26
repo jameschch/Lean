@@ -39,6 +39,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         private readonly MarketHoursDatabase _marketHoursDatabase;
         private readonly ITimeKeeper _timeKeeper;
         private readonly bool _liveMode;
+        private readonly IRegisteredSecurityDataTypesProvider _registeredTypesProvider;
 
         /// There is no ConcurrentHashSet collection in .NET,
         /// so we use ConcurrentDictionary with byte value to minimize memory usage
@@ -64,7 +65,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             IAlgorithm algorithm,
             ITimeKeeper timeKeeper,
             MarketHoursDatabase marketHoursDatabase,
-            bool liveMode)
+            bool liveMode,
+            IRegisteredSecurityDataTypesProvider registeredTypesProvider)
         {
             _dataFeed = dataFeed;
             UniverseSelection = universeSelection;
@@ -74,6 +76,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             _timeKeeper = timeKeeper;
             _marketHoursDatabase = marketHoursDatabase;
             _liveMode = liveMode;
+            _registeredTypesProvider = registeredTypesProvider;
 
             // wire ourselves up to receive notifications when universes are added/removed
             algorithm.UniverseManager.CollectionChanged += (sender, args) =>
@@ -98,7 +101,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                                     config,
                                     algorithm.Portfolio.CashBook[algorithm.AccountCurrency],
                                     SymbolProperties.GetDefault(algorithm.AccountCurrency),
-                                    algorithm.Portfolio.CashBook
+                                    algorithm.Portfolio.CashBook,
+                                    RegisteredSecurityDataTypesProvider.Null,
+                                    new SecurityCache()
                                  );
                             }
                             AddSubscription(
@@ -163,6 +168,10 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// <returns>True if the subscription was created and added successfully, false otherwise</returns>
         public bool AddSubscription(SubscriptionRequest request)
         {
+            // guarantee the configuration is present in our config collection
+            // this is related to GH issue 3877: where we added a configuration which we also removed
+            _subscriptionManagerSubscriptions.TryAdd(request.Configuration, request.Configuration);
+
             Subscription subscription;
             if (DataFeedSubscriptions.TryGetValue(request.Configuration, out subscription))
             {
@@ -289,11 +298,14 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             var config = _subscriptionManagerSubscriptions.GetOrAdd(newConfig, newConfig);
 
             // if the reference is not the same, means it was already there and we did not add anything new
-            if (!ReferenceEquals(config, newConfig) && Log.DebuggingEnabled)
+            if (!ReferenceEquals(config, newConfig))
             {
                 // for performance lets not create the message string if debugging is not enabled
                 // this can be executed many times and its in the algorithm thread
-                Log.Debug("DataManager.SubscriptionManagerGetOrAdd(): subscription already added: " + config);
+                if (Log.DebuggingEnabled)
+                {
+                    Log.Debug("DataManager.SubscriptionManagerGetOrAdd(): subscription already added: " + config);
+                }
             }
             else
             {
@@ -366,7 +378,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         public SubscriptionDataConfig Add(
             Type dataType,
             Symbol symbol,
-            Resolution resolution,
+            Resolution? resolution = null,
             bool fillForward = true,
             bool extendedMarketHours = false,
             bool isFilteredSubscription = true,
@@ -387,9 +399,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// </summary>
         public List<SubscriptionDataConfig> Add(
             Symbol symbol,
-            Resolution resolution,
-            bool fillForward,
-            bool extendedMarketHours,
+            Resolution? resolution = null,
+            bool fillForward = true,
+            bool extendedMarketHours = false,
             bool isFilteredSubscription = true,
             bool isInternalFeed = false,
             bool isCustomData = false,
@@ -398,7 +410,49 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             )
         {
             var dataTypes = subscriptionDataTypes ??
-                LookupSubscriptionConfigDataTypes(symbol.SecurityType, resolution, symbol.IsCanonical());
+                LookupSubscriptionConfigDataTypes(symbol.SecurityType, resolution ?? Resolution.Minute, symbol.IsCanonical());
+
+            if (!dataTypes.Any())
+            {
+                throw new ArgumentNullException(nameof(dataTypes), "At least one type needed to create new subscriptions");
+            }
+
+            var resolutionWasProvided = resolution.HasValue;
+            foreach (var typeTuple in dataTypes)
+            {
+                var baseInstance = typeTuple.Item1.GetBaseDataInstance();
+                baseInstance.Symbol = symbol;
+                if (!resolutionWasProvided)
+                {
+                    var defaultResolution = baseInstance.DefaultResolution();
+                    if (resolution.HasValue && resolution != defaultResolution)
+                    {
+                        // we are here because there are multiple 'dataTypes'.
+                        // if we get different default resolutions lets throw, this shouldn't happen
+                        throw new InvalidOperationException(
+                            $"Different data types ({string.Join(",", dataTypes.Select(tuple => tuple.Item1))})" +
+                            $" provided different default resolutions {defaultResolution} and {resolution}, this is an unexpected invalid operation.");
+                    }
+                    resolution = defaultResolution;
+                }
+                else
+                {
+                    // only assert resolution in backtesting, live can use other data source
+                    // for example daily data for options
+                    if (!_liveMode)
+                    {
+                        var supportedResolutions = baseInstance.SupportedResolutions();
+                        if (supportedResolutions.Contains(resolution.Value))
+                        {
+                            continue;
+                        }
+
+                        throw new ArgumentException($"Sorry {resolution.ToStringInvariant()} is not a supported resolution for {typeTuple.Item1.Name}" +
+                                                    $" and SecurityType.{symbol.SecurityType.ToStringInvariant()}." +
+                                                    $" Please change your AddData to use one of the supported resolutions ({string.Join(",", supportedResolutions)}).");
+                    }
+                }
+            }
 
             var marketHoursDbEntry = _marketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
             var exchangeHours = marketHoursDbEntry.ExchangeHours;
@@ -419,18 +473,13 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                     "ExchangeTimeZone is a required parameter for new subscriptions. Set to the time zone the security exchange resides in.");
             }
 
-            if (!dataTypes.Any())
-            {
-                throw new ArgumentNullException(nameof(dataTypes), "At least one type needed to create new subscriptions");
-            }
-
             var result = (from subscriptionDataType in dataTypes
                 let dataType = subscriptionDataType.Item1
                 let tickType = subscriptionDataType.Item2
                 select new SubscriptionDataConfig(
                     dataType,
                     symbol,
-                    resolution,
+                    resolution.Value,
                     marketHoursDbEntry.DataTimeZone,
                     exchangeHours.TimeZone,
                     fillForward,
@@ -444,6 +493,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             for (int i = 0; i < result.Count; i++)
             {
                 result[i] = SubscriptionManagerGetOrAdd(result[i]);
+
+                // track all registered data types
+                _registeredTypesProvider.RegisterType(result[i].Type);
             }
             return result;
         }

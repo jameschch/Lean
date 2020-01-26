@@ -16,6 +16,7 @@
 using Newtonsoft.Json;
 using System;
 using System.IO;
+using NodaTime;
 using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Data.Custom.Estimize
@@ -121,8 +122,8 @@ namespace QuantConnect.Data.Custom.Estimize
             UpdatedAt = Parse.DateTimeExact(csv[0], "yyyyMMdd HH:mm:ss");
             Time = UpdatedAt;
             Id = csv[1];
-            Source = csv[2].ConvertInvariant<Source>();
-            Type = csv[3].IfNotNullOrEmpty(s => s.ConvertInvariant<Type>());
+            Source = (Source)Enum.Parse(typeof(Source), csv[2]);
+            Type = csv[3].IfNotNullOrEmpty(s => (Type)Enum.Parse(typeof(Type), s));
             Mean = csv[4].IfNotNullOrEmpty<decimal?>(s => Parse.Decimal(s));
             High = csv[5].IfNotNullOrEmpty<decimal?>(s => Parse.Decimal(s));
             Low = csv[6].IfNotNullOrEmpty<decimal?>(s => Parse.Decimal(s));
@@ -191,6 +192,15 @@ namespace QuantConnect.Data.Custom.Estimize
         public override bool RequiresMapping()
         {
             return true;
+        }
+
+        /// <summary>
+        /// Specifies the data time zone for this data type. This is useful for custom data types
+        /// </summary>
+        /// <returns>The <see cref="DateTimeZone"/> of this data type</returns>
+        public override DateTimeZone DataTimeZone()
+        {
+            return TimeZones.Utc;
         }
     }
 

@@ -182,6 +182,272 @@ namespace QuantConnect.Tests.Python
         }
 
         [Test]
+        public void BackwardsCompatibilityDataFrame_ix_UsingTickerInCache()
+        {
+            using (Py.GIL())
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame['lastprice'].unstack(level=0).iloc[-1]['SPY']
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_iloc_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame['lastprice'].unstack(level=0).iloc[-1][symbol]
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_iloc_UsingTickerInCache()
+        {
+            using (Py.GIL())
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame['lastprice'].unstack(level=0).ix[-1]['SPY']
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_ix_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame['lastprice'].unstack(level=0).ix[-1][symbol]
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_concat_UsingTickerInCache()
+        {
+            using (Py.GIL())
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = pd.concat([dataFrame, dataFrame2])
+    data = newDataFrame['lastprice'].unstack(level=0).ix[-1]['SPY']
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_concat_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = pd.concat([dataFrame, dataFrame2])
+    data = newDataFrame['lastprice'].unstack(level=0).ix[-1][symbol]
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_join_UsingTickerInCache()
+        {
+            using (Py.GIL())
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = dataFrame.join(dataFrame2, lsuffix='_')
+    data = newDataFrame['lastprice'].unstack(level=0).ix[-1]['SPY']
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_join_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = dataFrame.join(dataFrame2, lsuffix='_')
+    data = newDataFrame['lastprice'].unstack(level=0).ix[-1][symbol]
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_append_UsingTickerInCache()
+        {
+            using (Py.GIL())
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = dataFrame.append(dataFrame2)
+    data = newDataFrame['lastprice'].unstack(level=0).ix[-1]['SPY']
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_append_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = dataFrame.append(dataFrame2)
+    data = newDataFrame['lastprice'].unstack(level=0).ix[-1][symbol]
+    if data is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_merge_UsingTickerInCache()
+        {
+            using (Py.GIL())
+            {
+                SymbolCache.Set("SPY", Symbols.SPY);
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = dataFrame.merge(dataFrame2, on='symbol', how='outer')
+    data = newDataFrame.loc['SPY']
+    if len(data) is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void BackwardsCompatibilityDataFrame_merge_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+import pandas as pd
+
+def Test(dataFrame, dataFrame2, symbol):
+    newDataFrame = dataFrame.merge(dataFrame2, on='symbol', how='outer')
+    data = newDataFrame.loc[symbol]
+    if len(data) is 0:
+        raise Exception('Data is zero')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), GetTestDataFrame(Symbols.AAPL), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void DataFrame_loc_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame.loc[symbol]").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void DataFrame_unstack_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame.unstack(level = 0).lastprice[symbol]").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
+        public void DataFrame_get_UsingSymbol()
+        {
+            using (Py.GIL())
+            {
+                dynamic test = PythonEngine.ModuleFromString("testModule",
+                    @"
+def Test(dataFrame, symbol):
+    data = dataFrame['lastprice'].unstack(level=0).get(symbol)
+    if data.empty:
+        raise Exception('Data is empty')").GetAttr("Test");
+
+                Assert.DoesNotThrow(() => test(GetTestDataFrame(Symbols.SPY), Symbols.SPY));
+            }
+        }
+
+        [Test]
         public void BackwardsCompatibilityDataFrame_get_NewWay()
         {
             using (Py.GIL())
@@ -870,6 +1136,7 @@ def Test(dataFrame, symbol):
                     var index = subDataFrame.index[i];
                     var value = subDataFrame.loc[index].value.AsManagedObject(typeof(decimal));
                     Assert.AreEqual(rawBars[i].Value, value);
+
                     var transactions = subDataFrame.loc[index].transactions.AsManagedObject(typeof(decimal));
                     var expected = (rawBars[i] as DynamicData)?.GetProperty("transactions");
                     expected = expected ?? type.GetProperty("Transactions")?.GetValue(rawBars[i]);
@@ -900,6 +1167,74 @@ def Test(dataFrame, symbol):
                     var expected = (rawBars[i] as DynamicData)?.GetProperty("transactions");
                     expected = expected ?? type.GetProperty("Transactions")?.GetValue(rawBars[i]);
                     Assert.AreEqual(expected, transactions);
+                }
+            }
+        }
+
+        [Test]
+        [TestCase(typeof(SubTradeBar), "SubProperty")]
+        [TestCase(typeof(SubSubTradeBar), "SubSubProperty")]
+        public void HandlesCustomDataBarsInheritsFromTradeBar(Type type, string propertyName)
+        {
+            var converter = new PandasConverter();
+            var symbol = Symbols.LTCUSD;
+
+            var config = GetSubscriptionDataConfig<Quandl>(symbol, Resolution.Daily);
+            dynamic custom = Activator.CreateInstance(type);
+
+            var rawBars = Enumerable
+                .Range(0, 10)
+                .Select(i =>
+                {
+                    var line = $"{DateTime.UtcNow.AddDays(i).ToStringInvariant("yyyyMMdd HH:mm")},{i + 101},{i + 102},{i + 100},{i + 101},{i + 101}";
+                    return custom.Reader(config, line, DateTime.UtcNow.AddDays(i), false) as BaseData;
+                })
+                .ToArray();
+
+            // GetDataFrame with argument of type IEnumerable<BaseData>
+            dynamic dataFrame = converter.GetDataFrame(rawBars);
+
+            using (Py.GIL())
+            {
+                Assert.IsFalse(dataFrame.empty.AsManagedObject(typeof(bool)));
+
+                var subDataFrame = dataFrame.loc[symbol];
+                Assert.IsFalse(subDataFrame.empty.AsManagedObject(typeof(bool)));
+
+                var count = subDataFrame.__len__().AsManagedObject(typeof(int));
+                Assert.AreEqual(count, 10);
+
+                for (var i = 0; i < count; i++)
+                {
+                    var index = subDataFrame.index[i];
+                    var value = subDataFrame.loc[index].value.AsManagedObject(typeof(decimal));
+                    Assert.AreEqual(rawBars[i].Value, value);
+
+                    var transactions = subDataFrame.loc[index][propertyName.ToLowerInvariant()].AsManagedObject(typeof(decimal));
+                    var expected = type.GetProperty(propertyName)?.GetValue(rawBars[i]);
+                    Assert.AreEqual(expected, transactions);
+                }
+            }
+
+            // GetDataFrame with argument of type IEnumerable<BaseData>
+            var history = GetHistory(symbol, Resolution.Daily, rawBars);
+            dataFrame = converter.GetDataFrame(history);
+
+            using (Py.GIL())
+            {
+                Assert.IsFalse(dataFrame.empty.AsManagedObject(typeof(bool)));
+
+                var subDataFrame = dataFrame.loc[symbol];
+                Assert.IsFalse(subDataFrame.empty.AsManagedObject(typeof(bool)));
+
+                var count = subDataFrame.__len__().AsManagedObject(typeof(int));
+                Assert.AreEqual(10, count);
+
+                for (var i = 0; i < count; i++)
+                {
+                    var index = subDataFrame.index[i];
+                    var value = subDataFrame.loc[index].value.AsManagedObject(typeof(decimal));
+                    Assert.AreEqual(rawBars[i].Value, value);
                 }
             }
         }
@@ -998,7 +1333,9 @@ def Test(dataFrame, symbol):
                 subscriptionDataConfig,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
         }
 
@@ -1010,6 +1347,30 @@ def Test(dataFrame, symbol):
                 .Select(i => new Tick(symbol, $"1440{i:D2}00,167{i:D2}00,1{i:D2},T,T,0", new DateTime(2013, 10, 7)))
                 .ToArray();
             return converter.GetDataFrame(rawBars);
+        }
+
+        internal class SubTradeBar : TradeBar
+        {
+            public decimal SubProperty => Value;
+
+            public SubTradeBar() { }
+
+            public SubTradeBar(TradeBar tradeBar) : base(tradeBar) { }
+
+            public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode) =>
+                new SubTradeBar((TradeBar) base.Reader(config, line, date, isLiveMode));
+        }
+
+        internal class SubSubTradeBar : SubTradeBar
+        {
+            public decimal SubSubProperty => Value;
+
+            public SubSubTradeBar() { }
+
+            public SubSubTradeBar(TradeBar tradeBar) : base(tradeBar) { }
+
+            public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode) =>
+                new SubSubTradeBar((TradeBar) base.Reader(config, line, date, isLiveMode));
         }
     }
 }

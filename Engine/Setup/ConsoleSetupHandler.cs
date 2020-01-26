@@ -158,6 +158,12 @@ namespace QuantConnect.Lean.Engine.Setup
                     // set the future chain provider
                     algorithm.SetFutureChainProvider(new CachingFutureChainProvider(new BacktestingFutureChainProvider()));
 
+                    // set the object store
+                    algorithm.SetObjectStore(parameters.ObjectStore);
+
+                    // before we call initialize
+                    BaseSetupHandler.LoadBacktestJobAccountCurrency(algorithm, backtestJob);
+
                     var isolator = new Isolator();
                     isolator.ExecuteWithTimeLimit(TimeSpan.FromMinutes(5),
                         () =>
@@ -168,21 +174,34 @@ namespace QuantConnect.Lean.Engine.Setup
                         sleepIntervalMillis: 50,
                         workerThread: WorkerThread);
 
+                    // set start and end date if present in the job
+                    if (backtestJob.PeriodStart.HasValue)
+                    {
+                        algorithm.SetStartDate(backtestJob.PeriodStart.Value);
+                    }
+                    if (backtestJob.PeriodFinish.HasValue)
+                    {
+                        algorithm.SetEndDate(backtestJob.PeriodFinish.Value);
+                    }
+
+                    // after we call initialize
+                    BaseSetupHandler.LoadBacktestJobCashAmount(algorithm, backtestJob);
+
                     //Finalize Initialization
                     algorithm.PostInitialize();
 
                     //Set the time frontier of the algorithm
                     algorithm.SetDateTime(algorithm.StartDate.ConvertToUtc(algorithm.TimeZone));
 
-                    //Construct the backtest job packet:
-                    backtestJob.PeriodStart = algorithm.StartDate;
-                    backtestJob.PeriodFinish = algorithm.EndDate;
-
                     //Backtest Specific Parameters:
-                    StartingDate = backtestJob.PeriodStart;
+                    StartingDate = algorithm.StartDate;
 
                     BaseSetupHandler.SetupCurrencyConversions(algorithm, parameters.UniverseSelection);
                     StartingPortfolioValue = algorithm.Portfolio.Cash;
+
+                    // we set the free portfolio value based on the initial total value and the free percentage value
+                    algorithm.Settings.FreePortfolioValue =
+                        algorithm.Portfolio.TotalPortfolioValue * algorithm.Settings.FreePortfolioValuePercentage;
                 }
                 else
                 {

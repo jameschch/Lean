@@ -53,6 +53,21 @@ namespace QuantConnect.Scheduling
         }
 
         /// <summary>
+        /// Specifies an event should fire at the current time
+        /// </summary>
+        public ITimeRule Now => new FuncTimeRule("Now", dates => dates.Select(date => date.Add(_securities.UtcTime.TimeOfDay)));
+
+        /// <summary>
+        /// Convenience property for running a scheduled event at midnight in the algorithm time zone
+        /// </summary>
+        public ITimeRule Midnight => new FuncTimeRule("Midnight", dates => dates.Select(date => date.ConvertToUtc(_timeZone)));
+
+        /// <summary>
+        /// Convenience property for running a scheduled event at noon in the algorithm time zone
+        /// </summary>
+        public ITimeRule Noon => new FuncTimeRule("Noon", dates => dates.Select(date => date.ConvertToUtc(_timeZone).AddHours(12)));
+
+        /// <summary>
         /// Specifies an event should fire at the specified time of day in the algorithm's time zone
         /// </summary>
         /// <param name="timeOfDay">The time of day in the algorithm's time zone the event should fire</param>
@@ -129,10 +144,9 @@ namespace QuantConnect.Scheduling
                 throw new ArgumentException("TimeRules.Every(): time span interval can not be zero or less");
             }
             var name = Invariant($"Every {interval.TotalMinutes:0.##} min");
-            Func<IEnumerable<DateTime>, IEnumerable<DateTime>> applicator = dates => EveryIntervalIterator(dates, interval);
+            Func<IEnumerable<DateTime>, IEnumerable<DateTime>> applicator = dates => EveryIntervalIterator(dates, interval, _timeZone);
             return new FuncTimeRule(name, applicator);
         }
-
 
         /// <summary>
         /// Specifies an event should fire at market open +- <paramref name="minutesAfterOpen"/>
@@ -201,7 +215,8 @@ namespace QuantConnect.Scheduling
         /// </summary>
         /// <param name="dates">The dates for which we want to create the different intervals</param>
         /// <param name="interval">The interval value to use, can not be zero or less</param>
-        private static IEnumerable<DateTime> EveryIntervalIterator(IEnumerable<DateTime> dates, TimeSpan interval)
+        /// <param name="timeZone">The time zone the date time is expressed in</param>
+        private static IEnumerable<DateTime> EveryIntervalIterator(IEnumerable<DateTime> dates, TimeSpan interval, DateTimeZone timeZone)
         {
             if (interval <= TimeSpan.Zero)
             {
@@ -211,7 +226,7 @@ namespace QuantConnect.Scheduling
             {
                 for (var time = TimeSpan.Zero; time < Time.OneDay; time += interval)
                 {
-                    yield return date + time;
+                    yield return (date + time).ConvertToUtc(timeZone);
                 }
             }
         }

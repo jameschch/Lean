@@ -29,7 +29,9 @@ namespace QuantConnect.Securities
         private readonly CashBook _cashBook;
         private readonly MarketHoursDatabase _marketHoursDatabase;
         private readonly SymbolPropertiesDatabase _symbolPropertiesDatabase;
+        private readonly IRegisteredSecurityDataTypesProvider _registeredTypes;
         private readonly ISecurityInitializerProvider _securityInitializerProvider;
+        private readonly SecurityCacheProvider _cacheProvider;
         private bool _isLiveMode;
 
         /// <summary>
@@ -38,12 +40,16 @@ namespace QuantConnect.Securities
         public SecurityService(CashBook cashBook,
             MarketHoursDatabase marketHoursDatabase,
             SymbolPropertiesDatabase symbolPropertiesDatabase,
-            ISecurityInitializerProvider securityInitializerProvider)
+            ISecurityInitializerProvider securityInitializerProvider,
+            IRegisteredSecurityDataTypesProvider registeredTypes,
+            SecurityCacheProvider cacheProvider)
         {
             _cashBook = cashBook;
+            _registeredTypes = registeredTypes;
             _marketHoursDatabase = marketHoursDatabase;
             _symbolPropertiesDatabase = symbolPropertiesDatabase;
             _securityInitializerProvider = securityInitializerProvider;
+            _cacheProvider = cacheProvider;
         }
 
         /// <summary>
@@ -112,38 +118,39 @@ namespace QuantConnect.Securities
             }
 
             var quoteCash = _cashBook[symbolProperties.QuoteCurrency];
+            var cache = _cacheProvider.GetSecurityCache(symbol);
 
             Security security;
             switch (symbol.ID.SecurityType)
             {
                 case SecurityType.Equity:
-                    security = new Equity.Equity(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
+                    security = new Equity.Equity(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook, _registeredTypes, cache);
                     break;
 
                 case SecurityType.Option:
                     if (addToSymbolCache) SymbolCache.Set(symbol.Underlying.Value, symbol.Underlying);
-                    security = new Option.Option(symbol, exchangeHours, quoteCash, new Option.OptionSymbolProperties(symbolProperties), _cashBook);
+                    security = new Option.Option(symbol, exchangeHours, quoteCash, new Option.OptionSymbolProperties(symbolProperties), _cashBook, _registeredTypes, cache);
                     break;
 
                 case SecurityType.Future:
-                    security = new Future.Future(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
+                    security = new Future.Future(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook, _registeredTypes, cache);
                     break;
 
                 case SecurityType.Forex:
-                    security = new Forex.Forex(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
+                    security = new Forex.Forex(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook, _registeredTypes, cache);
                     break;
 
                 case SecurityType.Cfd:
-                    security = new Cfd.Cfd(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
+                    security = new Cfd.Cfd(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook, _registeredTypes, cache);
                     break;
 
                 case SecurityType.Crypto:
-                    security = new Crypto.Crypto(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
+                    security = new Crypto.Crypto(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook, _registeredTypes, cache);
                     break;
 
                 default:
                 case SecurityType.Base:
-                    security = new Security(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook);
+                    security = new Security(symbol, exchangeHours, quoteCash, symbolProperties, _cashBook, _registeredTypes, cache);
                     break;
             }
 
@@ -161,7 +168,7 @@ namespace QuantConnect.Securities
 
             // if leverage was specified then apply to security after the initializer has run, parameters of this
             // method take precedence over the intializer
-            if (leverage > 0)
+            if (leverage != Security.NullLeverage)
             {
                 security.SetLeverage(leverage);
             }

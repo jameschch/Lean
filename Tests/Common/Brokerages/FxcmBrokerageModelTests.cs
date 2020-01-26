@@ -73,7 +73,9 @@ namespace QuantConnect.Tests.Common.Brokerages
                 ),
                 new Cash(symbol.SecurityType == SecurityType.Equity ? properties.QuoteCurrency : quoteCurrency, 0, 1m),
                 properties,
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
         }
 

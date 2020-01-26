@@ -41,7 +41,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators.Factories
                 config,
                 new Cash(Currencies.USD, 0, 1),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var universeSettings = new UniverseSettings(Resolution.Daily, 2m, true, false, TimeSpan.FromDays(1));
@@ -85,7 +87,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators.Factories
                 config,
                 new Cash(Currencies.USD, 0, 1),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var universeSettings = new UniverseSettings(Resolution.Daily, 2m, true, false, TimeSpan.FromDays(1));

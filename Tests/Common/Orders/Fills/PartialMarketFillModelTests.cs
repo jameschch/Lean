@@ -103,7 +103,9 @@ namespace QuantConnect.Tests.Common.Orders.Fills
                 config,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             model = new PartialMarketFillModel(algorithm.Transactions, 2);

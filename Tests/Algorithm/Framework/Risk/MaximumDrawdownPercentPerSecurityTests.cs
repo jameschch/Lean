@@ -50,7 +50,9 @@ namespace QuantConnect.Tests.Algorithm.Framework.Risk
                 SecurityExchangeHours.AlwaysOpen(TimeZones.NewYork),
                 new Cash(Currencies.USD, 0, 1),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
             security.Setup(m => m.Invested).Returns(invested);
 

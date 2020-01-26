@@ -511,7 +511,8 @@ namespace QuantConnect.Data.Market
         {
             if (isLiveMode)
             {
-                return new SubscriptionDataSource(string.Empty, SubscriptionTransportMedium.LocalFile);
+                // this data type is streamed in live mode
+                return new SubscriptionDataSource(string.Empty, SubscriptionTransportMedium.Streaming);
             }
 
             var source = LeanData.GenerateZipFilePath(Globals.DataFolder, config.Symbol, date, config.Resolution, config.TickType);
@@ -555,6 +556,19 @@ namespace QuantConnect.Data.Market
             {
                 Period = Period
             };
+        }
+
+        public override string ToString()
+        {
+            return $"{Symbol}: " +
+                   $"Bid: O: {Bid?.Open.SmartRounding()} " +
+                   $"Bid: H: {Bid?.High.SmartRounding()} " +
+                   $"Bid: L: {Bid?.Low.SmartRounding()} " +
+                   $"Bid: C: {Bid?.Close.SmartRounding()} " +
+                   $"Ask: O: {Ask?.Open.SmartRounding()} " +
+                   $"Ask: H: {Ask?.High.SmartRounding()} " +
+                   $"Ask: L: {Ask?.Low.SmartRounding()} " +
+                   $"Ask: C: {Ask?.Close.SmartRounding()} ";
         }
     }
 }

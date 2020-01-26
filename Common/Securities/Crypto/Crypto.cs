@@ -38,7 +38,13 @@ namespace QuantConnect.Securities.Crypto
         /// <param name="symbolProperties">The symbol properties for this security</param>
         /// <param name="currencyConverter">Currency converter used to convert <see cref="CashAmount"/>
         /// instances into units of the account currency</param>
-        public Crypto(SecurityExchangeHours exchangeHours, Cash quoteCurrency, SubscriptionDataConfig config, SymbolProperties symbolProperties, ICurrencyConverter currencyConverter)
+        /// <param name="registeredTypes">Provides all data types registered in the algorithm</param>
+        public Crypto(SecurityExchangeHours exchangeHours,
+            Cash quoteCurrency,
+            SubscriptionDataConfig config,
+            SymbolProperties symbolProperties,
+            ICurrencyConverter currencyConverter,
+            IRegisteredSecurityDataTypesProvider registeredTypes)
             : base(config,
                 quoteCurrency,
                 symbolProperties,
@@ -53,7 +59,8 @@ namespace QuantConnect.Securities.Crypto
                 new CashBuyingPowerModel(),
                 new ForexDataFilter(),
                 new SecurityPriceVariationModel(),
-                currencyConverter
+                currencyConverter,
+                registeredTypes
                 )
         {
             Holdings = new CryptoHolding(this, currencyConverter);
@@ -73,12 +80,19 @@ namespace QuantConnect.Securities.Crypto
         /// <param name="symbolProperties">The symbol properties for this security</param>
         /// <param name="currencyConverter">Currency converter used to convert <see cref="CashAmount"/>
         /// instances into units of the account currency</param>
-        public Crypto(Symbol symbol, SecurityExchangeHours exchangeHours, Cash quoteCurrency, SymbolProperties symbolProperties, ICurrencyConverter currencyConverter)
+        /// <param name="registeredTypes">Provides all data types registered in the algorithm</param>
+        public Crypto(Symbol symbol,
+            SecurityExchangeHours exchangeHours,
+            Cash quoteCurrency,
+            SymbolProperties symbolProperties,
+            ICurrencyConverter currencyConverter,
+            IRegisteredSecurityDataTypesProvider registeredTypes,
+            SecurityCache securityCache)
             : base(symbol,
                 quoteCurrency,
                 symbolProperties,
                 new CryptoExchange(exchangeHours),
-                new ForexCache(),
+                securityCache,
                 new SecurityPortfolioModel(),
                 new ImmediateFillModel(),
                 new GDAXFeeModel(),
@@ -88,7 +102,8 @@ namespace QuantConnect.Securities.Crypto
                 new CashBuyingPowerModel(),
                 new ForexDataFilter(),
                 new SecurityPriceVariationModel(),
-                currencyConverter
+                currencyConverter,
+                registeredTypes
                 )
         {
             Holdings = new CryptoHolding(this, currencyConverter);

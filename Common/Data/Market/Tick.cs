@@ -377,8 +377,8 @@ namespace QuantConnect.Data.Market
         {
             if (isLiveMode)
             {
-                // Currently ticks aren't sourced through GetSource in live mode
-                return new SubscriptionDataSource(string.Empty, SubscriptionTransportMedium.LocalFile);
+                // this data type is streamed in live mode
+                return new SubscriptionDataSource(string.Empty, SubscriptionTransportMedium.Streaming);
             }
 
             var source = LeanData.GenerateZipFilePath(Globals.DataFolder, config.Symbol, date, config.Resolution, config.TickType);
@@ -429,10 +429,31 @@ namespace QuantConnect.Data.Market
             return new Tick(this);
         }
 
+        /// <summary>
+        /// Formats a string with the symbol and value.
+        /// </summary>
+        /// <returns>string - a string formatted as SPY: 167.753</returns>
+        public override string ToString()
+        {
+            switch (TickType)
+            {
+                case TickType.Trade:
+                    return $"{Symbol}: Price: {Price} Quantity: {Quantity}";
+
+                case TickType.Quote:
+                    return $"{Symbol}: Bid: {BidSize}@{BidPrice} Ask: {AskSize}@{AskPrice}";
+
+                case TickType.OpenInterest:
+                    return $"{Symbol}: OpenInterest: {Value}";
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
         private static decimal GetScaleFactor(SecurityType securityType)
         {
             return securityType == SecurityType.Equity || securityType == SecurityType.Option ? 10000m : 1;
         }
-
-    } // End Tick Class:
+    }
 }

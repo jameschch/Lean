@@ -148,6 +148,7 @@ namespace QuantConnect.Securities
 
             var orderValue = parameters.Order.GetValue(parameters.Security)
                 * GetInitialMarginRequirement(parameters.Security);
+
             return orderValue + Math.Sign(orderValue) * feesInAccountCurrency;
         }
 
@@ -158,7 +159,7 @@ namespace QuantConnect.Securities
         /// <returns>The maintenance margin required for the </returns>
         protected virtual decimal GetMaintenanceMargin(Security security)
         {
-            return security.Holdings.AbsoluteHoldingsCost * GetMaintenanceMarginRequirement(security);
+            return security.Holdings.AbsoluteHoldingsValue * GetMaintenanceMarginRequirement(security);
         }
 
         /// <summary>
@@ -344,6 +345,17 @@ namespace QuantConnect.Securities
                 return new GetMaximumOrderQuantityForTargetValueResult(0, reason);
             }
 
+            var minimumValue = unitPrice * parameters.Security.SymbolProperties.LotSize;
+            if (minimumValue > targetOrderValue)
+            {
+                string reason = null;
+                if (!parameters.SilenceNonErrorReasons)
+                {
+                    reason = $"The target order value {targetOrderValue} is less than the minimum {minimumValue}.";
+                }
+                return new GetMaximumOrderQuantityForTargetValueResult(0, reason, false);
+            }
+
             // calculate the total margin available
             var marginRemaining = GetMarginRemaining(parameters.Portfolio, parameters.Security, direction);
             if (marginRemaining <= 0)
@@ -362,8 +374,12 @@ namespace QuantConnect.Securities
             orderQuantity -= orderQuantity % parameters.Security.SymbolProperties.LotSize;
             if (orderQuantity == 0)
             {
-                var reason = $"The order quantity is less than the lot size of {parameters.Security.SymbolProperties.LotSize} " +
-                    "and has been rounded to zero.";
+                string reason = null;
+                if (!parameters.SilenceNonErrorReasons)
+                {
+                    reason = $"The order quantity is less than the lot size of {parameters.Security.SymbolProperties.LotSize} " +
+                             "and has been rounded to zero.";
+                }
                 return new GetMaximumOrderQuantityForTargetValueResult(0, reason, false);
             }
 

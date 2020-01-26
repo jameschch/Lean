@@ -41,6 +41,7 @@ namespace QuantConnect.Lean.Engine.HistoricalData
         private IMapFileProvider _mapFileProvider;
         private IFactorFileProvider _factorFileProvider;
         private IDataCacheProvider _dataCacheProvider;
+        private bool _parallelHistoryRequestsEnabled;
 
         /// <summary>
         /// Initializes this history provider to work for the specified job
@@ -51,6 +52,7 @@ namespace QuantConnect.Lean.Engine.HistoricalData
             _mapFileProvider = parameters.MapFileProvider;
             _factorFileProvider = parameters.FactorFileProvider;
             _dataCacheProvider = parameters.DataCacheProvider;
+            _parallelHistoryRequestsEnabled = parameters.ParallelHistoryRequestsEnabled;
         }
 
         /// <summary>
@@ -66,8 +68,6 @@ namespace QuantConnect.Lean.Engine.HistoricalData
             foreach (var request in requests)
             {
                 var subscription = CreateSubscription(request, request.StartTimeUtc, request.EndTimeUtc);
-
-                subscription.MoveNext(); // prime pump
                 subscriptions.Add(subscription);
             }
 
@@ -102,7 +102,9 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 config,
                 new Cash(Currencies.NullCurrency, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.NullCurrency),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var mapFileResolver = MapFileResolver.Empty;
@@ -123,10 +125,11 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 _dataCacheProvider
                 );
 
-            dataReader.InvalidConfigurationDetected += (sender, args) => { OnInvalidConfigurationDetected(new InvalidConfigurationDetectedEventArgs(args.Message)); };
-            dataReader.NumericalPrecisionLimited += (sender, args) => { OnNumericalPrecisionLimited(new NumericalPrecisionLimitedEventArgs(args.Message)); };
-            dataReader.DownloadFailed += (sender, args) => { OnDownloadFailed(new DownloadFailedEventArgs(args.Message, args.StackTrace)); };
-            dataReader.ReaderErrorDetected += (sender, args) => { OnReaderErrorDetected(new ReaderErrorDetectedEventArgs(args.Message, args.StackTrace)); };
+            dataReader.InvalidConfigurationDetected += (sender, args) => { OnInvalidConfigurationDetected(args); };
+            dataReader.NumericalPrecisionLimited += (sender, args) => { OnNumericalPrecisionLimited(args); };
+            dataReader.StartDateLimited += (sender, args) => { OnStartDateLimited(args); };
+            dataReader.DownloadFailed += (sender, args) => { OnDownloadFailed(args); };
+            dataReader.ReaderErrorDetected += (sender, args) => { OnReaderErrorDetected(args); };
 
             var reader = CorporateEventEnumeratorFactory.CreateEnumerators(
                 dataReader,
@@ -134,10 +137,8 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 _factorFileProvider,
                 dataReader,
                 mapFileResolver,
-                false);
-
-            // has to be initialized after adding all the enumerators since it will execute a MoveNext
-            dataReader.Initialize();
+                false,
+                start);
 
             // optionally apply fill forward behavior
             if (request.FillForwardResolution.HasValue)
@@ -149,7 +150,7 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 }
 
                 var readOnlyRef = Ref.CreateReadOnly(() => request.FillForwardResolution.Value.ToTimeSpan());
-                reader = new FillForwardEnumerator(reader, security.Exchange, readOnlyRef, security.IsExtendedMarketHours, end, config.Increment, config.DataTimeZone);
+                reader = new FillForwardEnumerator(reader, security.Exchange, readOnlyRef, request.IncludeExtendedMarketHours, end, config.Increment, config.DataTimeZone, start);
             }
 
             // since the SubscriptionDataReader performs an any overlap condition on the trade bar's entire
@@ -167,11 +168,13 @@ namespace QuantConnect.Lean.Engine.HistoricalData
                 // filter out data before the start
                 return data.EndTime > start;
             });
+            var subscriptionRequest = new SubscriptionRequest(false, null, security, config, request.StartTimeUtc, request.EndTimeUtc);
 
-            var timeZoneOffsetProvider = new TimeZoneOffsetProvider(security.Exchange.TimeZone, start, end);
-            var subscriptionDataEnumerator = new SubscriptionDataEnumerator(config, security.Exchange.Hours, timeZoneOffsetProvider, reader);
-            var subscriptionRequest = new SubscriptionRequest(false, null, security, config, start, end);
-            return new Subscription(subscriptionRequest, subscriptionDataEnumerator, timeZoneOffsetProvider);
+            if (_parallelHistoryRequestsEnabled)
+            {
+                return SubscriptionUtils.CreateAndScheduleWorker(subscriptionRequest, reader);
+            }
+            return SubscriptionUtils.Create(subscriptionRequest, reader);
         }
 
         private class FilterEnumerator<T> : IEnumerator<T>

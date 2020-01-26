@@ -37,7 +37,6 @@ using QuantConnect.Orders;
 using QuantConnect.Packets;
 using QuantConnect.Scheduling;
 using QuantConnect.Securities;
-using QuantConnect.Statistics;
 using Log = QuantConnect.Logging.Log;
 
 namespace QuantConnect.Tests.Engine
@@ -57,11 +56,17 @@ namespace QuantConnect.Tests.Engine
             var dataManager = new DataManager(feed,
                 new UniverseSelection(
                     algorithm,
-                    new SecurityService(algorithm.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, algorithm)),
+                    new SecurityService(algorithm.Portfolio.CashBook,
+                        marketHoursDatabase,
+                        symbolPropertiesDataBase,
+                        algorithm,
+                        RegisteredSecurityDataTypesProvider.Null,
+                        new SecurityCacheProvider(algorithm.Portfolio))),
                 algorithm,
                 algorithm.TimeKeeper,
                 marketHoursDatabase,
-                false);
+                false,
+                RegisteredSecurityDataTypesProvider.Null);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
             var transactions = new BacktestingTransactionHandler();
             var results = new BacktestingResultHandler();
@@ -187,27 +192,31 @@ namespace QuantConnect.Tests.Engine
             {
             }
 
-            public void Sample(string chartName, string seriesName, int seriesIndex, SeriesType seriesType, DateTime time, decimal value, string unit = "$")
+            public void Sample(DateTime time, bool force = false)
             {
             }
 
-            public void SampleEquity(DateTime time, decimal value)
+            protected void Sample(string chartName, string seriesName, int seriesIndex, SeriesType seriesType, DateTime time, decimal value, string unit = "$")
             {
             }
 
-            public void SamplePerformance(DateTime time, decimal value)
+            protected void SampleEquity(DateTime time, decimal value)
             {
             }
 
-            public void SampleBenchmark(DateTime time, decimal value)
+            protected void SamplePerformance(DateTime time, decimal value)
             {
             }
 
-            public void SampleAssetPrices(Symbol symbol, DateTime time, decimal value)
+            protected void SampleBenchmark(DateTime time, decimal value)
             {
             }
 
-            public void SampleRange(List<Chart> samples)
+            protected void SampleAssetPrices(Symbol symbol, DateTime time, decimal value)
+            {
+            }
+
+            protected void SampleRange(List<Chart> samples)
             {
             }
 
@@ -280,7 +289,7 @@ namespace QuantConnect.Tests.Engine
             }
 
             public bool IsActive { get; }
-            public void Setup(IAlgorithm algorithm, AlgorithmNodePacket job, IResultHandler resultHandler, IApi api)
+            public void Setup(IAlgorithm algorithm, AlgorithmNodePacket job, IResultHandler resultHandler, IApi api, IIsolatorLimitResultProvider isolatorLimitProvider)
             {
             }
 

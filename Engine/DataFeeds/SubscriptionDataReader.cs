@@ -17,11 +17,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
 using QuantConnect.Data.Custom;
+using QuantConnect.Data.Custom.Fred;
 using QuantConnect.Data.Custom.Tiingo;
 using QuantConnect.Interfaces;
 using QuantConnect.Lean.Engine.DataFeeds.Enumerators;
@@ -33,8 +35,8 @@ namespace QuantConnect.Lean.Engine.DataFeeds
     /// <summary>
     /// Subscription data reader is a wrapper on the stream reader class to download, unpack and iterate over a data file.
     /// </summary>
-    /// <remarks>The class accepts any subscription configuration and automatically makes it availble to enumerate</remarks>
-    public class SubscriptionDataReader : IEnumerator<BaseData>, ITradableDatesNotifier
+    /// <remarks>The class accepts any subscription configuration and automatically makes it available to enumerate</remarks>
+    public class SubscriptionDataReader : IEnumerator<BaseData>, ITradableDatesNotifier, IDataProviderEvents
     {
         private bool _initialized;
 
@@ -86,6 +88,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// Event fired when the numerical precision in the factor file has been limited
         /// </summary>
         public event EventHandler<NumericalPrecisionLimitedEventArgs> NumericalPrecisionLimited;
+
+        /// <summary>
+        /// Event fired when the start date has been limited
+        /// </summary>
+        public event EventHandler<StartDateLimitedEventArgs> StartDateLimited;
 
         /// <summary>
         /// Event fired when there was an error downloading a remote file
@@ -189,7 +196,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             }
 
             // If Tiingo data, set the access token in data factory
-            var tiingo = _dataFactory as TiingoDailyData;
+            var tiingo = _dataFactory as TiingoPrice;
             if (tiingo != null)
             {
                 if (!Tiingo.IsAuthCodeSet)
@@ -198,13 +205,23 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
             }
 
-            // If USEnergyInformation data, set the access token in data factory
-            var energyInformation = _dataFactory as USEnergyInformation;
+            // If USEnergyAPI data, set the access token in data factory
+            var energyInformation = _dataFactory as USEnergyAPI;
             if (energyInformation != null)
             {
-                if (!USEnergyInformation.IsAuthCodeSet)
+                if (!USEnergyAPI.IsAuthCodeSet)
                 {
-                    USEnergyInformation.SetAuthCode(Config.Get("us-energy-information-auth-token"));
+                    USEnergyAPI.SetAuthCode(Config.Get("us-energy-information-auth-token"));
+                }
+            }
+
+            // If Fred data, set the access token in data factory
+            var fred = _dataFactory as FredApi;
+            if (fred != null)
+            {
+                if (!FredApi.IsAuthCodeSet)
+                {
+                    FredApi.SetAuthCode(Config.Get("fred-auth-token"));
                 }
             }
 
@@ -244,6 +261,18 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                                 }
                             }
                         }
+
+                        if (_periodStart < mapFile.FirstDate)
+                        {
+                            var originalStart = _periodStart;
+                            _periodStart = mapFile.FirstDate;
+
+                            OnStartDateLimited(
+                                new StartDateLimitedEventArgs(
+                                    $"The starting date for symbol {_config.Symbol.Value}," +
+                                    $" {originalStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}, has been adjusted to match map file first date" +
+                                    $" {mapFile.FirstDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}."));
+                        }
                     }
                 }
                 catch (Exception err)
@@ -268,7 +297,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             // adding a day so we stop at EOD
             _delistingDate = _delistingDate.AddDays(1);
 
-            _subscriptionFactoryEnumerator = ResolveDataEnumerator(true);
+            UpdateDataEnumerator(true);
 
             _initialized = true;
         }
@@ -369,9 +398,25 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                         // same date,
                         if (!_config.IsInternalFeed)
                         {
-                            // this will advance the date enumerator and determine if a new
-                            // instance of the subscription enumerator is required
-                            _subscriptionFactoryEnumerator = ResolveDataEnumerator(false);
+                            // lets keep this, it will be advanced by 'ResolveDataEnumerator'
+                            var currentTradeableDate = _tradeableDates.Current;
+
+                            if (UpdateDataEnumerator(false))
+                            {
+                                if (instance.Time.ConvertTo(_config.ExchangeTimeZone, _config.DataTimeZone).Date > currentTradeableDate)
+                                {
+                                    if (_subscriptionFactoryEnumerator == null)
+                                    {
+                                        // the end
+                                        break;
+                                    }
+                                    // Skip current 'instance' if its start time is beyond the current date, fixes GH issue 3912
+                                    continue;
+                                }
+                                // its not beyond 'currentTradeableDate' lets use current instance
+                            }
+                            // if we DO NOT get a new enumerator we use current instance, means its a valid source
+                            // even if after 'currentTradeableDate'
                         }
                     }
 
@@ -383,7 +428,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
 
                 // we've ended the enumerator, time to refresh
-                _subscriptionFactoryEnumerator = ResolveDataEnumerator(true);
+                UpdateDataEnumerator(true);
             }
             while (_subscriptionFactoryEnumerator != null);
 
@@ -392,9 +437,11 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         }
 
         /// <summary>
-        /// Resolves the next enumerator to be used in <see cref="MoveNext"/>
+        /// Resolves the next enumerator to be used in <see cref="MoveNext"/> and updates
+        /// <see cref="_subscriptionFactoryEnumerator"/>
         /// </summary>
-        private IEnumerator<BaseData> ResolveDataEnumerator(bool endOfEnumerator)
+        /// <returns>True, if the enumerator has been updated (even if updated to null)</returns>
+        private bool UpdateDataEnumerator(bool endOfEnumerator)
         {
             do
             {
@@ -404,8 +451,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 DateTime date;
                 if (!TryGetNextDate(out date) && !_isLiveMode)
                 {
+                    _subscriptionFactoryEnumerator = null;
                     // if we run out of dates then we're finished with this subscription
-                    return null;
+                    return true;
                 }
 
                 // fetch the new source, using the data time zone for the date
@@ -421,15 +469,16 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                     // save off for comparison next time
                     _source = newSource;
-                    var subscriptionFactory = CreateSubscriptionFactory(newSource);
-                    return subscriptionFactory.Read(newSource).GetEnumerator();
+                    var subscriptionFactory = CreateSubscriptionFactory(newSource, _dataFactory);
+                    _subscriptionFactoryEnumerator = subscriptionFactory.Read(newSource).GetEnumerator();
+                    return true;
                 }
 
                 // if there's still more in the enumerator and we received the same source from the GetSource call
                 // above, then just keep using the same enumerator as we were before
                 if (!endOfEnumerator) // && !sourceChanged is always true here
                 {
-                    return _subscriptionFactoryEnumerator;
+                    return false;
                 }
 
                 // keep churning until we find a new source or run out of tradeable dates
@@ -439,9 +488,9 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             while (true);
         }
 
-        private ISubscriptionDataSourceReader CreateSubscriptionFactory(SubscriptionDataSource source)
+        private ISubscriptionDataSourceReader CreateSubscriptionFactory(SubscriptionDataSource source, BaseData baseDataInstance)
         {
-            var factory = SubscriptionDataSourceReader.ForSource(source, _dataCacheProvider, _config, _tradeableDates.Current, _isLiveMode);
+            var factory = SubscriptionDataSourceReader.ForSource(source, _dataCacheProvider, _config, _tradeableDates.Current, _isLiveMode, baseDataInstance);
             AttachEventHandlers(factory, source);
             return factory;
         }
@@ -482,7 +531,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 var textSubscriptionFactory = (TextSubscriptionDataSourceReader)dataSourceReader;
                 textSubscriptionFactory.CreateStreamReaderError += (sender, args) =>
                 {
-                    if (_config.IsCustomData)
+                    if (_config.IsCustomData && !_config.Type.GetBaseDataInstance().IsSparseData())
                     {
                         OnDownloadFailed(
                             new DownloadFailedEventArgs(
@@ -584,6 +633,15 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         protected virtual void OnNumericalPrecisionLimited(NumericalPrecisionLimitedEventArgs e)
         {
             NumericalPrecisionLimited?.Invoke(this, e);
+        }
+
+        /// <summary>
+        /// Event invocator for the <see cref="StartDateLimited"/> event
+        /// </summary>
+        /// <param name="e">Event arguments for the <see cref="StartDateLimited"/> event</param>
+        protected virtual void OnStartDateLimited(StartDateLimitedEventArgs e)
+        {
+            StartDateLimited?.Invoke(this, e);
         }
 
         /// <summary>

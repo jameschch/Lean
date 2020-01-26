@@ -103,7 +103,9 @@ namespace QuantConnect.Tests.Common.Securities
                     abcConfig,
                     new Cash(Currencies.USD, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    cashBook));
+                    cashBook,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()));
             cash.EnsureCurrencyDataFeed(securities, subscriptions, MarketMap, SecurityChanges.None, dataManager.SecurityService, cashBook.AccountCurrency);
 
             Assert.AreEqual(1, subscriptions.SubscriptionDataConfigService.GetSubscriptionDataConfigs(Symbols.USDJPY, includeInternalConfigs:true).Count);
@@ -130,10 +132,12 @@ namespace QuantConnect.Tests.Common.Securities
                     abcConfig,
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
-            var usdjpy = new Security(Symbols.USDJPY, SecurityExchangeHours, new Cash("JPY", 0, 0), SymbolProperties.GetDefault("JPY"), ErrorCurrencyConverter.Instance);
+            var usdjpy = new Security(Symbols.USDJPY, SecurityExchangeHours, new Cash("JPY", 0, 0), SymbolProperties.GetDefault("JPY"), ErrorCurrencyConverter.Instance, RegisteredSecurityDataTypesProvider.Null, new SecurityCache());
             var changes = new SecurityChanges(new[] { usdjpy }, Enumerable.Empty<Security>());
             var addedSecurity = cash.EnsureCurrencyDataFeed(securities, subscriptions, MarketMap, changes, dataManager.SecurityService, cashBook.AccountCurrency);
 
@@ -163,7 +167,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(Symbols.SPY, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
             securities.Add(
@@ -173,7 +179,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(Symbols.EURUSD, minimumResolution, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 
@@ -201,7 +209,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(Symbols.EURUSD, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 
@@ -230,7 +240,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(Symbols.USDJPY, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 
@@ -278,7 +290,9 @@ namespace QuantConnect.Tests.Common.Securities
                         subscriptions.Add(symbol, Resolution.Minute, TimeZone, TimeZone),
                         new Cash(cashBook.AccountCurrency, 0, 1m),
                         SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                        ErrorCurrencyConverter.Instance
+                        ErrorCurrencyConverter.Instance,
+                        RegisteredSecurityDataTypesProvider.Null,
+                        new SecurityCache()
                     )
                 }
             };
@@ -324,7 +338,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(symbol, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 
@@ -362,7 +378,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(symbol, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 
@@ -445,7 +463,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(Symbols.USDJPY, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 
@@ -479,7 +499,9 @@ namespace QuantConnect.Tests.Common.Securities
                     subscriptions.Add(Symbols.GBPUSD, Resolution.Minute, TimeZone, TimeZone),
                     new Cash(cashBook.AccountCurrency, 0, 1m),
                     SymbolProperties.GetDefault(cashBook.AccountCurrency),
-                    ErrorCurrencyConverter.Instance
+                    ErrorCurrencyConverter.Instance,
+                    RegisteredSecurityDataTypesProvider.Null,
+                    new SecurityCache()
                 )
             );
 

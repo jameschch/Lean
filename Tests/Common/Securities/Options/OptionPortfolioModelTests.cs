@@ -42,7 +42,9 @@ namespace QuantConnect.Tests.Common.Securities.Options
                 SecurityExchangeHours.AlwaysOpen(DateTimeZone.Utc),
                 cash,
                 new OptionSymbolProperties(SymbolProperties.GetDefault("EUR")),
-                portfolio.CashBook
+                portfolio.CashBook,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
             option.Underlying = security;
             security.SetMarketPrice(new Tick { Value = 1000 });
@@ -75,7 +77,9 @@ namespace QuantConnect.Tests.Common.Securities.Options
                 CreateTradeBarConfig(),
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
             security.SetMarketPrice(new Tick { Value = 100 });
             var timeKeeper = new TimeKeeper(reference);

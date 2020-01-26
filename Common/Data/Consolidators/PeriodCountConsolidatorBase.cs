@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 
 using System;
 using QuantConnect.Data.Market;
+using Python.Runtime;
 
 namespace QuantConnect.Data.Consolidators
 {
@@ -29,6 +30,8 @@ namespace QuantConnect.Data.Consolidators
         where T : IBaseData
         where TConsolidated : BaseData
     {
+        // The symbol that we are consolidating for.
+        private Symbol _symbol;
         //The number of data updates between creating new bars.
         private readonly int? _maxCount;
         //
@@ -90,6 +93,15 @@ namespace QuantConnect.Data.Consolidators
         }
 
         /// <summary>
+        /// Creates a consolidator to produce a new <typeparamref name="TConsolidated"/> instance representing the last count pieces of data or the period, whichever comes first
+        /// </summary>
+        /// <param name="pyObject">Python object that defines either a function object that defines the start time of a consolidated data or a timespan</param>
+        protected PeriodCountConsolidatorBase(PyObject pyObject)
+            : this(GetPeriodSpecificationFromPyObject(pyObject))
+        {
+        }
+
+        /// <summary>
         /// Gets the type produced by this consolidator
         /// </summary>
         public override Type OutputType => typeof(TConsolidated);
@@ -112,9 +124,19 @@ namespace QuantConnect.Data.Consolidators
         /// For example, if time span is 1 minute, we have [10:00, 10:01): so data at 10:01 is not 
         /// included in the bar starting at 10:00.
         /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown when multiple symbols are being consolidated.</exception>
         /// <param name="data">The new data for the consolidator</param>
         public override void Update(T data)
         {
+            if (_symbol == null)
+            {
+                _symbol = data.Symbol;
+            }
+            else if (_symbol != data.Symbol)
+            {
+                throw new InvalidOperationException($"Consolidators can only be used with a single symbol. The previous consolidated symbol ({_symbol}) is not the same as in the current data ({data.Symbol}).");
+            }
+
             if (!ShouldProcess(data))
             {
                 // first allow the base class a chance to filter out data it doesn't want
@@ -232,7 +254,7 @@ namespace QuantConnect.Data.Consolidators
         protected TimeSpan? Period => _period;
 
         /// <summary>
-        /// Determines whether or not the specified data should be processd
+        /// Determines whether or not the specified data should be processed
         /// </summary>
         /// <param name="data">The data to check</param>
         /// <returns>True if the consolidator should process this data, false otherwise</returns>
@@ -272,6 +294,25 @@ namespace QuantConnect.Data.Consolidators
         {
             base.OnDataConsolidated(e);
             DataConsolidated?.Invoke(this, e);
+        }
+
+        /// <summary>
+        /// Gets the period specification from the PyObject that can either represent a function object that defines the start time of a consolidated data or a timespan.
+        /// </summary>
+        /// <param name="pyObject">Python object that defines either a function object that defines the start time of a consolidated data or a timespan</param>
+        /// <returns>IPeriodSpecification that represents the PyObject</returns>
+        private static IPeriodSpecification GetPeriodSpecificationFromPyObject(PyObject pyObject)
+        {
+            Func<DateTime, CalendarInfo> expiryFunc;
+            if (pyObject.TryConvertToDelegate(out expiryFunc))
+            {
+                return new FuncPeriodSpecification(expiryFunc);
+            }
+
+            using (Py.GIL())
+            {
+                return new TimeSpanPeriodSpecification(pyObject.As<TimeSpan>());
+            }
         }
 
         /// <summary>
@@ -324,7 +365,7 @@ namespace QuantConnect.Data.Consolidators
         }
 
         /// <summary>
-        /// Special case for bars which open time is defined by a function
+        /// Special case for bars where the open time is defined by a function
         /// </summary>
         private class FuncPeriodSpecification : IPeriodSpecification
         {

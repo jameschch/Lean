@@ -20,6 +20,7 @@ using System.Linq;
 using System.Numerics;
 using Newtonsoft.Json;
 using QuantConnect.Configuration;
+using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Interfaces;
 using QuantConnect.Logging;
 using QuantConnect.Util;
@@ -52,6 +53,11 @@ namespace QuantConnect
         /// Gets an instance of <see cref="SecurityIdentifier"/> that is empty, that is, one with no symbol specified
         /// </summary>
         public static readonly SecurityIdentifier Empty = new SecurityIdentifier(string.Empty, 0);
+
+        /// <summary>
+        /// Gets an instance of <see cref="SecurityIdentifier"/> that is explicitly no symbol
+        /// </summary>
+        public static readonly SecurityIdentifier None = new SecurityIdentifier("NONE", 0);
 
         /// <summary>
         /// Gets the date to be used when it does not apply.
@@ -353,13 +359,14 @@ namespace QuantConnect
         /// <param name="market">The market</param>
         /// <param name="mapSymbol">Specifies if symbol should be mapped using map file provider</param>
         /// <param name="mapFileProvider">Specifies the IMapFileProvider to use for resolving symbols, specify null to load from Composer</param>
+        /// <param name="mappingResolveDate">The date to use to resolve the map file. Default value is <see cref="DateTime.Today"/></param>
         /// <returns>A new <see cref="SecurityIdentifier"/> representing the specified symbol today</returns>
-        public static SecurityIdentifier GenerateEquity(string symbol, string market, bool mapSymbol = true, IMapFileProvider mapFileProvider = null)
+        public static SecurityIdentifier GenerateEquity(string symbol, string market, bool mapSymbol = true, IMapFileProvider mapFileProvider = null, DateTime? mappingResolveDate = null)
         {
             var firstDate = DefaultDate;
             if (mapSymbol)
             {
-                var firstTickerDate = GetFirstTickerAndDate(mapFileProvider ?? MapFileProvider.Value, symbol, market);
+                var firstTickerDate = GetFirstTickerAndDate(mapFileProvider ?? MapFileProvider.Value, symbol, market, mappingResolveDate: mappingResolveDate);
                 firstDate = firstTickerDate.Item2;
                 symbol = firstTickerDate.Item1;
             }
@@ -377,6 +384,22 @@ namespace QuantConnect
         public static SecurityIdentifier GenerateEquity(DateTime date, string symbol, string market)
         {
             return Generate(date, symbol, SecurityType.Equity, market);
+        }
+
+        /// <summary>
+        /// Generates a new <see cref="SecurityIdentifier"/> for a <see cref="ConstituentsUniverseData"/>.
+        /// Note that the symbol ticker is case sensitive here.
+        /// </summary>
+        /// <param name="symbol">The ticker to use for this constituent identifier</param>
+        /// <param name="securityType">The security type of this constituent universe</param>
+        /// <param name="market">The security's market</param>
+        /// <remarks>This method is special in the sense that it does not force the Symbol to be upper
+        /// which is required to determine the source file of the constituent
+        /// <see cref="ConstituentsUniverseData.GetSource(Data.SubscriptionDataConfig,DateTime,bool)"/></remarks>
+        /// <returns>A new <see cref="SecurityIdentifier"/> representing the specified constituent universe</returns>
+        public static SecurityIdentifier GenerateConstituentIdentifier(string symbol, SecurityType securityType, string market)
+        {
+            return Generate(DefaultDate, symbol, securityType, market, forceSymbolToUpper: false);
         }
 
         /// <summary>
@@ -512,11 +535,12 @@ namespace QuantConnect
         /// <param name="mapFileProvider">The IMapFileProvider instance used for resolving map files</param>
         /// <param name="tickerToday">The security's ticker as it trades today</param>
         /// <param name="market">The market the security exists in</param>
+        /// <param name="mappingResolveDate">The date to use to resolve the map file. Default value is <see cref="DateTime.Today"/></param>
         /// <returns>The security's first ticker/date if mapping data available, otherwise, the provided ticker and DefaultDate are returned</returns>
-        private static Tuple<string, DateTime> GetFirstTickerAndDate(IMapFileProvider mapFileProvider, string tickerToday, string market)
+        private static Tuple<string, DateTime> GetFirstTickerAndDate(IMapFileProvider mapFileProvider, string tickerToday, string market, DateTime? mappingResolveDate = null)
         {
             var resolver = mapFileProvider.Get(market);
-            var mapFile = resolver.ResolveMapFile(tickerToday, DateTime.Today);
+            var mapFile = resolver.ResolveMapFile(tickerToday, mappingResolveDate ?? DateTime.Today);
 
             // if we have mapping data, use the first ticker/date from there, otherwise use provided ticker and DefaultDate
             return mapFile.Any()
@@ -671,7 +695,7 @@ namespace QuantConnect
         {
             exception = null;
 
-            if (string.IsNullOrWhiteSpace(value))
+            if (string.IsNullOrWhiteSpace(value) || value == " 0")
             {
                 identifier = Empty;
                 return true;
@@ -801,6 +825,7 @@ namespace QuantConnect
         public override string ToString()
         {
             var props = EncodeBase36(_properties);
+            props = props.Length == 0 ? "0" : props;
             if (HasUnderlying)
             {
                 return _symbol + ' ' + props + '|' + _underlying.SecurityIdentifier;

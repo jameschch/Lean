@@ -17,17 +17,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NodaTime;
 using NUnit.Framework;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
-using QuantConnect.Data.Custom;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Securities;
-using QuantConnect.Securities.Equity;
-using QuantConnect.Securities.Option;
 using QuandlFuture = QuantConnect.Algorithm.CSharp.QCUQuandlFutures.QuandlFuture;
 
 namespace QuantConnect.Tests.Engine.DataFeeds
@@ -60,7 +56,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 subscriptionDataConfig,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             DateTime refTime = DateTime.UtcNow;
@@ -109,7 +107,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 subscriptionDataConfig1,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var security2 = new Security(
@@ -117,7 +117,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 subscriptionDataConfig1,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var timeSlice = _timeSliceFactory.Create(DateTime.UtcNow,
@@ -185,7 +187,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 subscriptionDataConfig,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var timeSlice = _timeSliceFactory.Create(DateTime.UtcNow,
@@ -217,7 +221,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 subscriptionDataConfig,
                 new Cash(Currencies.USD, 0, 1m),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
             var refTime = DateTime.UtcNow;
 

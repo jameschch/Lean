@@ -207,7 +207,9 @@ namespace QuantConnect.Tests.Algorithm.Framework.Portfolio
                 config,
                 new Cash(Currencies.USD, 0, 1),
                 SymbolProperties.GetDefault(Currencies.USD),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
         }
 

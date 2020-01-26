@@ -36,6 +36,15 @@ namespace QuantConnect.Data.Fundamental
         }
 
         /// <summary>
+        /// Price * Total SharesOutstanding.
+        /// The most current market cap for example, would be the most recent closing price x the most recent reported shares outstanding.
+        /// For ADR share classes, market cap is price * (ordinary shares outstanding / adr ratio).
+        /// </summary>
+        [JsonIgnore]
+        public long MarketCap => CompanyProfile?.MarketCap ?? 0;
+
+
+        /// <summary>
         /// Creates the universe symbol used for fine fundamental data
         /// </summary>
         /// <param name="market">The market</param>

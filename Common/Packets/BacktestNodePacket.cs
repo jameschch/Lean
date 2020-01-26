@@ -16,8 +16,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Newtonsoft.Json;
+using QuantConnect.Securities;
 
 namespace QuantConnect.Packets
 {
@@ -26,6 +28,10 @@ namespace QuantConnect.Packets
     /// </summary>
     public class BacktestNodePacket : AlgorithmNodePacket
     {
+        // default random id, static so its one per process
+        private static readonly string DefaultId
+            = Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture);
+
         /// <summary>
         /// Name of the backtest as randomly defined in the IDE.
         /// </summary>
@@ -36,19 +42,19 @@ namespace QuantConnect.Packets
         /// BacktestId / Algorithm Id for this task
         /// </summary>
         [JsonProperty(PropertyName = "sBacktestID")]
-        public string BacktestId = "";
+        public string BacktestId = DefaultId;
 
         /// <summary>
         /// Backtest start-date as defined in the Initialize() method.
         /// </summary>
         [JsonProperty(PropertyName = "dtPeriodStart")]
-        public DateTime PeriodStart = DateTime.Now;
+        public DateTime? PeriodStart;
 
         /// <summary>
         /// Backtest end date as defined in the Initialize() method.
         /// </summary>
         [JsonProperty(PropertyName = "dtPeriodFinish")]
-        public DateTime PeriodFinish = DateTime.Now;
+        public DateTime? PeriodFinish;
 
         /// <summary>
         /// Estimated number of trading days in this backtest task based on the start-end dates.
@@ -82,6 +88,11 @@ namespace QuantConnect.Packets
         public bool IsDebugging => Breakpoints.Any();
 
         /// <summary>
+        /// Optional initial cash amount if set
+        /// </summary>
+        public CashAmount? CashAmount;
+
+        /// <summary>
         /// Default constructor for JSON
         /// </summary>
         public BacktestNodePacket()
@@ -99,7 +110,15 @@ namespace QuantConnect.Packets
         /// Initialize the backtest task packet.
         /// </summary>
         public BacktestNodePacket(int userId, int projectId, string sessionId, byte[] algorithmData, decimal startingCapital, string name, UserPlan userPlan = UserPlan.Free) 
-            : base (PacketType.BacktestNode)
+            : this (userId, projectId, sessionId, algorithmData, name, userPlan, new CashAmount(startingCapital, Currencies.USD))
+        {
+        }
+
+        /// <summary>
+        /// Initialize the backtest task packet.
+        /// </summary>
+        public BacktestNodePacket(int userId, int projectId, string sessionId, byte[] algorithmData, string name, UserPlan userPlan = UserPlan.Free, CashAmount? startingCapital = null)
+            : base(PacketType.BacktestNode)
         {
             UserId = userId;
             Algorithm = algorithmData;
@@ -107,6 +126,7 @@ namespace QuantConnect.Packets
             ProjectId = projectId;
             UserPlan = userPlan;
             Name = name;
+            CashAmount = startingCapital;
             Language = Language.CSharp;
             Controls = new Controls
             {

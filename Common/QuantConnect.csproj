@@ -31,13 +31,16 @@
     <DebugType>full</DebugType>
     <Optimize>$(SelectedOptimization)</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>bin\Debug\QuantConnect.Common.xml</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>6</LangVersion>
     <CodeAnalysisRuleSet>..\QuantConnect.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' AND '$(SelectedOptimization)' == ''">
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -49,6 +52,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <LangVersion>6</LangVersion>
     <CodeAnalysisRuleSet>..\QuantConnect.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>bin\Release\QuantConnect.Common.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Mono|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -157,22 +161,22 @@
   <Choose>
     <When Condition="$(IsWindows) AND '$(ForceLinuxBuild)' != 'true'">
       <ItemGroup>
-        <Reference Include="Python.Runtime, Version=1.0.5.25, Culture=neutral, processorArchitecture=MSIL">
-          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.25\lib\win\Python.Runtime.dll</HintPath>
+        <Reference Include="Python.Runtime, Version=1.0.5.29, Culture=neutral, processorArchitecture=MSIL">
+          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.29\lib\win\Python.Runtime.dll</HintPath>
         </Reference>
       </ItemGroup>
     </When>
     <When Condition="$(IsLinux) OR '$(ForceLinuxBuild)' == 'true'">
       <ItemGroup>
-        <Reference Include="Python.Runtime, Version=1.0.5.25, Culture=neutral, processorArchitecture=MSIL">
-          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.25\lib\linux\Python.Runtime.dll</HintPath>
+        <Reference Include="Python.Runtime, Version=1.0.5.29, Culture=neutral, processorArchitecture=MSIL">
+          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.29\lib\linux\Python.Runtime.dll</HintPath>
         </Reference>
       </ItemGroup>
     </When>
     <When Condition="$(IsOSX) AND '$(ForceLinuxBuild)' != 'true'">
       <ItemGroup>
-        <Reference Include="Python.Runtime, Version=1.0.5.25, Culture=neutral, processorArchitecture=MSIL">
-          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.25\lib\osx\Python.Runtime.dll</HintPath>
+        <Reference Include="Python.Runtime, Version=1.0.5.29, Culture=neutral, processorArchitecture=MSIL">
+          <HintPath>..\packages\QuantConnect.pythonnet.1.0.5.29\lib\osx\Python.Runtime.dll</HintPath>
         </Reference>
       </ItemGroup>
     </When>
@@ -223,6 +227,7 @@
     <Compile Include="Benchmarks\IBenchmark.cs" />
     <Compile Include="Benchmarks\SecurityBenchmark.cs" />
     <Compile Include="Brokerages\AlpacaBrokerageModel.cs" />
+    <Compile Include="Brokerages\AlphaStreamsBrokerageModel.cs" />
     <Compile Include="Brokerages\BrokerageFactoryAttribute.cs" />
     <Compile Include="Brokerages\BrokerageName.cs" />
     <Compile Include="Brokerages\DefaultBrokerageMessageHandler.cs" />
@@ -236,6 +241,19 @@
     <Compile Include="Data\Auxiliary\MappingExtensions.cs" />
     <Compile Include="Data\Consolidators\CalendarType.cs" />
     <Compile Include="Data\Consolidators\FilteredIdentityDataConsolidator.cs" />
+    <Compile Include="Data\Custom\Benzinga\BenzingaNewsJsonConverter.cs" />
+    <Compile Include="Data\Custom\CBOE\CBOE.cs" />
+    <Compile Include="Data\Custom\Fred\CBOE.cs" />
+    <Compile Include="Data\Custom\Fred\CentralBankInterventions.cs" />
+    <Compile Include="Data\Custom\Fred\CommercialPaper.cs" />
+    <Compile Include="Data\Custom\Fred\Fred.cs" />
+    <Compile Include="Data\Custom\Fred\FredApi.cs" />
+    <Compile Include="Data\Custom\Fred\ICEBofAML.cs" />
+    <Compile Include="Data\Custom\Fred\LIBOR.cs" />
+    <Compile Include="Data\Custom\Fred\OECDRecessionIndicators.cs" />
+    <Compile Include="Data\Custom\Fred\TradeWeightedIndexes.cs" />
+    <Compile Include="Data\Custom\Fred\Wilshire.cs" />
+    <Compile Include="Data\Custom\Benzinga\BenzingaNews.cs" />
     <Compile Include="Data\Custom\FxcmVolume.cs" />
     <Compile Include="Data\Custom\SEC\ISECReport.cs" />
     <Compile Include="Data\Custom\SEC\SECReportBusinessAddress.cs" />
@@ -252,6 +270,14 @@
     <Compile Include="Data\Custom\SEC\SECReport10K.cs" />
     <Compile Include="Data\Custom\SEC\SECReportIndexFile.cs" />
     <Compile Include="Data\Custom\SEC\SECReportSubmission.cs" />
+    <Compile Include="Data\Custom\SmartInsider\SmartInsiderExecutionHolding.cs" />
+    <Compile Include="Data\Custom\SmartInsider\SmartInsiderExecutionEntity.cs" />
+    <Compile Include="Data\Custom\SmartInsider\SmartInsiderEventType.cs" />
+    <Compile Include="Data\Custom\SmartInsider\SmartInsiderExecutionType.cs" />
+    <Compile Include="Data\Custom\Tiingo\TiingoDailyData.cs" />
+    <Compile Include="Data\Custom\Tiingo\TiingoNews.cs" />
+    <Compile Include="Data\Custom\Tiingo\TiingoNewsJsonConverter.cs" />
+    <Compile Include="Data\Custom\Tiingo\TiingoSymbolMapper.cs" />
     <Compile Include="Data\Custom\TradingEconomics\TradingEconomics.cs" />
     <Compile Include="Data\Custom\TradingEconomics\TradingEconomicsEarnings.cs" />
     <Compile Include="Data\Custom\TradingEconomics\TradingEconomicsIndicator.cs" />
@@ -260,24 +286,33 @@
     <Compile Include="Data\Custom\Estimize\EstimizeConsensus.cs" />
     <Compile Include="Data\Custom\Estimize\EstimizeEstimate.cs" />
     <Compile Include="Data\Custom\Estimize\EstimizeRelease.cs" />
-    <Compile Include="Data\Custom\PsychSignal\PsychSignalSentimentData.cs" />
-    <Compile Include="Data\Custom\USEnergyInformation.cs" />
+    <Compile Include="Data\Custom\PsychSignal\PsychSignalSentiment.cs" />
+    <Compile Include="Data\Custom\USEnergy\USEnergy.cs" />
+    <Compile Include="Data\Custom\USEnergy\USEnergyAPI.cs" />
+    <Compile Include="Data\Custom\USEnergy\USEnergy.Category.cs" />
     <Compile Include="Data\Custom\USTreasury\USTreasuryYieldCurveRate.cs" />
     <Compile Include="Data\Fundamental\AssetClassificationHelper.cs" />
+    <Compile Include="Data\GetSetPropertyDynamicMetaObject.cs" />
     <Compile Include="Data\HistoryProviderBase.cs" />
     <Compile Include="Data\HistoryProviderInitializeParameters.cs" />
     <Compile Include="Data\HistoryRequestFactory.cs" />
     <Compile Include="Data\Custom\SmartInsider\SmartInsiderEvent.cs" />
     <Compile Include="Data\Custom\SmartInsider\SmartInsiderIntention.cs" />
     <Compile Include="Data\Custom\SmartInsider\SmartInsiderTransaction.cs" />
+    <Compile Include="Data\IndexedBasedData.cs" />
     <Compile Include="Data\SubscriptionDataConfigExtensions.cs" />
+    <Compile Include="Data\UniverseSelection\ConstituentsUniverse.cs" />
+    <Compile Include="Data\UniverseSelection\ConstituentsUniverseData.cs" />
     <Compile Include="Expiry.cs" />
-    <Compile Include="HistoryProviderEvents.cs" />
+    <Compile Include="DataProviderEvents.cs" />
+    <Compile Include="IIsolatorLimitResultProvider.cs" />
     <Compile Include="Indicators\IIndicatorWarmUpPeriodProvider.cs" />
     <Compile Include="Interfaces\IAccountCurrencyProvider.cs" />
     <Compile Include="Interfaces\IAlgorithmSubscriptionManager.cs" />
+    <Compile Include="Interfaces\IObjectStore.cs" />
     <Compile Include="Interfaces\IBrokerageCashSynchronizer.cs" />
     <Compile Include="Interfaces\IBusyCollection.cs" />
+    <Compile Include="Interfaces\IDataProviderEvents.cs" />
     <Compile Include="Interfaces\IDownloadProvider.cs" />
     <Compile Include="Interfaces\IHistoryProvider.cs" />
     <Compile Include="Interfaces\IOptionPrice.cs" />
@@ -287,22 +322,30 @@
     <Compile Include="Interfaces\ISubscriptionDataConfigProvider.cs" />
     <Compile Include="Interfaces\ISubscriptionDataConfigService.cs" />
     <Compile Include="Interfaces\ITimeKeeper.cs" />
+    <Compile Include="Interfaces\ObjectStoreErrorRaisedEventArgs.cs" />
     <Compile Include="IsolatorLimitResult.cs" />
+    <Compile Include="IsolatorLimitResultProvider.cs" />
+    <Compile Include="ITimeProvider.cs" />
     <Compile Include="Orders\Fees\AlphaStreamsFeeModel.cs" />
     <Compile Include="Orders\Fills\Fill.cs" />
     <Compile Include="Orders\Fills\FillModelParameters.cs" />
     <Compile Include="Orders\Fees\FeeModel.cs" />
     <Compile Include="Orders\Fees\OrderFee.cs" />
     <Compile Include="Orders\Fees\OrderFeeParameters.cs" />
+    <Compile Include="Orders\Slippage\AlphaStreamsSlippageModel.cs" />
     <Compile Include="Packets\Breakpoint.cs" />
+    <Compile Include="Packets\LeakyBucketControlParameters.cs" />
     <Compile Include="Python\BrokerageMessageHandlerPythonWrapper.cs" />
     <Compile Include="Python\MarginCallModelPythonWrapper.cs" />
     <Compile Include="Python\PythonInitializer.cs" />
     <Compile Include="Python\PythonWrapper.cs" />
+    <Compile Include="RealTimeProvider.cs" />
+    <Compile Include="Scheduling\ScheduledEventException.cs" />
     <Compile Include="Securities\BuyingPower.cs" />
     <Compile Include="Securities\BuyingPowerParameters.cs" />
     <Compile Include="Securities\BuyingPowerModel.cs" />
     <Compile Include="Securities\BuyingPowerModelExtensions.cs" />
+    <Compile Include="Securities\RegisteredSecurityDataTypesProvider.cs" />
     <Compile Include="Securities\ErrorCurrencyConverter.cs" />
     <Compile Include="Securities\GetMaximumOrderQuantityForTargetValueParameters.cs" />
     <Compile Include="Securities\HasSufficientBuyingPowerForOrderParameters.cs" />
@@ -311,11 +354,15 @@
     <Compile Include="Securities\CashAmount.cs" />
     <Compile Include="Securities\IdentityCurrencyConverter.cs" />
     <Compile Include="Securities\AccountCurrencyImmediateSettlementModel.cs" />
+    <Compile Include="Securities\IRegisteredSecurityDataTypesProvider.cs" />
     <Compile Include="Securities\InitialMarginRequiredForOrderParameters.cs" />
     <Compile Include="Securities\IOrderEventProvider.cs" />
     <Compile Include="Securities\GetMinimumPriceVariationParameters.cs" />
     <Compile Include="Securities\ReservedBuyingPowerForPosition.cs" />
     <Compile Include="Securities\ReservedBuyingPowerForPositionParameters.cs" />
+    <Compile Include="Securities\SecurityCacheDataStoredEventArgs.cs" />
+    <Compile Include="Securities\DynamicSecurityData.cs" />
+    <Compile Include="Securities\SecurityCacheProvider.cs" />
     <Compile Include="Securities\SecurityService.cs" />
     <Compile Include="Securities\Volatility\BaseVolatilityModel.cs" />
     <Compile Include="Series.cs" />
@@ -323,7 +370,7 @@
     <Compile Include="Data\Custom\Intrinio\IntrinioEconomicData.cs" />
     <Compile Include="Data\Custom\Intrinio\EconomicDataSources.cs" />
     <Compile Include="Data\Custom\Tiingo\Tiingo.cs" />
-    <Compile Include="Data\Custom\Tiingo\TiingoDailyData.cs" />
+    <Compile Include="Data\Custom\Tiingo\TiingoPrice.cs" />
     <Compile Include="Data\Fundamental\Fundamentals.cs" />
     <Compile Include="Data\Fundamental\Generated\AssetClassification.cs" />
     <Compile Include="Data\Fundamental\Generated\CompanyProfile.cs" />
@@ -700,6 +747,7 @@
     <Compile Include="Statistics\TradeStatistics.cs" />
     <Compile Include="Statistics\Statistics.cs" />
     <Compile Include="RealTimeSynchronizedTimer.cs" />
+    <Compile Include="Storage\ObjectStore.cs" />
     <Compile Include="StringExtensions.cs" />
     <Compile Include="Parse.cs" />
     <Compile Include="Symbol.cs" />
@@ -733,6 +781,13 @@
     <Compile Include="Util\FixedSizeHashQueue.cs" />
     <Compile Include="Util\FuncTextWriter.cs" />
     <Compile Include="Util\JsonRoundingConverter.cs" />
+    <Compile Include="Util\RateLimit\BusyWaitSleepStrategy.cs" />
+    <Compile Include="Util\RateLimit\FixedIntervalRefillStrategy.cs" />
+    <Compile Include="Util\RateLimit\IRefillStrategy.cs" />
+    <Compile Include="Util\RateLimit\ISleepStrategy.cs" />
+    <Compile Include="Util\RateLimit\ITokenBucket.cs" />
+    <Compile Include="Util\RateLimit\LeakyBucket.cs" />
+    <Compile Include="Util\RateLimit\ThreadSleepStrategy.cs" />
     <Compile Include="Util\LeanData.cs" />
     <Compile Include="Util\LeanDataPathComponents.cs" />
     <Compile Include="Util\ListComparer.cs" />
@@ -740,10 +795,12 @@
     <Compile Include="Util\ColorJsonConverter.cs" />
     <Compile Include="Util\PythonUtil.cs" />
     <Compile Include="Util\RateGate.cs" />
+    <Compile Include="Util\RateLimit\TokenBucket.cs" />
     <Compile Include="Util\SecurityExtensions.cs" />
     <Compile Include="Util\SecurityIdentifierJsonConverter.cs" />
     <Compile Include="Util\SeriesJsonConverter.cs" />
     <Compile Include="Util\StreamReaderEnumerable.cs" />
+    <Compile Include="Util\StreamReaderExtensions.cs" />
     <Compile Include="Util\TypeChangeJsonConverter.cs" />
     <Compile Include="Util\LinqExtensions.cs" />
     <Compile Include="Util\MemoizingEnumerable.cs" />
@@ -787,12 +844,12 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.25\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.25\build\QuantConnect.pythonnet.targets')" />
+  <Import Project="..\packages\QuantConnect.pythonnet.1.0.5.29\build\QuantConnect.pythonnet.targets" Condition="Exists('..\packages\QuantConnect.pythonnet.1.0.5.29\build\QuantConnect.pythonnet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.25\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.25\build\QuantConnect.pythonnet.targets'))" />
+    <Error Condition="!Exists('..\packages\QuantConnect.pythonnet.1.0.5.29\build\QuantConnect.pythonnet.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\QuantConnect.pythonnet.1.0.5.29\build\QuantConnect.pythonnet.targets'))" />
     <Error Condition="!Exists('..\packages\Microsoft.CodeAnalysis.VersionCheckAnalyzer.2.9.3\build\Microsoft.CodeAnalysis.VersionCheckAnalyzer.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.CodeAnalysis.VersionCheckAnalyzer.2.9.3\build\Microsoft.CodeAnalysis.VersionCheckAnalyzer.props'))" />
     <Error Condition="!Exists('..\packages\Microsoft.CodeQuality.Analyzers.2.9.3\build\Microsoft.CodeQuality.Analyzers.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.CodeQuality.Analyzers.2.9.3\build\Microsoft.CodeQuality.Analyzers.props'))" />
     <Error Condition="!Exists('..\packages\Microsoft.NetCore.Analyzers.2.9.3\build\Microsoft.NetCore.Analyzers.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.NetCore.Analyzers.2.9.3\build\Microsoft.NetCore.Analyzers.props'))" />

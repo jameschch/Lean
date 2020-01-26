@@ -61,8 +61,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
             _currencySubscriptionDataConfigManager = new CurrencySubscriptionDataConfigManager(algorithm.Portfolio.CashBook,
                 algorithm.Securities,
                 algorithm.SubscriptionManager,
-                _securityService,
-                algorithm.BrokerageModel);
+                _securityService);
         }
 
         /// <summary>
@@ -214,23 +213,25 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 selectSymbolsResult = universe.PerformSelection(dateTimeUtc, universeData);
             }
 
-            // check for no changes first
-            if (ReferenceEquals(selectSymbolsResult, Universe.Unchanged))
-            {
-                return SecurityChanges.None;
-            }
-
             // materialize the enumerable into a set for processing
             var selections = selectSymbolsResult.ToHashSet();
 
             var additions = new List<Security>();
             var removals = new List<Security>();
 
+            // first check for no pending removals, even if the universe selection
+            // didn't change we might need to remove a security because a position was closed
             RemoveSecurityFromUniverse(
                 _pendingRemovalsManager.CheckPendingRemovals(selections, universe),
                 removals,
                 dateTimeUtc,
                 algorithmEndDateUtc);
+
+            // check for no changes second
+            if (ReferenceEquals(selectSymbolsResult, Universe.Unchanged))
+            {
+                return SecurityChanges.None;
+            }
 
             // determine which data subscriptions need to be removed from this universe
             foreach (var member in universe.Members.Values)
@@ -380,7 +381,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
 
                     var dataConfig = _algorithm.SubscriptionManager.SubscriptionDataConfigService.Add(
                         securityBenchmark.Security.Symbol,
-                        _algorithm.LiveMode ? Resolution.Minute : Resolution.Daily,
+                        _algorithm.LiveMode ? Resolution.Minute : Resolution.Hour,
                         isInternalFeed: true,
                         fillForward: false).First();
 
@@ -399,7 +400,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
                 }
             }
 
-            if (_currencySubscriptionDataConfigManager.UpdatePendingSubscriptionDataConfigs())
+            if (_currencySubscriptionDataConfigManager.UpdatePendingSubscriptionDataConfigs(_algorithm.BrokerageModel))
             {
                 foreach (var subscriptionDataConfig in _currencySubscriptionDataConfigManager
                     .GetPendingSubscriptionDataConfigs())
@@ -422,7 +423,7 @@ namespace QuantConnect.Lean.Engine.DataFeeds
         /// </summary>
         public void EnsureCurrencyDataFeeds(SecurityChanges securityChanges)
         {
-            _currencySubscriptionDataConfigManager.EnsureCurrencySubscriptionDataConfigs(securityChanges);
+            _currencySubscriptionDataConfigManager.EnsureCurrencySubscriptionDataConfigs(securityChanges, _algorithm.BrokerageModel);
         }
 
         private void RemoveSecurityFromUniverse(

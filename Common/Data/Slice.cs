@@ -17,6 +17,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using QuantConnect.Data.Custom;
 using QuantConnect.Data.Market;
 
@@ -245,33 +246,65 @@ namespace QuantConnect.Data
         public DataDictionary<T> Get<T>()
             where T : IBaseData
         {
+            return GetImpl(typeof(T), this);
+        }
+
+        /// <summary>
+        /// Gets the data of the specified symbol and type.
+        /// </summary>
+        /// <remarks>Supports both C# and Python use cases</remarks>
+        protected static dynamic GetImpl(Type type, Slice instance)
+        {
             Lazy<object> dictionary;
-            if (!_dataByType.TryGetValue(typeof(T), out dictionary))
+            if (!instance._dataByType.TryGetValue(type, out dictionary))
             {
-                if (typeof(T) == typeof(Tick))
+                if (type == typeof(Tick))
                 {
-                    dictionary = new Lazy<object>(() => new DataDictionary<T>(_data.Value.Values.AsEnumerable().SelectMany<SymbolData, Tick>(x => x.GetData()).OfType<T>(), x => x.Symbol));
+                    dictionary = new Lazy<object>(() =>
+                    {
+                        var dataDictionaryCache = GenericDataDictionary.Get(type);
+                        var dic = Activator.CreateInstance(dataDictionaryCache.GenericType);
+
+                        foreach (var data in
+                            instance._data.Value.Values.SelectMany<dynamic, dynamic>(x => x.GetData()).Where(o => o != null && (Type)o.GetType() == type))
+                        {
+                            dataDictionaryCache.MethodInfo.Invoke(dic, new[] { data.Symbol, data });
+                        }
+                        return dic;
+                    }
+                    );
                 }
-                else if (typeof(T) == typeof(TradeBar))
+                else if (type == typeof(TradeBar))
                 {
                     dictionary = new Lazy<object>(() => new DataDictionary<TradeBar>(
-                        _data.Value.Values.Where(x => x.TradeBar != null).Select(x => x.TradeBar),
+                        instance._data.Value.Values.Where(x => x.TradeBar != null).Select(x => x.TradeBar),
                         x => x.Symbol));
                 }
-                else if (typeof(T) == typeof(QuoteBar))
+                else if (type == typeof(QuoteBar))
                 {
                     dictionary = new Lazy<object>(() => new DataDictionary<QuoteBar>(
-                        _data.Value.Values.Where(x => x.QuoteBar != null).Select(x => x.QuoteBar),
+                        instance._data.Value.Values.Where(x => x.QuoteBar != null).Select(x => x.QuoteBar),
                         x => x.Symbol));
                 }
                 else
                 {
-                    dictionary = new Lazy<object>(() => new DataDictionary<T>(_data.Value.Values.Select(x => x.GetData()).OfType<T>(), x => x.Symbol));
+                    dictionary = new Lazy<object>(() =>
+                    {
+                        var dataDictionaryCache = GenericDataDictionary.Get(type);
+                        var dic = Activator.CreateInstance(dataDictionaryCache.GenericType);
+
+                        foreach (var data in instance._data.Value.Values.Select(x => x.GetData()).Where(o => o != null && (Type)o.GetType() == type))
+                        {
+                            dataDictionaryCache.MethodInfo.Invoke(dic, new[] { data.Symbol, data });
+                        }
+                        return dic;
+                    }
+                    );
                 }
 
-                _dataByType[typeof(T)] = dictionary;
+                instance._dataByType[type] = dictionary;
             }
-            return (DataDictionary<T>)dictionary.Value;
+            return dictionary.Value;
         }
 
         /// <summary>
@@ -484,5 +517,48 @@ namespace QuantConnect.Data
             }
         }
 
+        /// <summary>
+        /// Helper class for generic <see cref="DataDictionary{T}"/>
+        /// </summary>
+        /// <remarks>The value of this class is primarily performance since it keeps a cache
+        /// of the generic types instances and there add methods.</remarks>
+        private class GenericDataDictionary
+        {
+            private static readonly Dictionary<Type, GenericDataDictionary> _genericCache = new Dictionary<Type, GenericDataDictionary>();
+
+            /// <summary>
+            /// The <see cref="DataDictionary{T}.Add(KeyValuePair{QuantConnect.Symbol,T})"/> method
+            /// </summary>
+            public MethodInfo MethodInfo { get; }
+
+            /// <summary>
+            /// The <see cref="DataDictionary{T}"/> type
+            /// </summary>
+            public Type GenericType { get; }
+
+            private GenericDataDictionary(Type genericType, MethodInfo methodInfo)
+            {
+                GenericType = genericType;
+                MethodInfo = methodInfo;
+            }
+
+            /// <summary>
+            /// Provides a <see cref="GenericDataDictionary"/> instance for a given <see cref="Type"/>
+            /// </summary>
+            /// <param name="type"></param>
+            /// <returns>A new instance or retrieved from the cache</returns>
+            public static GenericDataDictionary Get(Type type)
+            {
+                GenericDataDictionary dataDictionaryCache;
+                if (!_genericCache.TryGetValue(type, out dataDictionaryCache))
+                {
+                    var generic = typeof(DataDictionary<>).MakeGenericType(type);
+                    var method = generic.GetMethod("Add", new[] { typeof(Symbol), type });
+                    _genericCache[type] = dataDictionaryCache = new GenericDataDictionary(generic, method);
+                }
+
+                return dataDictionaryCache;
+            }
+        }
     }
 }

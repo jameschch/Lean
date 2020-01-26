@@ -9,15 +9,14 @@
   "environment": "backtesting", // "live-paper", "backtesting", "live-interactive", "live-interactive-iqfeed"
 
   // algorithm class selector
-  "algorithm-type-name": "RobotLittleJiggleUnmix",
-  "algorithm-manager-time-loop-maximum": 980,
+  "algorithm-type-name": "BasicTemplateFrameworkAlgorithm",
+
   // Algorithm language selector - options CSharp, FSharp, VisualBasic, Python, Java
   "algorithm-language": "CSharp",
 
   //Physical DLL location
-  "algorithm-location": "Jtc.Algorithm.dll",
-  //"algorithm-location": "QuantConnect.Algorithm.CSharp.dll",
-  //"algorithm-location": "../../../Algorithm.Python/BasicTemplateAlgorithm.py",
+  "algorithm-location": "QuantConnect.Algorithm.CSharp.dll",
+  //"algorithm-location": "../../../Algorithm.Python/BasicTemplateFrameworkAlgorithm.py",
   //"algorithm-location": "QuantConnect.Algorithm.FSharp.dll",
   //"algorithm-location": "QuantConnect.Algorithm.VisualBasic.dll",
   //"algorithm-location": "QuantConnect.Algorithm.Java.dll",
@@ -26,22 +25,7 @@
   //"composer-dll-directory": ".",
 
   // engine
-  "data-folder": "R:/Data/",
-  "data-directory": "R:/Data/",
-
-  // log noise
-  "job-project-id": 0,
-  "lean-manager-type": "LocalLeanManager",
-  "plugin-directory": null,
-  "algorithm-path-python": "../../../Algorithm.Python/",
-  "composer-dll-directory": ".",
-  "forward-console-messages": true,
-  "send-via-api": false,
-  "ignore-version-checks": false,
-  "cache-location": "R:/Data/",
-  "version-id": "",
-  "security-data-feeds": "",
-  "cloud-api-url": "http://localhost",
+  "data-folder": "../../../Data/",
 
   // debugging configuration
   "debugging": false,
@@ -51,11 +35,13 @@
   "log-handler": "QuantConnect.Logging.CompositeLogHandler",
   "messaging-handler": "QuantConnect.Messaging.Messaging",
   "job-queue-handler": "QuantConnect.Queues.JobQueue",
-  "api-handler": "Optimization.EmptyApiHandler",
+  "api-handler": "QuantConnect.Api.Api",
   "map-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
   "factor-file-provider": "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
   "data-provider": "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
-  "alpha-handler": "Jtc.Algorithm.EmptyAlphaHandler",
+  "alpha-handler": "QuantConnect.Lean.Engine.Alphas.DefaultAlphaHandler",
+  "data-channel-provider": "DataChannelProvider",
+  "object-store": "QuantConnect.Lean.Engine.Storage.LocalObjectStore",
 
   // limits on number of symbols to allow
   "symbol-minute-limit": 10000,
@@ -67,7 +53,7 @@
 
   // if one uses true in following token, market hours will remain open all hours and all days.
   // if one uses false will make lean operate only during regular market hours.
-  "force-exchange-always-open": true,
+  "force-exchange-always-open": false,
 
   // save list of transactions to the specified csv file
   "transaction-log": "",

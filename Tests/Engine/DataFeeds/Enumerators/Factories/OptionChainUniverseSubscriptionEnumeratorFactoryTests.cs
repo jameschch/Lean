@@ -64,7 +64,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators.Factories
                 exchangeHours,
                 quoteCurrency,
                 new OptionSymbolProperties(SymbolProperties.GetDefault(Currencies.USD)),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var fillForwardResolution = Ref.CreateReadOnly(() => Resolution.Minute.ToTimeSpan());
@@ -82,7 +84,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators.Factories
                         false,
                         Time.EndOfTime,
                         Resolution.Minute.ToTimeSpan(),
-                        TimeZones.Utc);
+                        TimeZones.Utc,
+                        Time.BeginningOfTime);
                 };
             var factory = new OptionChainUniverseSubscriptionEnumeratorFactory(underlyingEnumeratorFunc, symbolUniverse, timeProvider);
 
@@ -193,6 +196,11 @@ namespace QuantConnect.Tests.Engine.DataFeeds.Enumerators.Factories
                 TotalLookupCalls++;
 
                 return _timeProvider.GetUtcNow().Date.Day >= 20 ? _symbolList2 : _symbolList1;
+            }
+
+            public bool CanAdvanceTime(SecurityType securityType)
+            {
+                return true;
             }
         }
     }

@@ -1,11 +1,11 @@
 /*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License"); 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -74,10 +74,18 @@ namespace QuantConnect.Algorithm
                                  select x).Take(numberOfSymbolsCoarse).ToList();
 
                         dollarVolumeBySymbol.Clear();
-                        foreach (var i in sortedByDollarVolume)
+                        foreach (var x in sortedByDollarVolume)
                         {
-                            dollarVolumeBySymbol[i.Symbol] = i.DollarVolume;
+                            dollarVolumeBySymbol[x.Symbol] = x.DollarVolume;
                         }
+
+                        // If no security has met the QC500 criteria, the universe is unchanged.
+                        // A new selection will be attempted on the next trading day as lastMonth is not updated
+                        if (dollarVolumeBySymbol.Count == 0)
+                        {
+                            return Universe.Unchanged;
+                        }
+
                         return dollarVolumeBySymbol.Keys;
                     });
 
@@ -85,12 +93,6 @@ namespace QuantConnect.Algorithm
                     coarseUniverse,
                     fine =>
                     {
-                        if (_algorithm.Time.Month == lastMonth)
-                        {
-                            return Universe.Unchanged;
-                        }
-                        lastMonth = _algorithm.Time.Month;
-
                         // The company's headquarter must in the U.S.
                         // The stock must be traded on either the NYSE or NASDAQ 
                         // At least half a year since its initial public offering
@@ -100,11 +102,22 @@ namespace QuantConnect.Algorithm
                                  where x.CompanyReference.CountryId == "USA" &&
                                        (x.CompanyReference.PrimaryExchangeID == "NYS" || x.CompanyReference.PrimaryExchangeID == "NAS") &&
                                        (_algorithm.Time - x.SecurityReference.IPODate).Days > 180 &&
-                                       x.EarningReports.BasicAverageShares.ThreeMonths *
-                                       x.EarningReports.BasicEPS.TwelveMonths * x.ValuationRatios.PERatio > 500000000m
+                                       x.MarketCap > 500000000m
                                  select x).ToList();
 
-                        var percent = numberOfSymbolsFine / (double)filteredFine.Count;
+                        var count = filteredFine.Count;
+
+                        // If no security has met the QC500 criteria, the universe is unchanged.
+                        // A new selection will be attempted on the next trading day as lastMonth is not updated
+                        if (count == 0)
+                        {
+                            return Universe.Unchanged;
+                        }
+
+                        // Update _lastMonth after all QC500 criteria checks passed
+                        lastMonth = _algorithm.Time.Month;
+
+                        var percent = numberOfSymbolsFine / (double)count;
 
                         // select stocks with top dollar volume in every single sector 
                         var topFineBySector =

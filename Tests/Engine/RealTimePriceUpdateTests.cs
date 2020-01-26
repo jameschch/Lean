@@ -22,13 +22,13 @@ using QuantConnect.Algorithm;
 using QuantConnect.Brokerages;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
-using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.Tests.Common.Securities;
+using QuantConnect.Tests.Engine.DataFeeds;
 
 namespace QuantConnect.Tests.Engine
 {
@@ -49,10 +49,11 @@ namespace QuantConnect.Tests.Engine
             var thursday = LocalMarketHours.OpenAllDay(DayOfWeek.Thursday);
             var friday = new LocalMarketHours(DayOfWeek.Friday, TimeSpan.Zero, new TimeSpan(17, 0, 0));
             var earlyCloses = new Dictionary<DateTime, TimeSpan>();
+            var lateOpens = new Dictionary<DateTime, TimeSpan>();
             _exchangeHours = new SecurityExchangeHours(TimeZones.NewYork, USHoliday.Dates.Select(x => x.Date), new[]
             {
                 sunday, monday, tuesday, wednesday, thursday, friday
-            }.ToDictionary(x => x.DayOfWeek), earlyCloses);
+            }.ToDictionary(x => x.DayOfWeek), earlyCloses, lateOpens);
 
             _liveTradingDataFeed = new TestableLiveTradingDataFeed();
 
@@ -69,11 +70,12 @@ namespace QuantConnect.Tests.Engine
             var dataManager = new DataManager(_liveTradingDataFeed,
                 new UniverseSelection(
                     algo,
-                    new SecurityService(algo.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, algo)),
+                    new SecurityService(algo.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, algo, RegisteredSecurityDataTypesProvider.Null, new SecurityCacheProvider(algo.Portfolio))),
                 algo,
                 algo.TimeKeeper,
                 marketHoursDatabase,
-                true);
+                true,
+                RegisteredSecurityDataTypesProvider.Null);
             algo.SubscriptionManager.SetDataManager(dataManager);
             var synchronizer = new LiveSynchronizer();
             synchronizer.Initialize(algo, dataManager);
@@ -114,7 +116,9 @@ namespace QuantConnect.Tests.Engine
                 _exchangeHours,
                 new Cash("USA", 100m, 1m),
                 SymbolProperties.GetDefault("USA"),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var subscriptionRequest = new SubscriptionRequest(false, null, security, _config, DateTime.MinValue, DateTime.MaxValue);
@@ -130,23 +134,14 @@ namespace QuantConnect.Tests.Engine
                 _exchangeHours,
                 new Cash("USA", 100m, 1m),
                 SymbolProperties.GetDefault("USA"),
-                ErrorCurrencyConverter.Instance
+                ErrorCurrencyConverter.Instance,
+                RegisteredSecurityDataTypesProvider.Null,
+                new SecurityCache()
             );
 
             var subscriptionRequest = new SubscriptionRequest(false, null, security, _config, DateTime.MinValue, DateTime.MaxValue);
             var subscription = new Subscription(subscriptionRequest, null, new TimeZoneOffsetProviderNeverOpen());
             Assert.IsTrue(_liveTradingDataFeed.UpdateRealTimePrice(subscription, new TimeZoneOffsetProviderAlwaysOpen(), _exchangeHours));
-        }
-
-        class TestableLiveTradingDataFeed : LiveTradingDataFeed
-        {
-            public bool UpdateRealTimePrice(
-                Subscription subscription,
-                TimeZoneOffsetProvider timeZoneOffsetProvider,
-                SecurityExchangeHours exchangeHours)
-            {
-                return UpdateSubscriptionRealTimePrice(subscription, timeZoneOffsetProvider, exchangeHours, new Tick());
-            }
         }
 
         class TimeZoneOffsetProviderNeverOpen : TimeZoneOffsetProvider

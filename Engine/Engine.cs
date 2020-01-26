@@ -45,6 +45,7 @@ namespace QuantConnect.Lean.Engine
     /// </summary>
     public class Engine
     {
+        private bool _historyStartDateLimitedWarningEmitted;
         private readonly bool _liveMode;
         private readonly Lazy<StackExceptionInterpreter> _exceptionInterpreter;
 
@@ -78,9 +79,10 @@ namespace QuantConnect.Lean.Engine
         /// Runs a single backtest/live job from the job queue
         /// </summary>
         /// <param name="job">The algorithm job to be processed</param>
-        /// <param name="manager"></param>
+        /// <param name="manager">The algorithm manager instance</param>
         /// <param name="assemblyPath">The path to the algorithm's assembly</param>
-        public void Run(AlgorithmNodePacket job, AlgorithmManager manager, string assemblyPath)
+        /// <param name="workerThread">The worker thread instance</param>
+        public void Run(AlgorithmNodePacket job, AlgorithmManager manager, string assemblyPath, WorkerThread workerThread)
         {
             var marketHoursDatabaseTask = Task.Run(() => StaticInitializations());
 
@@ -95,7 +97,6 @@ namespace QuantConnect.Lean.Engine
                 Thread threadResults = null;
                 Thread threadRealTime = null;
                 Thread threadAlphas = null;
-                WorkerThread workerThread = null;
 
                 //-> Initialize messaging system
                 SystemHandlers.Notify.SetAuthentication(job);
@@ -115,8 +116,6 @@ namespace QuantConnect.Lean.Engine
                     // since the algorithm constructor will use it
                     var marketHoursDatabase = marketHoursDatabaseTask.Result;
 
-                    // start worker thread
-                    workerThread = new WorkerThread();
                     AlgorithmHandlers.Setup.WorkerThread = workerThread;
 
                     // Save algorithm to cache, load algorithm instance:
@@ -128,16 +127,25 @@ namespace QuantConnect.Lean.Engine
                     // initialize the alphas handler with the algorithm instance
                     AlgorithmHandlers.Alphas.Initialize(job, algorithm, SystemHandlers.Notify, SystemHandlers.Api);
 
+                    // initialize the object store
+                    AlgorithmHandlers.ObjectStore.Initialize(algorithm.Name, job.UserId, job.ProjectId, job.UserToken, job.Controls);
+
+                    // notify the user of any errors w/ object store persistence
+                    AlgorithmHandlers.ObjectStore.ErrorRaised += (sender, args) => algorithm.Debug($"ObjectStore Persistence Error: {args.Error.Message}");
+
                     // Initialize the brokerage
                     IBrokerageFactory factory;
                     brokerage = AlgorithmHandlers.Setup.CreateBrokerage(job, algorithm, out factory);
 
                     var symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
 
+                    var registeredTypesProvider = new RegisteredSecurityDataTypesProvider();
                     var securityService = new SecurityService(algorithm.Portfolio.CashBook,
                         marketHoursDatabase,
                         symbolPropertiesDatabase,
-                        (ISecurityInitializerProvider)algorithm);
+                        algorithm,
+                        registeredTypesProvider,
+                        new SecurityCacheProvider(algorithm.Portfolio));
 
                     algorithm.Securities.SetSecurityService(securityService);
 
@@ -148,7 +156,8 @@ namespace QuantConnect.Lean.Engine
                         algorithm,
                         algorithm.TimeKeeper,
                         marketHoursDatabase,
-                        _liveMode);
+                        _liveMode,
+                        registeredTypesProvider);
 
                     AlgorithmHandlers.Results.SetDataManager(dataManager);
                     algorithm.SubscriptionManager.SetDataManager(dataManager);
@@ -194,7 +203,9 @@ namespace QuantConnect.Lean.Engine
                                     AlgorithmHandlers.Results.SendStatusUpdate(AlgorithmStatus.History,
                                         Invariant($"Processing history {progress}%..."));
                                 }
-                            }
+                            },
+                            // disable parallel history requests for live trading
+                            parallelHistoryRequestsEnabled: !_liveMode
                         )
                     );
 
@@ -209,7 +220,7 @@ namespace QuantConnect.Lean.Engine
                     algorithm.BrokerageMessageHandler = factory.CreateBrokerageMessageHandler(algorithm, job, SystemHandlers.Api);
 
                     //Initialize the internal state of algorithm and job: executes the algorithm.Initialize() method.
-                    initializeComplete = AlgorithmHandlers.Setup.Setup(new SetupHandlerParameters(dataManager.UniverseSelection, algorithm, brokerage, job, AlgorithmHandlers.Results, AlgorithmHandlers.Transactions, AlgorithmHandlers.RealTime));
+                    initializeComplete = AlgorithmHandlers.Setup.Setup(new SetupHandlerParameters(dataManager.UniverseSelection, algorithm, brokerage, job, AlgorithmHandlers.Results, AlgorithmHandlers.Transactions, AlgorithmHandlers.RealTime, AlgorithmHandlers.ObjectStore));
 
                     // set this again now that we've actually added securities
                     AlgorithmHandlers.Results.SetAlgorithm(algorithm, AlgorithmHandlers.Setup.StartingPortfolioValue);
@@ -255,6 +266,7 @@ namespace QuantConnect.Lean.Engine
                 Log.Trace("         Results:      " + AlgorithmHandlers.Results.GetType().FullName);
                 Log.Trace("         Transactions: " + AlgorithmHandlers.Transactions.GetType().FullName);
                 Log.Trace("         Alpha:        " + AlgorithmHandlers.Alphas.GetType().FullName);
+                Log.Trace("         ObjectStore:  " + AlgorithmHandlers.ObjectStore.GetType().FullName);
                 if (algorithm?.HistoryProvider != null)
                 {
                     Log.Trace("         History Provider:     " + algorithm.HistoryProvider.GetType().FullName);
@@ -276,7 +288,7 @@ namespace QuantConnect.Lean.Engine
 
                     //Load the associated handlers for transaction and realtime events:
                     AlgorithmHandlers.Transactions.Initialize(algorithm, brokerage, AlgorithmHandlers.Results);
-                    AlgorithmHandlers.RealTime.Setup(algorithm, job, AlgorithmHandlers.Results, SystemHandlers.Api);
+                    AlgorithmHandlers.RealTime.Setup(algorithm, job, AlgorithmHandlers.Results, SystemHandlers.Api, algorithmManager.TimeLimit);
 
                     // wire up the brokerage message handler
                     brokerage.Message += (sender, message) =>
@@ -317,7 +329,7 @@ namespace QuantConnect.Lean.Engine
                         var isolator = new Isolator();
 
                         // Execute the Algorithm Code:
-                        var complete = isolator.ExecuteWithTimeLimit(AlgorithmHandlers.Setup.MaximumRuntime, algorithmManager.TimeLoopWithinLimits, () =>
+                        var complete = isolator.ExecuteWithTimeLimit(AlgorithmHandlers.Setup.MaximumRuntime, algorithmManager.TimeLimit.IsWithinLimit, () =>
                         {
                             try
                             {
@@ -355,6 +367,8 @@ namespace QuantConnect.Lean.Engine
                     catch (Exception err)
                     {
                         //Error running the user algorithm: purge datafeed, send error messages, set algorithm status to failed.
+                        algorithm.RunTimeError = err;
+                        algorithm.SetStatus(AlgorithmStatus.RuntimeError);
                         HandleAlgorithmError(job, err);
                     }
 
@@ -480,7 +494,22 @@ namespace QuantConnect.Lean.Engine
             {
                 historyProvider = Config.Get("history-provider", "SubscriptionDataReaderHistoryProvider");
             }
-            return Composer.Instance.GetExportedValueByTypeName<IHistoryProvider>(historyProvider);
+            var provider = Composer.Instance.GetExportedValueByTypeName<IHistoryProvider>(historyProvider);
+
+            provider.InvalidConfigurationDetected += (sender, args) => { AlgorithmHandlers.Results.ErrorMessage(args.Message); };
+            provider.NumericalPrecisionLimited += (sender, args) => { AlgorithmHandlers.Results.DebugMessage(args.Message); };
+            provider.StartDateLimited += (sender, args) =>
+            {
+                if (!_historyStartDateLimitedWarningEmitted)
+                {
+                    _historyStartDateLimitedWarningEmitted = true;
+                    AlgorithmHandlers.Results.DebugMessage("Warning: when performing history requests, the start date will be adjusted if it is before the first known date for the symbol.");
+                }
+            };
+            provider.DownloadFailed += (sender, args) => { AlgorithmHandlers.Results.ErrorMessage(args.Message, args.StackTrace); };
+            provider.ReaderErrorDetected += (sender, args) => { AlgorithmHandlers.Results.RuntimeError(args.Message, args.StackTrace); };
+
+            return provider;
         }
 
         /// <summary>

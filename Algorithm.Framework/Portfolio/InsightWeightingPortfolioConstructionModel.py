@@ -15,12 +15,8 @@ from clr import AddReference
 AddReference("QuantConnect.Common")
 AddReference("QuantConnect.Algorithm.Framework")
 
-from QuantConnect import Resolution, Extensions
+from QuantConnect import Resolution
 from QuantConnect.Algorithm.Framework.Alphas import *
-from itertools import groupby
-from datetime import datetime, timedelta
-from pytz import utc
-UTCMIN = datetime.min.replace(tzinfo=utc)
 from EqualWeightingPortfolioConstructionModel import EqualWeightingPortfolioConstructionModel
 
 class InsightWeightingPortfolioConstructionModel(EqualWeightingPortfolioConstructionModel):
@@ -33,11 +29,12 @@ class InsightWeightingPortfolioConstructionModel(EqualWeightingPortfolioConstruc
     percent holdings proportionally so the sum is 1.
     It will ignore Insight that have no Insight.Weight value.'''
 
-    def __init__(self, resolution = Resolution.Daily):
+    def __init__(self, rebalancingParam = Resolution.Daily):
         '''Initialize a new instance of InsightWeightingPortfolioConstructionModel
         Args:
-            resolution: Rebalancing frequency'''
-        super().__init__(resolution)
+            rebalancingParam: Rebalancing parameter. If it is a timedelta or Resolution, it will be converted into a function.
+                              The function returns the next expected rebalance time for a given algorithm UTC DateTime'''
+        super().__init__(rebalancingParam)
 
     def ShouldCreateTargetForInsight(self, insight):
         '''Method that will determine if the portfolio construction model should create a
@@ -53,10 +50,18 @@ class InsightWeightingPortfolioConstructionModel(EqualWeightingPortfolioConstruc
             activeInsights: The active insights to generate a target for'''
         result = {}
         # We will adjust weights proportionally in case the sum is > 1 so it sums to 1.
-        weightSums = sum(insight.Weight for insight in activeInsights)
+        weightSums = sum(self.GetValue(insight) for insight in activeInsights)
         weightFactor = 1.0
         if weightSums > 1:
             weightFactor = 1 / weightSums
         for insight in activeInsights:
-            result[insight] = insight.Direction * insight.Weight * weightFactor
+            result[insight] = insight.Direction * self.GetValue(insight) * weightFactor
         return result
+
+    def GetValue(self, insight):
+        '''Method that will determine which member will be used to compute the weights and gets its value
+        Args:
+            insight: The insight to create a target for
+        Returns:
+            The value of the selected insight member'''
+        return insight.Weight

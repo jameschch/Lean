@@ -20,6 +20,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -28,9 +30,13 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NodaTime;
 using Python.Runtime;
+using QuantConnect.Algorithm.Framework.Portfolio;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Data;
+using QuantConnect.Interfaces;
+using QuantConnect.Logging;
 using QuantConnect.Orders;
+using QuantConnect.Python;
 using QuantConnect.Securities;
 using QuantConnect.Util;
 using Timer = System.Timers.Timer;
@@ -43,6 +49,82 @@ namespace QuantConnect
     /// </summary>
     public static class Extensions
     {
+        private static readonly Dictionary<IntPtr, PythonActivator> PythonActivators
+            = new Dictionary<IntPtr, PythonActivator>();
+
+        /// <summary>
+        /// Returns true if the specified <see cref="Series"/> instance holds no <see cref="ChartPoint"/>
+        /// </summary>
+        public static bool IsEmpty(this Series series)
+        {
+            return series.Values.Count == 0;
+        }
+
+        /// <summary>
+        /// Returns if the specified <see cref="Chart"/> instance  holds no <see cref="Series"/>
+        /// or they are all empty <see cref="IsEmpty(Series)"/>
+        /// </summary>
+        public static bool IsEmpty(this Chart chart)
+        {
+            return chart.Series.Values.All(IsEmpty);
+        }
+
+        /// <summary>
+        /// Gets a python method by name
+        /// </summary>
+        /// <param name="instance">The object instance to search the method in</param>
+        /// <param name="name">The name of the method</param>
+        /// <returns>The python method or null if not defined or CSharp implemented</returns>
+        public static dynamic GetPythonMethod(this PyObject instance, string name)
+        {
+            using (Py.GIL())
+            {
+                var method = instance.GetAttr(name);
+                var pythonType = method.GetPythonType();
+                var isPythonDefined = pythonType.Repr().Equals("<class \'method\'>");
+
+                return isPythonDefined ? method : null;
+            }
+        }
+
+        /// <summary>
+        /// Returns an ordered enumerable where position reducing orders are executed first
+        /// and the remaining orders are executed in decreasing order value.
+        /// Will NOT return targets for securities that have no data yet.
+        /// Will NOT return targets for which current holdings + open orders quantity, sum up to the target quantity
+        /// </summary>
+        /// <param name="targets">The portfolio targets to order by margin</param>
+        /// <param name="algorithm">The algorithm instance</param>
+        /// <param name="targetIsDelta">True if the target quantity is the delta between the
+        /// desired and existing quantity</param>
+        public static IEnumerable<IPortfolioTarget> OrderTargetsByMarginImpact(
+            this IEnumerable<IPortfolioTarget> targets,
+            IAlgorithm algorithm,
+            bool targetIsDelta = false)
+        {
+            return targets.Select(x => new {
+                    PortfolioTarget = x,
+                    TargetQuantity = x.Quantity,
+                    ExistingQuantity = algorithm.Portfolio[x.Symbol].Quantity
+                                       + algorithm.Transactions.GetOpenOrderTickets(x.Symbol)
+                                           .Aggregate(0m, (d, t) => d + t.Quantity - t.QuantityFilled),
+                    Security = algorithm.Securities[x.Symbol]
+                })
+                .Where(x => x.Security.HasData
+                            && (targetIsDelta ? Math.Abs(x.TargetQuantity) : Math.Abs(x.TargetQuantity - x.ExistingQuantity))
+                            >= x.Security.SymbolProperties.LotSize
+                )
+                .Select(x => new {
+                    PortfolioTarget = x.PortfolioTarget,
+                    OrderValue = Math.Abs((targetIsDelta ? x.TargetQuantity : (x.TargetQuantity - x.ExistingQuantity)) * x.Security.Price),
+                    IsReducingPosition = x.ExistingQuantity != 0
+                                         && Math.Abs((targetIsDelta ? (x.TargetQuantity + x.ExistingQuantity) : x.TargetQuantity)) < Math.Abs(x.ExistingQuantity)
+                })
+                .OrderByDescending(x => x.IsReducingPosition)
+                .ThenByDescending(x => x.OrderValue)
+                .Select(x => x.PortfolioTarget);
+        }
+
         /// <summary>
         /// Given a type will create a new instance using the parameterless constructor
         /// and assert the type implements <see cref="BaseData"/>
@@ -284,12 +366,14 @@ namespace QuantConnect
         /// <returns>New instance with just 3 decimal places</returns>
         public static decimal TruncateTo3DecimalPlaces(this decimal value)
         {
-            if (value == decimal.MaxValue
-                || value == decimal.MinValue
+            // we will multiply by 1k bellow, if its bigger it will stack overflow
+            if (value >= decimal.MaxValue / 1000
+                || value <= decimal.MinValue / 1000
                 || value == 0)
             {
                 return value;
             }
+
             return Math.Truncate(1000 * value) / 1000;
         }
 
@@ -308,8 +392,7 @@ namespace QuantConnect
             }
 
             // this is good for forex and other small numbers
-            var d = (double)input;
-            return (decimal)d.RoundToSignificantDigits(7);
+            return input.RoundToSignificantDigits(7).Normalize();
         }
 
         /// <summary>
@@ -529,7 +612,7 @@ namespace QuantConnect
         /// <returns>Last 4 character string of string.</returns>
         public static string GetExtension(this string str) {
             var ext = str.Substring(Math.Max(0, str.Length - 4));
-            var allowedExt = new List<string>() { ".zip", ".csv", ".json" };
+            var allowedExt = new List<string> { ".zip", ".csv", ".json", ".tsv" };
             if (!allowedExt.Contains(ext))
             {
                 ext = ".custom";
@@ -1421,6 +1504,50 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Convert a <see cref="PyObject"/> into a managed dictionary
+        /// </summary>
+        /// <typeparam name="TKey">Target type of the resulting dictionary key</typeparam>
+        /// <typeparam name="TValue">Target type of the resulting dictionary value</typeparam>
+        /// <param name="pyObject">PyObject to be converted</param>
+        /// <returns>Dictionary of TValue keyed by TKey</returns>
+        public static Dictionary<TKey, TValue> ConvertToDictionary<TKey, TValue>(this PyObject pyObject)
+        {
+            var result = new List<KeyValuePair<TKey, TValue>>();
+            using (Py.GIL())
+            {
+                var inputType = pyObject.GetPythonType().ToString();
+                var targetType = nameof(PyDict);
+
+                try
+                {
+                    using (var pyDict = new PyDict(pyObject))
+                    {
+                        targetType = $"{typeof(TKey).Name}: {typeof(TValue).Name}";
+
+                        foreach (PyObject item in pyDict.Items())
+                        {
+                            inputType = $"{item[0].GetPythonType()}: {item[1].GetPythonType()}";
+
+                            var key = item[0].As<TKey>();
+                            var value = item[1].As<TValue>();
+
+                            result.Add(new KeyValuePair<TKey, TValue>(key, value));
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    throw new ArgumentException(
+                        $"ConvertToDictionary cannot be used to convert a {inputType} into {targetType}. Reason: {e.Message}",
+                        e
+                    );
+                }
+            }
+
+            return result.ToDictionary();
+        }
+
+        /// <summary>
         /// Gets Enumerable of <see cref="Symbol"/> from a PyObject
         /// </summary>
         /// <param name="pyObject">PyObject containing Symbol or Array of Symbol</param>
@@ -1482,6 +1609,44 @@ namespace QuantConnect
                     throw new ArgumentException($"GetEnumString(): {pyObject.Repr()} is not a C# Type.");
                 }
             }
+        }
+
+        /// <summary>
+        /// Creates a type with a given name, if PyObject is not a CLR type. Otherwise, convert it.
+        /// </summary>
+        /// <param name="pyObject">Python object representing a type.</param>
+        /// <returns>Type object</returns>
+        public static Type CreateType(this PyObject pyObject)
+        {
+            Type type;
+            if (pyObject.TryConvert(out type) &&
+                type != typeof(PythonQuandl) &&
+                type != typeof(PythonData))
+            {
+                return type;
+            }
+
+            PythonActivator pythonType;
+            if (!PythonActivators.TryGetValue(pyObject.Handle, out pythonType))
+            {
+                AssemblyName an;
+                using (Py.GIL())
+                {
+                    an = new AssemblyName(pyObject.Repr().Split('\'')[1]);
+                }
+                var typeBuilder = AppDomain.CurrentDomain
+                    .DefineDynamicAssembly(an, AssemblyBuilderAccess.Run)
+                    .DefineDynamicModule("MainModule")
+                    .DefineType(an.Name, TypeAttributes.Class, type);
+
+                pythonType = new PythonActivator(typeBuilder.CreateType(), pyObject);
+
+                ObjectActivator.AddActivator(pythonType.Type, pythonType.Factory);
+
+                // Save to prevent future additions
+                PythonActivators.Add(pyObject.Handle, pythonType);
+            }
+            return pythonType.Type;
         }
 
         /// <summary>
