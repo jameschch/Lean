@@ -165,7 +165,7 @@ namespace QuantConnect.Lean.Engine.Setup
                     BaseSetupHandler.LoadBacktestJobAccountCurrency(algorithm, backtestJob);
 
                     var isolator = new Isolator();
-                    isolator.ExecuteWithTimeLimit(TimeSpan.FromMinutes(5),
+                    isolator.ExecuteWithTimeLimit(TimeSpan.FromDays(365),
                         () =>
                         {
                             //Setup Base Algorithm:

@@ -478,7 +478,7 @@ namespace QuantConnect.Data.Market
             }
 
             // only create the ask if it exists in the file
-            if (csv.Count == 10 && csv[6].Length != 0 || csv[7].Length != 0 || csv[8].Length != 0 || csv[9].Length != 0)
+            if (csv.Count == 10 && (csv[6].Length != 0 || csv[7].Length != 0 || csv[8].Length != 0 || csv[9].Length != 0))
             {
                 quoteBar.Ask = new Bar
                 {
