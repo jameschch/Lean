@@ -47,6 +47,12 @@ namespace QuantConnect
         public IDictionary<int, Order> Orders;
 
         /// <summary>
+        /// OrderEvent updates since the last result packet
+        /// </summary>
+        [JsonProperty(PropertyName = "OrderEvents", NullValueHandling = NullValueHandling.Ignore)]
+        public List<OrderEvent> OrderEvents;
+
+        /// <summary>
         /// Trade profit and loss information since the last algorithm result packet
         /// </summary>
         [JsonProperty(PropertyName = "ProfitLoss", NullValueHandling = NullValueHandling.Ignore)]
@@ -64,5 +70,11 @@ namespace QuantConnect
         /// </summary>
         [JsonProperty(PropertyName = "RuntimeStatistics", NullValueHandling = NullValueHandling.Ignore)]
         public IDictionary<string, string> RuntimeStatistics;
+
+        /// <summary>
+        /// Server status information, including CPU/RAM usage, ect...
+        /// </summary>
+        [JsonProperty(PropertyName = "ServerStatistics", NullValueHandling = NullValueHandling.Ignore)]
+        public IDictionary<string, string> ServerStatistics;
     }
 }

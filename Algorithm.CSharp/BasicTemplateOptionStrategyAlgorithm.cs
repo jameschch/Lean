@@ -48,7 +48,10 @@ namespace QuantConnect.Algorithm.CSharp
             _optionSymbol = option.Symbol;
 
             // set our strike/expiry filter for this option chain
-            option.SetFilter(-2, +2, TimeSpan.Zero, TimeSpan.FromDays(180));
+            // SetFilter method accepts TimeSpan objects or integer for days.
+            // The following statements yield the same filtering criteria
+            option.SetFilter(-2, +2, 0, 180);
+            // option.SetFilter(-2, +2, TimeSpan.Zero, TimeSpan.FromDays(180));
 
             // Adding this to reproduce GH issue #2314
             SetWarmup(TimeSpan.FromMinutes(1));
@@ -132,24 +135,25 @@ namespace QuantConnect.Algorithm.CSharp
             {"Treynor Ratio", "0"},
             {"Total Fees", "$778.00"},
             {"Fitness Score", "0"},
-            {"Kelly Criterion Estimate", "-2.958"},
-            {"Kelly Criterion Probability Value", "0.613"},
+            {"Kelly Criterion Estimate", "0"},
+            {"Kelly Criterion Probability Value", "0"},
             {"Sortino Ratio", "0"},
             {"Return Over Maximum Drawdown", "0"},
             {"Portfolio Turnover", "0"},
-            {"Total Insights Generated", "778"},
-            {"Total Insights Closed", "774"},
-            {"Total Insights Analysis Completed", "774"},
+            {"Total Insights Generated", "0"},
+            {"Total Insights Closed", "0"},
+            {"Total Insights Analysis Completed", "0"},
             {"Long Insight Count", "0"},
-            {"Short Insight Count", "390"},
-            {"Long/Short Ratio", "0%"},
-            {"Estimated Monthly Alpha Value", "$-0.2742857"},
-            {"Total Accumulated Estimated Alpha Value", "$-0.008"},
-            {"Mean Population Estimated Insight Value", "$-0.00001033592"},
-            {"Mean Population Direction", "22.6169%"},
+            {"Short Insight Count", "0"},
+            {"Long/Short Ratio", "100%"},
+            {"Estimated Monthly Alpha Value", "$0"},
+            {"Total Accumulated Estimated Alpha Value", "$0"},
+            {"Mean Population Estimated Insight Value", "$0"},
+            {"Mean Population Direction", "0%"},
             {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "0.5865%"},
-            {"Rolling Averaged Population Magnitude", "0%"}
+            {"Rolling Averaged Population Direction", "0%"},
+            {"Rolling Averaged Population Magnitude", "0%"},
+            {"OrderListHash", "-702975961"}
         };
     }
 }

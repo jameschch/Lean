@@ -35,7 +35,7 @@ using QuantConnect.Tests.Engine.DataFeeds;
 
 namespace QuantConnect.Tests.Engine.Setup
 {
-    [TestFixture]
+    [TestFixture, Parallelizable(ParallelScope.Fixtures)]
     public class BrokerageSetupHandlerTests
     {
         private IAlgorithm _algorithm;
@@ -46,7 +46,7 @@ namespace QuantConnect.Tests.Engine.Setup
 
         private TestableBrokerageSetupHandler _brokerageSetupHandler;
 
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Setup()
         {
             _algorithm = new QCAlgorithm();
@@ -262,7 +262,8 @@ namespace QuantConnect.Tests.Engine.Setup
                 ProjectId = 1,
                 DeployId = "1",
                 Brokerage = "PaperBrokerage",
-                DataQueueHandler = "none"
+                DataQueueHandler = "none",
+                Controls = new Controls { RamAllocation = 4096 } // no real limit
             };
 
             var resultHandler = new Mock<IResultHandler>();
@@ -287,7 +288,7 @@ namespace QuantConnect.Tests.Engine.Setup
             Assert.Greater(algorithm.UtcTime, time);
         }
 
-        public TestCaseData[] GetExistingHoldingsAndOrdersTestCaseData()
+        private static TestCaseData[] GetExistingHoldingsAndOrdersTestCaseData()
         {
             return new[]
             {

@@ -80,7 +80,10 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 return filter
                     .Strikes(+1, +1)
-                    .Expiration(TimeSpan.Zero, TimeSpan.FromDays(7))
+                    // Expiration method accepts TimeSpan objects or integer for days.
+                    // The following statements yield the same filtering criteria
+                    .Expiration(0, 7)
+                    //.Expiration(TimeSpan.Zero, TimeSpan.FromDays(7))
                     .WeeklysOnly()
                     .PutsOnly()
                     .OnlyApplyFilterAtMarketOpen();
@@ -176,7 +179,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Direction", "50%"},
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "50.0482%"},
-            {"Rolling Averaged Population Magnitude", "0%"}
+            {"Rolling Averaged Population Magnitude", "0%"},
+            {"OrderListHash", "352959406"}
         };
     }
 }

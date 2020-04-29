@@ -262,14 +262,19 @@ namespace QuantConnect.Algorithm
         /// Creates a new universe and adds it to the algorithm. This is for coarse and fine fundamental US Equity data and
         /// will be executed on day changes in the NewYork time zone (<see cref="TimeZones.NewYork"/>
         /// </summary>
-        /// <param name="pycoarse">Defines an initial coarse selection</param>
+        /// <param name="pyObject">Defines an initial coarse selection or a universe</param>
         /// <param name="pyfine">Defines a more detailed selection with access to more data</param>
-        public void AddUniverse(PyObject pycoarse, PyObject pyfine)
+        public void AddUniverse(PyObject pyObject, PyObject pyfine)
         {
             Func<IEnumerable<CoarseFundamental>, object> coarseFunc;
             Func<IEnumerable<FineFundamental>, object> fineFunc;
+            Universe universe;
 
-            if (pycoarse.TryConvertToDelegate(out coarseFunc) && pyfine.TryConvertToDelegate(out fineFunc))
+            if (pyObject.TryConvert(out universe) && pyfine.TryConvertToDelegate(out fineFunc))
+            {
+                AddUniverse(universe, fineFunc.ConvertToUniverseSelectionSymbolDelegate());
+            }
+            else if (pyObject.TryConvertToDelegate(out coarseFunc) && pyfine.TryConvertToDelegate(out fineFunc))
             {
                 AddUniverse(coarseFunc.ConvertToUniverseSelectionSymbolDelegate(),
                     fineFunc.ConvertToUniverseSelectionSymbolDelegate());
@@ -278,7 +283,7 @@ namespace QuantConnect.Algorithm
             {
                 using (Py.GIL())
                 {
-                    throw new ArgumentException($"QCAlgorithm.AddUniverse: {pycoarse.Repr()} or {pyfine.Repr()} is not a valid argument.");
+                    throw new ArgumentException($"QCAlgorithm.AddUniverse: {pyObject.Repr()} or {pyfine.Repr()} is not a valid argument.");
                 }
             }
         }
@@ -481,27 +486,21 @@ namespace QuantConnect.Algorithm
 
             if (indicator.TryConvert(out indicatorDataPoint))
             {
-                Func<IBaseData, decimal> func = null;
-                selector?.TryConvert(out func);
-                RegisterIndicator(symbol, indicatorDataPoint, consolidator, func);
+                RegisterIndicator(symbol, indicatorDataPoint, consolidator, selector?.ConvertToDelegate<Func<IBaseData, decimal>>());
                 return;
             }
             else if (indicator.TryConvert(out indicatorDataBar))
             {
-                Func<IBaseData, IBaseDataBar> func = null;
-                selector?.TryConvert(out func);
-                RegisterIndicator(symbol, indicatorDataBar, consolidator, func);
+                RegisterIndicator(symbol, indicatorDataBar, consolidator, selector?.ConvertToDelegate<Func<IBaseData, IBaseDataBar>>());
                 return;
             }
             else if (indicator.TryConvert(out indicatorTradeBar))
             {
-                Func<IBaseData, TradeBar> func = null;
-                selector?.TryConvert(out func);
-                RegisterIndicator(symbol, indicatorTradeBar, consolidator, func);
+                RegisterIndicator(symbol, indicatorTradeBar, consolidator, selector?.ConvertToDelegate<Func<IBaseData, TradeBar>>());
                 return;
             }
 
-            RegisterIndicator(symbol, WrapPythonIndicator(indicator), consolidator);
+            RegisterIndicator(symbol, WrapPythonIndicator(indicator), consolidator, selector?.ConvertToDelegate<Func<IBaseData, IBaseData>>());
         }
 
         /// <summary>
@@ -1022,12 +1021,12 @@ namespace QuantConnect.Algorithm
         /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol
         /// </summary>
         /// <param name="symbol">The symbol who's data is to be consolidated</param>
-        /// <param name="calendarType">The consolidation calendar type</param>
+        /// <param name="calendar">The consolidation calendar</param>
         /// <param name="handler">Data handler receives new consolidated data when generated</param>
         /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
-        public IDataConsolidator Consolidate(Symbol symbol, Func<DateTime, CalendarInfo> calendarType, PyObject handler)
+        public IDataConsolidator Consolidate(Symbol symbol, Func<DateTime, CalendarInfo> calendar, PyObject handler)
         {
-            return Consolidate(symbol, calendarType, null, handler);
+            return Consolidate(symbol, calendar, null, handler);
         }
 
         /// <summary>
@@ -1054,26 +1053,26 @@ namespace QuantConnect.Algorithm
         /// Registers the <paramref name="handler"/> to receive consolidated data for the specified symbol
         /// </summary>
         /// <param name="symbol">The symbol who's data is to be consolidated</param>
-        /// <param name="calendarType">The consolidation calendar type</param>
+        /// <param name="calendar">The consolidation calendar</param>
         /// <param name="tickType">The tick type of subscription used as data source for consolidator. Specify null to use first subscription found.</param>
         /// <param name="handler">Data handler receives new consolidated data when generated</param>
         /// <returns>A new consolidator matching the requested parameters with the handler already registered</returns>
-        private IDataConsolidator Consolidate(Symbol symbol, Func<DateTime, CalendarInfo> calendarType, TickType? tickType, PyObject handler)
+        private IDataConsolidator Consolidate(Symbol symbol, Func<DateTime, CalendarInfo> calendar, TickType? tickType, PyObject handler)
         {
             // resolve consolidator input subscription
             var type = GetSubscription(symbol, tickType).Type;
 
             if (type == typeof(TradeBar))
             {
-                return Consolidate(symbol, calendarType, tickType, handler.ConvertToDelegate<Action<TradeBar>>());
+                return Consolidate(symbol, calendar, tickType, handler.ConvertToDelegate<Action<TradeBar>>());
             }
 
             if (type == typeof(QuoteBar))
             {
-                return Consolidate(symbol, calendarType, tickType, handler.ConvertToDelegate<Action<QuoteBar>>());
+                return Consolidate(symbol, calendar, tickType, handler.ConvertToDelegate<Action<QuoteBar>>());
             }
 
-            return Consolidate(symbol, calendarType, tickType, handler.ConvertToDelegate<Action<BaseData>>());
+            return Consolidate(symbol, calendar, tickType, handler.ConvertToDelegate<Action<BaseData>>());
         }
 
         /// <summary>

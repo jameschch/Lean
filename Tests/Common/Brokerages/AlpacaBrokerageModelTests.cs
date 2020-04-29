@@ -28,7 +28,7 @@ using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Common.Brokerages
 {
-    [TestFixture]
+    [TestFixture, Parallelizable(ParallelScope.All)]
     public class AlpacaBrokerageModelTests
     {
         [TestCaseSource(nameof(GetOrderTestData))]
@@ -81,7 +81,7 @@ namespace QuantConnect.Tests.Common.Brokerages
             }
         }
 
-        public TestCaseData[] GetOrderTestData()
+        private static TestCaseData[] GetOrderTestData()
         {
             return new[]
             {

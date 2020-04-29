@@ -80,11 +80,8 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 throw new Exception("Securities must be marked as tradable until they're delisted or removed from the universe");
             }
-        }
 
-        public void OnData(Delistings data)
-        {
-            foreach (var kvp in data)
+            foreach (var kvp in data.Delistings)
             {
                 var symbol = kvp.Key;
                 var delisting = kvp.Value;
@@ -150,38 +147,39 @@ namespace QuantConnect.Algorithm.CSharp
             {"Drawdown", "4.300%"},
             {"Expectancy", "-1"},
             {"Net Profit", "-4.312%"},
-            {"Sharpe Ratio", "-10.321"},
+            {"Sharpe Ratio", "-5.958"},
             {"Probabilistic Sharpe Ratio", "0.000%"},
             {"Loss Rate", "100%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-1.203"},
+            {"Alpha", "-0.685"},
             {"Beta", "-0.445"},
             {"Annual Standard Deviation", "0.119"},
             {"Annual Variance", "0.014"},
-            {"Information Ratio", "-8.223"},
+            {"Information Ratio", "-4.887"},
             {"Tracking Error", "0.155"},
-            {"Treynor Ratio", "2.752"},
+            {"Treynor Ratio", "1.589"},
             {"Total Fees", "$55.05"},
             {"Fitness Score", "0.002"},
-            {"Kelly Criterion Estimate", "-45.709"},
-            {"Kelly Criterion Probability Value", "0.681"},
+            {"Kelly Criterion Estimate", "0"},
+            {"Kelly Criterion Probability Value", "0"},
             {"Sortino Ratio", "-15.687"},
             {"Return Over Maximum Drawdown", "-18.549"},
             {"Portfolio Turnover", "0.334"},
-            {"Total Insights Generated", "3"},
-            {"Total Insights Closed", "2"},
-            {"Total Insights Analysis Completed", "2"},
-            {"Long Insight Count", "1"},
-            {"Short Insight Count", "1"},
+            {"Total Insights Generated", "0"},
+            {"Total Insights Closed", "0"},
+            {"Total Insights Analysis Completed", "0"},
+            {"Long Insight Count", "0"},
+            {"Short Insight Count", "0"},
             {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$-1163.479"},
-            {"Total Accumulated Estimated Alpha Value", "$-394.29"},
-            {"Mean Population Estimated Insight Value", "$-197.145"},
+            {"Estimated Monthly Alpha Value", "$0"},
+            {"Total Accumulated Estimated Alpha Value", "$0"},
+            {"Mean Population Estimated Insight Value", "$0"},
             {"Mean Population Direction", "0%"},
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"}
+            {"Rolling Averaged Population Magnitude", "0%"},
+            {"OrderListHash", "-2022527947"}
         };
     }
 }

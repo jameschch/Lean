@@ -1,4 +1,4 @@
-﻿/*
+/*
  * QUANTCONNECT.COM - Democratizing Finance, Empowering Individuals.
  * Lean Algorithmic Trading Engine v2.0. Copyright 2014 QuantConnect Corporation.
  *
@@ -668,14 +668,14 @@ namespace QuantConnect.Util
                     if (isHourlyOrDaily)
                     {
                         var expiryYearMonth = Parse.DateTimeExact(parts[2], DateFormat.YearMonth);
-                        var futureExpiryFunc = FuturesExpiryFunctions.FuturesExpiryFunction(parts[1]);
+                        var futureExpiryFunc = FuturesExpiryFunctions.FuturesExpiryFunction(symbol);
                         var futureExpiry = futureExpiryFunc(expiryYearMonth);
                         return Symbol.CreateFuture(parts[0], symbol.ID.Market, futureExpiry);
                     }
                     else
                     {
                         var expiryYearMonth = Parse.DateTimeExact(parts[4], DateFormat.YearMonth);
-                        var futureExpiryFunc = FuturesExpiryFunctions.FuturesExpiryFunction(parts[1]);
+                        var futureExpiryFunc = FuturesExpiryFunctions.FuturesExpiryFunction(symbol);
                         var futureExpiry = futureExpiryFunc(expiryYearMonth);
                         return Symbol.CreateFuture(parts[1], symbol.ID.Market, futureExpiry);
                     }
@@ -767,7 +767,9 @@ namespace QuantConnect.Util
             }
             if (type == typeof(Tick))
             {
-                if (securityType == SecurityType.Forex || securityType == SecurityType.Cfd || securityType == SecurityType.Crypto)
+                if (securityType == SecurityType.Forex || 
+                    securityType == SecurityType.Cfd || 
+                    securityType == SecurityType.Crypto)
                 {
                     return TickType.Quote;
                 }

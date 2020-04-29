@@ -24,7 +24,6 @@ using QuantConnect.Lean.Engine.Results;
 using QuantConnect.Lean.Engine.Setup;
 using QuantConnect.Lean.Engine.TransactionHandlers;
 using QuantConnect.Logging;
-using QuantConnect.Orders.Fills;
 using QuantConnect.Packets;
 using QuantConnect.Securities;
 using QuantConnect.Util;
@@ -233,8 +232,9 @@ namespace QuantConnect.Report
         /// </summary>
         /// <param name="equityCurve">Equity curve series</param>
         /// <param name="orders">Orders</param>
+        /// <param name="liveSeries">Equity curve series originates from LiveResult</param>
         /// <returns>Enumerable of <see cref="PointInTimePortfolio"/></returns>
-        public static IEnumerable<PointInTimePortfolio> FromOrders(Series<DateTime, double> equityCurve, IEnumerable<Order> orders)
+        public static IEnumerable<PointInTimePortfolio> FromOrders(Series<DateTime, double> equityCurve, IEnumerable<Order> orders, bool liveSeries = false)
         {
             // Don't do anything if we have no orders or equity curve to process
             if (!orders.Any() || equityCurve.IsEmpty)
@@ -270,11 +270,28 @@ namespace QuantConnect.Report
             PointInTimePortfolio prev = null;
             foreach (var deploymentOrders in portfolioDeployments)
             {
+                if (deploymentOrders.Count == 0)
+                {
+                    Log.Trace($"PortfolioLooper.FromOrders(): Deployment contains no orders");
+                    continue;
+                }
+                var startTime = deploymentOrders.First().Time;
+                var deployment = equityCurve.Where(kvp => kvp.Key <= startTime);
+                if (deployment.IsEmpty)
+                {
+                    Log.Trace($"PortfolioLooper.FromOrders(): Equity series is empty after filtering with upper bound: {startTime}");
+                    continue;
+                }
+
+                // Skip any deployments that haven't been ran long enough to be generated in live mode
+                if (liveSeries && deploymentOrders.First().Time.Date == deploymentOrders.Last().Time.Date)
+                {
+                    Log.Trace("PortfolioLooper.FromOrders(): Filtering deployment because it has not been deployed for more than one day");
+                    continue;
+                }
+
                 // For every deployment, we want to start fresh.
-                var looper = new PortfolioLooper(
-                    equityCurve.Where(kvp => kvp.Key <= deploymentOrders.First().Time).LastValue(),
-                    deploymentOrders
-                );
+                var looper = new PortfolioLooper(deployment.LastValue(), deploymentOrders);
 
                 foreach (var portfolio in looper.ProcessOrders(deploymentOrders))
                 {

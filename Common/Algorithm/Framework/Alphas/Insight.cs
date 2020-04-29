@@ -288,7 +288,7 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// Creates a deep clone of this insight instance
         /// </summary>
         /// <returns>A new insight with identical values, but new instances</returns>
-        public Insight Clone()
+        public virtual Insight Clone()
         {
             return new Insight(Symbol, Period, Type, Direction, Magnitude, Confidence, weight:Weight)
             {
@@ -746,7 +746,6 @@ namespace QuantConnect.Algorithm.Framework.Alphas
         /// Special case for insights where we do not know whats the
         /// <see cref="Period"/> or <see cref="CloseTimeUtc"/>.
         /// </summary>
-        /// <remarks><see cref="OrderBasedInsightGenerator"/></remarks>
         private class EndOfTimeCloseTimePeriodSpecification : IPeriodSpecification
         {
             public void SetPeriodAndCloseTime(Insight insight, SecurityExchangeHours exchangeHours)

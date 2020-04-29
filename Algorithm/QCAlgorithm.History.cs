@@ -654,13 +654,25 @@ namespace QuantConnect.Algorithm
             if (Securities.TryGetValue(symbol, out security))
             {
                 // find all subscriptions matching the requested type with a higher resolution than requested
-                return from sub in security.Subscriptions.OrderByDescending(s => s.Resolution)
-                       where type.IsAssignableFrom(sub.Type)
-                       select sub;
+                var matchingSubscriptions = from sub in security.Subscriptions.OrderByDescending(s => s.Resolution)
+                    where type.IsAssignableFrom(sub.Type)
+                    select sub;
+
+                if (resolution.HasValue
+                    && (resolution == Resolution.Daily || resolution == Resolution.Hour)
+                    && symbol.SecurityType == SecurityType.Equity)
+                {
+                    // for Daily and Hour resolution, for equities, we have to
+                    // filter out any existing subscriptions that could be of Quote type
+                    // This could happen if they were Resolution.Minute/Second/Tick
+                    matchingSubscriptions = matchingSubscriptions.Where(s => s.TickType != TickType.Quote);
+                }
+
+                return matchingSubscriptions;
             }
             else
             {
-                var timeZone = GetExchangeHours(symbol).TimeZone;
+                var entry = MarketHoursDatabase.GetEntry(symbol.ID.Market, symbol, symbol.ID.SecurityType);
                 resolution = GetResolution(symbol, resolution);
 
                 return SubscriptionManager
@@ -669,7 +681,8 @@ namespace QuantConnect.Algorithm
                         x.Item1,
                         symbol,
                         resolution.Value,
-                        timeZone, timeZone,
+                        entry.DataTimeZone,
+                        entry.ExchangeHours.TimeZone,
                         UniverseSettings.FillForward,
                         UniverseSettings.ExtendedMarketHours,
                         true,

@@ -36,8 +36,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void Initialize()
         {
-            SetStartDate(2005, 2, 25);
-            SetEndDate(2005, 2, 28);
+            SetStartDate(2014, 6, 6);
+            SetEndDate(2014, 6, 9);
             SetCash(100000);
             SetBenchmark(x => 0);
 
@@ -68,7 +68,7 @@ namespace QuantConnect.Algorithm.CSharp
                 else if (slice.Splits.Single().Value.Type == SplitType.SplitOccurred)
                 {
                     _receivedOccurredEvent = true;
-                    if (slice.Splits.Single().Value.Price != 88.9700m || slice.Splits.Single().Value.ReferencePrice != 88.9700m)
+                    if (slice.Splits.Single().Value.Price != 645.5700m || slice.Splits.Single().Value.ReferencePrice != 645.5700m)
                     {
                         throw new Exception("Did not receive expected price values");
                     }
@@ -134,10 +134,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Sortino Ratio", "79228162514264337593543950335"},
             {"Return Over Maximum Drawdown", "79228162514264337593543950335"},
             {"Portfolio Turnover", "0"},
-            {"Total Insights Generated", "1"},
+            {"Total Insights Generated", "0"},
             {"Total Insights Closed", "0"},
             {"Total Insights Analysis Completed", "0"},
-            {"Long Insight Count", "1"},
+            {"Long Insight Count", "0"},
             {"Short Insight Count", "0"},
             {"Long/Short Ratio", "100%"},
             {"Estimated Monthly Alpha Value", "$0"},
@@ -146,7 +146,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Direction", "0%"},
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"}
+            {"Rolling Averaged Population Magnitude", "0%"},
+            {"OrderListHash", "1221624625"}
         };
     }
 }

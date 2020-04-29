@@ -17,10 +17,8 @@ using System;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using QuantConnect.Configuration;
-using QuantConnect.Interfaces;
-using QuantConnect.Util;
 using QuantConnect.Brokerages;
+using QuantConnect.Securities;
 
 namespace QuantConnect.Orders
 {
@@ -29,10 +27,6 @@ namespace QuantConnect.Orders
     /// </summary>
     public class OrderJsonConverter : JsonConverter
     {
-        private static readonly Lazy<IMapFileProvider> MapFileProvider = new Lazy<IMapFileProvider>(() =>
-            Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Config.Get("map-file-provider", "LocalDiskMapFileProvider"))
-            );
-
         /// <summary>
         /// Gets a value indicating whether this <see cref="T:Newtonsoft.Json.JsonConverter"/> can write JSON.
         /// </summary>
@@ -96,9 +90,24 @@ namespace QuantConnect.Orders
             order.Id = jObject["Id"].Value<int>();
             order.Status = (OrderStatus) jObject["Status"].Value<int>();
             order.Time = jObject["Time"].Value<DateTime>();
+
+            var orderSubmissionData = jObject["OrderSubmissionData"];
+            if (orderSubmissionData != null && orderSubmissionData.Type != JTokenType.Null)
+            {
+                var bidPrice = orderSubmissionData["BidPrice"].Value<decimal>();
+                var askPrice = orderSubmissionData["AskPrice"].Value<decimal>();
+                var lastPrice = orderSubmissionData["LastPrice"].Value<decimal>();
+                order.OrderSubmissionData = new OrderSubmissionData(bidPrice, askPrice, lastPrice);
+            }
+
             var lastFillTime = jObject["LastFillTime"];
             var lastUpdateTime = jObject["LastUpdateTime"];
+            var canceledTime = jObject["CanceledTime"];
 
+            if (canceledTime != null && canceledTime.Type != JTokenType.Null)
+            {
+                order.CanceledTime = canceledTime.Value<DateTime>();
+            }
             if (lastFillTime != null && lastFillTime.Type != JTokenType.Null)
             {
                 order.LastFillTime = lastFillTime.Value<DateTime>();
@@ -107,32 +116,40 @@ namespace QuantConnect.Orders
             {
                 order.LastUpdateTime = lastUpdateTime.Value<DateTime>();
             }
-            order.Tag = jObject["Tag"].Value<string>();
+            var tag = jObject["Tag"];
+            if (tag != null && tag.Type != JTokenType.Null)
+            {
+                order.Tag = tag.Value<string>();
+            }
+            else
+            {
+                order.Tag = "";
+            }
 
             order.Quantity = jObject["Quantity"].Value<decimal>();
 
             order.Price = jObject["Price"].Value<decimal>();
+            var priceCurrency = jObject["PriceCurrency"];
+            if (priceCurrency != null && priceCurrency.Type != JTokenType.Null)
+            {
+                order.PriceCurrency = priceCurrency.Value<string>();
+            }
             var securityType = (SecurityType) jObject["SecurityType"].Value<int>();
             order.BrokerId = jObject["BrokerId"].Select(x => x.Value<string>()).ToList();
             order.ContingentId = jObject["ContingentId"].Value<int>();
 
-            var timeInForce = jObject["TimeInForce"] ?? jObject["Duration"];
+            var timeInForce = jObject["Properties"]?["TimeInForce"] ?? jObject["TimeInForce"] ?? jObject["Duration"];
             order.Properties.TimeInForce = timeInForce != null
                 ? CreateTimeInForce(timeInForce, jObject)
                 : TimeInForce.GoodTilCanceled;
 
-            string market = Market.USA;
+            string market = null;
 
             //does data have market?
             var suppliedMarket = jObject.SelectTokens("Symbol.ID.Market");
             if (suppliedMarket.Any())
             {
                 market = suppliedMarket.Single().Value<string>();
-            }
-            else
-            {
-                //no data, use default
-                new DefaultBrokerageModel().DefaultMarkets.TryGetValue(securityType, out market);
             }
 
             if (jObject.SelectTokens("Symbol.ID").Any())
@@ -145,11 +162,21 @@ namespace QuantConnect.Orders
             {
                 // provide for backwards compatibility
                 var ticker = jObject.SelectTokens("Symbol.Value").Single().Value<string>();
+
+                if (market == null && !SymbolPropertiesDatabase.FromDataFolder().TryGetMarket(ticker, securityType, out market))
+                {
+                    market = DefaultBrokerageModel.DefaultMarketMap[securityType];
+                }
                 order.Symbol = Symbol.Create(ticker, securityType, market);
             }
             else
             {
                 var tickerstring = jObject["Symbol"].Value<string>();
+
+                if (market == null && !SymbolPropertiesDatabase.FromDataFolder().TryGetMarket(tickerstring, securityType, out market))
+                {
+                    market = DefaultBrokerageModel.DefaultMarketMap[securityType];
+                }
                 order.Symbol = Symbol.Create(tickerstring, securityType, market);
             }
 

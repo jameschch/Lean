@@ -14,6 +14,7 @@
 */
 
 using System;
+using System.IO;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using QuantConnect.Configuration;
@@ -24,6 +25,18 @@ namespace QuantConnect.Tests.Configuration
     [TestFixture]
     public class ConfigTests
     {
+        [OneTimeSetUp]
+        public void SetUp()
+        {
+            Config.Reset();
+        }
+
+        [OneTimeTearDown]
+        public void TearDown()
+        {
+            Config.Reset();
+        }
+
         [Test]
         public void SetRespectsEnvironment()
         {
@@ -36,6 +49,24 @@ namespace QuantConnect.Tests.Configuration
             Assert.AreNotEqual(betaMode, betaMode2);
         }
 
+        [Test]
+        public void ChangeConfigurationFileNameWrites()
+        {
+            // we need to load the current config, since it's lazy we get the current env to load it up
+            var env = Config.GetEnvironment();
+            var tempFile = Path.GetTempFileName();
+            Config.SetConfigurationFile(tempFile);
+            Config.Write();
+            Assert.True(File.Exists(tempFile));
+            Assert.True(File.ReadAllText(tempFile).Length > 0);
+            File.Delete(tempFile);
+
+            var defaultFile = "config.json";
+            Config.SetConfigurationFile(defaultFile);
+            Assert.True(File.Exists(defaultFile));
+            Assert.True(File.ReadAllText(defaultFile).Length > 0);
+        }
+        
         [Test]
         public void FlattenTest()
         {

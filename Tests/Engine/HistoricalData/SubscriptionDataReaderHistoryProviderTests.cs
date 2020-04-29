@@ -23,6 +23,7 @@ using QuantConnect.Data.Market;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.HistoricalData;
 using QuantConnect.Securities;
+using QuantConnect.Util;
 using HistoryRequest = QuantConnect.Data.HistoryRequest;
 
 namespace QuantConnect.Tests.Engine.HistoricalData
@@ -34,11 +35,12 @@ namespace QuantConnect.Tests.Engine.HistoricalData
         public void OptionsAreMappedCorrectly()
         {
             var historyProvider = new SubscriptionDataReaderHistoryProvider();
+            var zipCache = new ZipDataCacheProvider(new DefaultDataProvider());
             historyProvider.Initialize(new HistoryProviderInitializeParameters(
                 null,
                 null,
                 new DefaultDataProvider(),
-                new ZipDataCacheProvider(new DefaultDataProvider()), 
+                zipCache,
                 new LocalDiskMapFileProvider(),
                 new LocalDiskFactorFileProvider(),
                 null,
@@ -79,17 +81,19 @@ namespace QuantConnect.Tests.Engine.HistoricalData
             Assert.AreEqual(28, firstBar.Time.Date.Day);
             Assert.IsTrue(lastBar.Symbol.Value.Contains("FOXA"));
             Assert.AreEqual(2, lastBar.Time.Date.Day);
+            zipCache.DisposeSafely();
         }
 
         [Test]
         public void EquitiesAreMappedCorrectly()
         {
             var historyProvider = new SubscriptionDataReaderHistoryProvider();
+            var zipCache = new ZipDataCacheProvider(new DefaultDataProvider());
             historyProvider.Initialize(new HistoryProviderInitializeParameters(
                 null,
                 null,
                 new DefaultDataProvider(),
-                new ZipDataCacheProvider(new DefaultDataProvider()),
+                zipCache,
                 new LocalDiskMapFileProvider(),
                 new LocalDiskFactorFileProvider(),
                 null,
@@ -99,8 +103,8 @@ namespace QuantConnect.Tests.Engine.HistoricalData
             var result = historyProvider.GetHistory(
                 new[]
                 {
-                    new HistoryRequest(new DateTime(2000, 01,01),
-                        new DateTime(2000, 01,05),
+                    new HistoryRequest(new DateTime(2008, 01,01),
+                        new DateTime(2008, 01,05),
                         typeof(TradeBar),
                         symbol,
                         Resolution.Daily,
@@ -115,8 +119,9 @@ namespace QuantConnect.Tests.Engine.HistoricalData
                 TimeZones.NewYork).ToList();
 
             var firstBar = result.First().Values.Single();
-            Assert.IsTrue(firstBar.Symbol.Value.Contains("WMI"));
+            Assert.AreEqual("WMI", firstBar.Symbol.Value);
             Assert.IsNotEmpty(result);
+            zipCache.DisposeSafely();
         }
     }
 }

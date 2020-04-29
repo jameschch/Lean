@@ -34,6 +34,8 @@
 
 # QC Cloud Setup Bash Files
 *.sh
+# Include docker build scripts for Mac/Linux
+!run_docker.sh
 
 # QC Config Files:
 # config.json
@@ -165,6 +167,9 @@ AutoTest.Net/
 
 # Installshield output folder
 [Ee]xpress/
+
+# JetBrains Rider
+.idea/
 
 # DocProject is a documentation generator add-in
 DocProject/buildhelp/

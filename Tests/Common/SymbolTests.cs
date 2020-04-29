@@ -34,13 +34,13 @@ namespace QuantConnect.Tests.Common
         };
 
         [Theory]
-        [TestCaseSource("GetSymbolCreateTestCaseData")]
+        [TestCaseSource(nameof(GetSymbolCreateTestCaseData))]
         public void SymbolCreate(string ticker, SecurityType securityType, string market, Symbol expected)
         {
             Assert.AreEqual(Symbol.Create(ticker, securityType, market), expected);
         }
 
-        private TestCaseData[] GetSymbolCreateTestCaseData()
+        private static TestCaseData[] GetSymbolCreateTestCaseData()
         {
             return new []
             {
@@ -422,8 +422,14 @@ namespace QuantConnect.Tests.Common
             string stringEurusd = eurusd;
             Assert.AreEqual(eurusd.ID.ToString(), stringEurusd);
 
-            Symbol notASymbol = "this will not resolve to a proper Symbol instance";
-            Assert.AreEqual(Symbol.Empty, notASymbol);
+            Assert.Throws<ArgumentException>(() =>
+            {
+                Symbol symbol = "this will not resolve to a proper Symbol instance";
+            });
+
+            Symbol notASymbol = "NotASymbol";
+            Assert.AreNotEqual(Symbol.Empty, notASymbol);
+            Assert.IsTrue(notASymbol.ToString().Contains("NotASymbol"));
 #pragma warning restore 0618
         }
 
@@ -495,8 +501,8 @@ namespace QuantConnect.Tests.Common
             var symbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, OptionRight.Call, 200, new DateTime(2012, 09, 22));
             var weeklySymbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, OptionRight.Call, 200, new DateTime(2012, 09, 07));
 
-            Assert.True(OptionSymbol.IsStandardContract(symbol));
-            Assert.False(OptionSymbol.IsStandardContract(weeklySymbol));
+            Assert.True(OptionSymbol.IsStandard(symbol));
+            Assert.False(OptionSymbol.IsStandard(weeklySymbol));
 
             Assert.AreEqual(new DateTime(2012, 09, 21)/*Friday*/, OptionSymbol.GetLastDayOfTrading(symbol));
             Assert.AreEqual(new DateTime(2012, 09, 07)/*Friday*/, OptionSymbol.GetLastDayOfTrading(weeklySymbol));
@@ -508,11 +514,25 @@ namespace QuantConnect.Tests.Common
             var symbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, OptionRight.Call, 200, new DateTime(2016, 02, 19));
             var weeklySymbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, OptionRight.Call, 200, new DateTime(2016, 02, 05));
 
-            Assert.True(OptionSymbol.IsStandardContract(symbol));
-            Assert.False(OptionSymbol.IsStandardContract(weeklySymbol));
+            Assert.True(OptionSymbol.IsStandard(symbol));
+            Assert.False(OptionSymbol.IsStandard(weeklySymbol));
 
             Assert.AreEqual(new DateTime(2016, 02, 19)/*Friday*/, OptionSymbol.GetLastDayOfTrading(symbol));
             Assert.AreEqual(new DateTime(2016, 02, 05)/*Friday*/, OptionSymbol.GetLastDayOfTrading(weeklySymbol));
+        }
+
+        [Test]
+        public void TestIfWeDetectCorrectlyWeeklies()
+        {
+            var weeklySymbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, OptionRight.Call, 200, new DateTime(2020, 04, 10));
+            var monthlysymbol = Symbol.CreateOption("SPY", Market.USA, OptionStyle.American, OptionRight.Call, 200, new DateTime(2020, 04, 17));
+
+            Assert.True(OptionSymbol.IsWeekly(weeklySymbol));
+            Assert.False(OptionSymbol.IsWeekly(monthlysymbol));
+
+            Assert.AreEqual(new DateTime(2020, 04, 17)/*Friday*/, OptionSymbol.GetLastDayOfTrading(monthlysymbol));
+            //Good Friday on 10th so should be 9th
+            Assert.AreEqual(new DateTime(2020, 04, 09)/*Thursday*/, OptionSymbol.GetLastDayOfTrading(weeklySymbol));
         }
 
         [Test]

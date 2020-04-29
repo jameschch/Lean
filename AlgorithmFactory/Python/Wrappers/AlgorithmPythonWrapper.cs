@@ -559,7 +559,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
             {
                 using (Py.GIL())
                 {
-                    _onData(SubscriptionManager.HasCustomData ? new PythonSlice(slice) : slice);
+                    _onData(new PythonSlice(slice));
                 }
             }
         }
@@ -570,10 +570,7 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// <param name="slice">The current data slice</param>
         public void OnFrameworkData(Slice slice)
         {
-            using (Py.GIL())
-            {
-                _algorithm.OnFrameworkData(SubscriptionManager.HasCustomData ? new PythonSlice(slice) : slice);
-            }
+            _baseAlgorithm.OnFrameworkData(slice);
         }
 
         /// <summary>
@@ -904,7 +901,17 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// Returns a <see cref = "string"/> that represents the current <see cref = "AlgorithmPythonWrapper"/> object.
         /// </summary>
         /// <returns></returns>
-        public override string ToString() => _algorithm == null ? base.ToString() : _algorithm.Repr();
+        public override string ToString()
+        {
+            if (_algorithm == null)
+            {
+                return base.ToString();
+            }
+            using (Py.GIL())
+            {
+                return _algorithm.Repr();
+            }
+        }
 
         /// <summary>
         /// Sets the current slice
@@ -923,13 +930,5 @@ namespace QuantConnect.AlgorithmFactory.Python.Wrappers
         /// </summary>
         /// <param name="objectStore">The object store</param>
         public void SetObjectStore(IObjectStore objectStore) => _baseAlgorithm.SetObjectStore(objectStore);
-
-        /// <summary>
-        /// Sets the order event provider
-        /// </summary>
-        /// <param name="newOrderEvent">The order event provider</param>
-        /// <remarks>Will be called before the <see cref="SecurityPortfolioManager"/></remarks>
-        public void SetOrderEventProvider(IOrderEventProvider newOrderEvent)
-            => _baseAlgorithm.SetOrderEventProvider(newOrderEvent);
     }
 }

@@ -20,7 +20,6 @@ using QuantConnect.Data.Market;
 using QuantConnect.Python;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Securities;
-using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.Orders.Fills
 {
@@ -35,7 +34,9 @@ namespace QuantConnect.Orders.Fills
         protected FillModelParameters Parameters { get; set; }
 
         /// <summary>
-        /// This is required due to a limitation in PythonNet to resolved overriden methods
+        /// This is required due to a limitation in PythonNet to resolved overriden methods.
+        /// When Python calls a C# method that calls a method that's overriden in python it won't
+        /// run the python implementation unless the call is performed through python too.
         /// </summary>
         protected FillModelPythonWrapper PythonWrapper;
 
@@ -121,7 +122,7 @@ namespace QuantConnect.Orders.Fills
             // if the order is filled on stale (fill-forward) data, set a warning message on the order event
             if (pricesEndTimeUtc.Add(Parameters.StalePriceTimeSpan) < order.Time)
             {
-                fill.Message = $"Warning: fill at stale price ({prices.EndTime} {asset.Exchange.TimeZone})";
+                fill.Message = $"Warning: fill at stale price ({prices.EndTime.ToStringInvariant()} {asset.Exchange.TimeZone})";
             }
 
             //Order [fill]price for a market order model is the current security price

@@ -41,7 +41,7 @@ namespace QuantConnect.Brokerages.Alpaca
         {
             CheckRateLimiting();
 
-            var task = _restClient.GetLastQuoteAsync(instrument);
+            var task = _polygonDataClient.GetLastQuoteAsync(instrument);
             var response = task.SynchronouslyAwaitTaskResult();
 
             return new Tick
@@ -95,8 +95,11 @@ namespace QuantConnect.Brokerages.Alpaca
             }
 
             CheckRateLimiting();
-            var task = _restClient.PostOrderAsync(order.Symbol.Value, quantity, side, type, timeInForce,
-                limitPrice, stopPrice);
+            var task = _alpacaTradingClient.PostOrderAsync(new NewOrderRequest(order.Symbol.Value, quantity, side, type, timeInForce)
+            {
+                LimitPrice = limitPrice,
+                StopPrice = stopPrice
+            });
 
             var apOrder = task.SynchronouslyAwaitTaskResult();
 
@@ -109,7 +112,7 @@ namespace QuantConnect.Brokerages.Alpaca
         /// <param name="trade">The event object</param>
         private void OnTradeUpdate(ITradeUpdate trade)
         {
-            Log.Trace($"AlpacaBrokerage.OnTradeUpdate(): Event:{trade.Event} OrderId:{trade.Order.OrderId} OrderStatus:{trade.Order.OrderStatus} FillQuantity: {trade.Order.FilledQuantity} Price: {trade.Price}");
+            Log.Trace($"AlpacaBrokerage.OnTradeUpdate(): Event:{trade.Event} OrderId:{trade.Order.OrderId} Symbol:{trade.Order.Symbol} OrderStatus:{trade.Order.OrderStatus} FillQuantity:{trade.Order.FilledQuantity} FillPrice:{trade.Price} Quantity:{trade.Order.Quantity} LimitPrice:{trade.Order.LimitPrice} StopPrice:{trade.Order.StopPrice}");
 
             Order order;
             OrderTicket ticket = null;
@@ -162,9 +165,9 @@ namespace QuantConnect.Brokerages.Alpaca
             }
         }
 
-        private static void OnNatsClientError(string error)
+        private static void OnPolygonStreamingClientError(Exception exception)
         {
-            Log.Error($"NatsClient error: {error}");
+            Log.Error(exception, $"PolygonStreamingClient error");
         }
 
         private static void OnSockClientError(Exception exception)
@@ -198,9 +201,14 @@ namespace QuantConnect.Brokerages.Alpaca
             {
                 CheckRateLimiting();
 
-                var task = resolution == Resolution.Daily
-                    ? _restClient.ListDayAggregatesAsync(symbol.Value, startTime, endTime)
-                    : _restClient.ListMinuteAggregatesAsync(symbol.Value, startTime, endTime);
+                var task = _polygonDataClient.ListAggregatesAsync(
+                    new AggregatesRequest(
+                        symbol.Value,
+                        new AggregationPeriod(
+                            1,
+                            resolution == Resolution.Daily ? AggregationPeriodUnit.Day : AggregationPeriodUnit.Minute
+                        )
+                    ).SetInclusiveTimeInterval(startTime, endTime));
 
                 var time = startTime;
                 var items = task.SynchronouslyAwaitTaskResult()
@@ -271,19 +279,18 @@ namespace QuantConnect.Brokerages.Alpaca
         {
             var startTime = startTimeUtc;
 
-            var offset = 0L;
             while (startTime < endTimeUtc)
             {
                 CheckRateLimiting();
 
                 var date = startTime.ConvertFromUtc(requestedTimeZone).Date;
 
-                var task = _restClient.ListHistoricalTradesAsync(symbol.Value, date, offset);
+                var task = _polygonDataClient.ListHistoricalTradesAsync(new HistoricalRequest(symbol.Value, date));
 
                 var time = startTime;
                 var items = task.SynchronouslyAwaitTaskResult()
                     .Items
-                    .Where(x => DateTimeHelper.FromUnixTimeMilliseconds(x.TimeOffset) >= time)
+                    .Where(x => x.Timestamp >= time)
                     .ToList();
 
                 if (!items.Any())
@@ -296,15 +303,14 @@ namespace QuantConnect.Brokerages.Alpaca
                     yield return new Tick
                     {
                         TickType = TickType.Trade,
-                        Time = DateTimeHelper.FromUnixTimeMilliseconds(item.TimeOffset).ConvertFromUtc(requestedTimeZone),
+                        Time = item.Timestamp.ConvertFromUtc(requestedTimeZone),
                         Symbol = symbol,
                         Value = item.Price,
                         Quantity = item.Size
                     };
                 }
 
-                offset = items.Last().TimeOffset;
-                startTime = DateTimeHelper.FromUnixTimeMilliseconds(offset);
+                startTime = items.Last().Timestamp;
             }
         }
 

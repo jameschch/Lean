@@ -106,6 +106,8 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
         private readonly ManualResetEvent _accountHoldingsResetEvent = new ManualResetEvent(false);
         private Exception _accountHoldingsLastException;
 
+        // tracks requested order updates, so we can flag Submitted order events as updates
+        private readonly ConcurrentDictionary<int, int> _orderUpdates = new ConcurrentDictionary<int, int>();
         // tracks executions before commission reports, map: execId -> execution
         private readonly ConcurrentDictionary<string, Execution> _orderExecutions = new ConcurrentDictionary<string, Execution>();
         // tracks commission reports before executions, map: execId -> commission report
@@ -132,6 +134,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             { Market.ICE, "NYBOT" },
             { Market.CBOE, "CFE" }
         };
+        private SymbolPropertiesDatabase _symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
 
         // exchange time zones by symbol
         private readonly Dictionary<Symbol, DateTimeZone> _symbolExchangeTimeZones = new Dictionary<Symbol, DateTimeZone>();
@@ -375,11 +378,13 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             try
             {
                 Log.Trace("InteractiveBrokersBrokerage.UpdateOrder(): Symbol: " + order.Symbol.Value + " Quantity: " + order.Quantity + " Status: " + order.Status);
-
+                _orderUpdates[order.Id] = order.Id;
                 IBPlaceOrder(order, false);
             }
             catch (Exception err)
             {
+                int id;
+                _orderUpdates.TryRemove(order.Id, out id);
                 Log.Error("InteractiveBrokersBrokerage.UpdateOrder(): " + err);
                 return false;
             }
@@ -997,7 +1002,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             ContractDetails details;
             if (_contractDetails.TryGetValue(GetUniqueKey(contract), out details))
             {
-                return details.Summary.PrimaryExch;
+                return details.Contract.PrimaryExch;
             }
 
             details = GetContractDetails(contract, symbol);
@@ -1007,7 +1012,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 return null;
             }
 
-            return details.Summary.PrimaryExch;
+            return details.Contract.PrimaryExch;
         }
 
         private string GetTradingClass(Contract contract, Symbol symbol)
@@ -1015,7 +1020,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             ContractDetails details;
             if (_contractDetails.TryGetValue(GetUniqueKey(contract), out details))
             {
-                return details.Summary.TradingClass;
+                return details.Contract.TradingClass;
             }
 
             details = GetContractDetails(contract, symbol);
@@ -1025,7 +1030,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 return null;
             }
 
-            return details.Summary.TradingClass;
+            return details.Contract.TradingClass;
         }
 
         private decimal GetMinTick(Contract contract, Symbol symbol)
@@ -1106,7 +1111,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
             // sorting list of available contracts by exchange priority, taking the top 1
             return contractDetails
-                    .Select(details => details.Summary.Exchange)
+                    .Select(details => details.Contract.Exchange)
                     .OrderByDescending(e => Array.IndexOf(exchanges, e))
                     .FirstOrDefault();
         }
@@ -1188,6 +1193,12 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             if (_requestInformation.TryGetValue(requestId, out requestMessage))
             {
                 errorMsg += ". Origin: " + requestMessage;
+            }
+
+            // historical data request with no data returned
+            if (errorCode == 162 && errorMsg.Contains("HMDS query returned no data"))
+            {
+                return;
             }
 
             Log.Trace($"InteractiveBrokersBrokerage.HandleError(): RequestId: {requestId} ErrorCode: {errorCode} - {errorMsg}");
@@ -1412,15 +1423,19 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                     return;
                 }
 
+                int id;
+                // if we get a Submitted status and we had placed an order update, this new event is flagged as an update
+                var isUpdate = status == OrderStatus.Submitted && _orderUpdates.TryRemove(order.Id, out id);
+
                 // IB likes to duplicate/triplicate some events, so we fire non-fill events only if status changed
-                if (status != order.Status)
+                if (status != order.Status || isUpdate)
                 {
                     if (order.Status.IsClosed())
                     {
                         // if the order is already in a closed state, we ignore the event
                         Log.Trace("InteractiveBrokersBrokerage.HandleOrderStatusUpdates(): ignoring update in closed state - order.Status: " + order.Status + ", status: " + status);
                     }
-                    else if (order.Status == OrderStatus.PartiallyFilled && (status == OrderStatus.New || status == OrderStatus.Submitted))
+                    else if (order.Status == OrderStatus.PartiallyFilled && (status == OrderStatus.New || status == OrderStatus.Submitted) && !isUpdate)
                     {
                         // if we receive a New or Submitted event when already partially filled, we ignore it
                         Log.Trace("InteractiveBrokersBrokerage.HandleOrderStatusUpdates(): ignoring status " + status + " after partial fills");
@@ -1430,7 +1445,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                         // fire the event
                         OnOrderEvent(new OrderEvent(order, DateTime.UtcNow, OrderFee.Zero, "Interactive Brokers Order Event")
                         {
-                            Status = status
+                            Status = isUpdate ? OrderStatus.UpdateSubmitted : status
                         });
                     }
                 }
@@ -1860,23 +1875,14 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
             if (symbol.ID.SecurityType == SecurityType.Future)
             {
-                // if Market.USA is specified we automatically find exchange from the prioritized list
-                // Otherwise we convert Market.* markets into IB exchanges if we have them in our map
+                // we convert Market.* markets into IB exchanges if we have them in our map
 
                 contract.Symbol = ibSymbol;
                 contract.LastTradeDateOrContractMonth = symbol.ID.Date.ToStringInvariant(DateFormat.EightCharacter);
 
-                if (symbol.ID.Market == Market.USA)
-                {
-                    contract.Exchange = "";
-                    contract.Exchange = GetFuturesContractExchange(contract, symbol.Value);
-                }
-                else
-                {
-                    contract.Exchange = _futuresExchanges.ContainsKey(symbol.ID.Market) ?
-                                            _futuresExchanges[symbol.ID.Market] :
-                                            symbol.ID.Market;
-                }
+                contract.Exchange = _futuresExchanges.ContainsKey(symbol.ID.Market) ?
+                                        _futuresExchanges[symbol.ID.Market] :
+                                        symbol.ID.Market;
             }
 
             return contract;
@@ -2223,6 +2229,13 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
 
             if (securityType == SecurityType.Future)
             {
+                var leanSymbol = _symbolMapper.GetLeanRootSymbol(ibSymbol);
+                var defaultMarket = market;
+                if (!_symbolPropertiesDatabase.TryGetMarket(leanSymbol, securityType, out market))
+                {
+                    market = defaultMarket;
+                }
+
                 var contractDate = DateTime.ParseExact(contract.LastTradeDateOrContractMonth, DateFormat.EightCharacter, CultureInfo.InvariantCulture);
 
                 return _symbolMapper.GetLeanSymbol(ibSymbol, securityType, market, contractDate);
@@ -2825,7 +2838,7 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
                 // filtering results
                 var filteredResults =
                     results
-                        .Select(x => x.Summary)
+                        .Select(x => x.Contract)
                         .GroupBy(x => x.Exchange)
                         .OrderByDescending(g => exchangeFilter(g.Key))
                         .FirstOrDefault();
@@ -3204,4 +3217,5 @@ namespace QuantConnect.Brokerages.InteractiveBrokers
             105, 106, 107, 109, 110, 111, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 129, 131, 132, 133, 134, 135, 136, 137, 140, 141, 146, 147, 148, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 163, 167, 168, 201, 313,314,315,325,328,329,334,335,336,337,338,339,340,341,342,343,345,347,348,349,350,352,353,355,356,358,359,360,361,362,363,364,367,368,369,370,371,372,373,374,375,376,377,378,379,380,382,383,387,388,389,390,391,392,393,394,395,396,397,398,400,401,402,403,405,406,407,408,409,410,411,412,413,417,418,419,421,423,424,427,428,429,433,434,435,436,437,439,440,441,442,443,444,445,446,447,448,449,10002,10006,10007,10008,10009,10010,10011,10012,10014,10020,2102
         };
     }
+
 }

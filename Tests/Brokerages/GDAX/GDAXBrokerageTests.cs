@@ -27,10 +27,13 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using QuantConnect.Brokerages.GDAX.Messages;
+using QuantConnect.Util;
+using Order = QuantConnect.Orders.Order;
 
 namespace QuantConnect.Tests.Brokerages.GDAX
 {
-    [TestFixture]
+    [TestFixture, Parallelizable(ParallelScope.Fixtures)]
     public class GDAXBrokerageTests
     {
         #region Declarations
@@ -134,10 +137,13 @@ namespace QuantConnect.Tests.Brokerages.GDAX
         {
             string json = _matchData;
             string id = "132fb6ae-456b-4654-b4e0-d681ac05cea1";
+
             //not our order
             if (expectedQuantity == 99)
             {
-                json = json.Replace(id, Guid.NewGuid().ToString());
+                var message = JsonConvert.DeserializeObject<Matched>(json);
+                message.UserId = null;
+                json = JsonConvert.SerializeObject(message);
             }
 
             decimal orderQuantity = 6.1m;
@@ -155,7 +161,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
                 actualQuantity += e.AbsoluteFillQuantity;
 
                 Assert.IsTrue(actualQuantity != orderQuantity);
-                Assert.AreEqual(OrderStatus.Filled, e.Status);
+                Assert.AreEqual(OrderStatus.PartiallyFilled, e.Status);
                 Assert.AreEqual(expectedQuantity, e.FillQuantity);
                 // fill quantity = 5.23512
                 // fill price = 400.23
@@ -167,11 +173,14 @@ namespace QuantConnect.Tests.Brokerages.GDAX
             _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
 
             // not our order, market order is completed even if not totally filled
-            json = json.Replace(id, Guid.NewGuid().ToString());
+            var msg = JsonConvert.DeserializeObject<Matched>(json);
+            msg.UserId = null;
+            json = JsonConvert.SerializeObject(msg);
             _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
 
             //if not our order should get no event
             Assert.AreEqual(raised.WaitOne(1000), expectedQuantity != 99);
+            raised.DisposeSafely();
         }
 
         [Test]
@@ -351,7 +360,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
             _unit.Unsubscribe(new List<Symbol> { Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX) });
             StringAssert.Contains("user", actual);
             StringAssert.Contains("heartbeat", actual);
-            StringAssert.Contains("matches", actual);
+            StringAssert.DoesNotContain("matches", actual);
         }
 
         [Test, Ignore("This test is obsolete, the 'ticker' channel is no longer used.")]
@@ -403,7 +412,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
             const string json = "{\"type\":\"error\",\"message\":\"Failed to subscribe\",\"reason\":\"Invalid product ID provided\"}";
             _unit.OnMessage(_unit, GDAXTestsHelpers.GetArgs(json));
 
-            Assert.AreEqual(BrokerageMessageType.Warning, messageType);
+            Assert.AreEqual(BrokerageMessageType.Error, messageType);
         }
     }
 }

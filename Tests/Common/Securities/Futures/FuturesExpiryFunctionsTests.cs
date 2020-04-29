@@ -21,10 +21,12 @@ using System.Linq;
 using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
+using QuantConnect.Brokerages;
+using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Common.Securities.Futures
 {
-    [TestFixture]
+    [TestFixture, Parallelizable(ParallelScope.Fixtures)]
     public class FuturesExpiryFunctionsTests
     {
         private IDictionary<String, List<Dates>> _data = new Dictionary<String, List<Dates>>();
@@ -48,8 +50,9 @@ namespace QuantConnect.Tests.Common.Securities.Futures
         private const string TwelveOclock = "12:00:00";
         private const string TwelveOne = "12:01:00";
         private const string FourPmLondonTime = "15:00:00";
+        private readonly SymbolPropertiesDatabase _symbolPropertiesDatabase = SymbolPropertiesDatabase.FromDataFolder();
 
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Init()
         {
             var path = Path.Combine("TestData", "FuturesExpiryFunctionsTestData.xml");
@@ -60,15 +63,15 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             }
         }
 
-        [TestCase]
+        [Test]
         public void FuturesExpiryFunction_MissingSymbol_ShouldThrowArgumentException()
         {
             const string badSymbol = "AAAAA";
-            Assert.Throws<ArgumentException>(() => { FuturesExpiryFunctions.FuturesExpiryFunction(badSymbol); },
+            Assert.Throws<ArgumentException>(() => { FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(badSymbol)); },
                                              $"Expiry function not implemented for {badSymbol} in FuturesExpiryFunctions.FuturesExpiryDictionary");
         }
 
-        [TestCase]
+        [Test]
         public void FuturesExpiryFunctions_AllFutures_ShouldHaveExpiryFunction()
         {
             var missingFutures = new List<string>();
@@ -82,7 +85,7 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             {
                 try
                 {
-                    FuturesExpiryFunctions.FuturesExpiryFunction(futuresSymbol);
+                    FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(futuresSymbol));
                 }
                 catch (ArgumentException)
                 {
@@ -110,11 +113,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade;
 
                 //Assert
@@ -151,11 +154,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -240,11 +243,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -258,17 +261,19 @@ namespace QuantConnect.Tests.Common.Securities.Futures
         [TestCase(QuantConnect.Securities.Futures.Financials.Y5TreasuryNote, TwelveOne)]
         [TestCase(QuantConnect.Securities.Futures.Financials.Y2TreasuryNote, TwelveOne)]
         [TestCase(QuantConnect.Securities.Futures.Financials.FiveYearUSDMACSwap, TwoPMCentralTime)]
+        [TestCase(QuantConnect.Securities.Futures.Financials.UltraUSTreasuryBond, TwelveOne)]
+        [TestCase(QuantConnect.Securities.Futures.Financials.UltraTenYearUSTreasuryNote, Zero)]
         public void FinancialsExpiryDateFunction_WithDifferentDates_ShouldFollowContract(string symbol, string dayTime)
         {
             Assert.IsTrue(_data.ContainsKey(symbol), "Symbol " + symbol + " not present in Test Data");
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -294,11 +299,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -315,11 +320,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -334,11 +339,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -360,11 +365,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 //Assert
@@ -384,11 +389,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 //Arrange
-                var security = Symbol.CreateFuture(symbol, Market.USA, date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 //Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade;
 
                 //Assert
@@ -408,11 +413,11 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             foreach (var date in _data[symbol])
             {
                 // Arrange
-                var security = Symbol.CreateFuture(symbol, "usa", date.ContractMonth);
-                var func = FuturesExpiryFunctions.FuturesExpiryFunction(security.ID.Symbol);
+                var futureSymbol = GetFutureSymbol(symbol, date.ContractMonth);
+                var func = FuturesExpiryFunctions.FuturesExpiryFunction(GetFutureSymbol(symbol));
 
                 // Act
-                var actual = func(security.ID.Date);
+                var actual = func(futureSymbol.ID.Date);
                 var expected = date.LastTrade + Parse.TimeSpan(dayTime);
 
                 // Assert
@@ -443,6 +448,21 @@ namespace QuantConnect.Tests.Common.Securities.Futures
             [XmlAttribute]
             public String Symbol;
             public List<Dates> SymbolDates;
+        }
+
+        private Symbol GetFutureSymbol(string symbol, DateTime? date =null)
+        {
+            string market;
+            if (!_symbolPropertiesDatabase.TryGetMarket(symbol, SecurityType.Future, out market))
+            {
+                market = DefaultBrokerageModel.DefaultMarketMap[SecurityType.Future];
+            }
+
+            if (date.HasValue)
+            {
+                return Symbol.CreateFuture(symbol, market, date.Value);
+            }
+            return Symbol.Create(symbol, SecurityType.Future, market);
         }
     }
 }

@@ -17,12 +17,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
+using NodaTime;
 using NUnit.Framework;
 using Python.Runtime;
+using QuantConnect.Algorithm.Framework.Alphas;
 using QuantConnect.Data.Market;
 using QuantConnect.Data.UniverseSelection;
 using QuantConnect.Indicators;
 using QuantConnect.Orders;
+using QuantConnect.Orders.Fees;
+using QuantConnect.Packets;
+using QuantConnect.Scheduling;
 using QuantConnect.Securities;
 
 namespace QuantConnect.Tests.Common.Util
@@ -30,6 +35,82 @@ namespace QuantConnect.Tests.Common.Util
     [TestFixture]
     public class ExtensionsTests
     {
+        [TestCase("A", "a")]
+        [TestCase("", "")]
+        [TestCase(null, null)]
+        [TestCase("Buy", "buy")]
+        [TestCase("BuyTheDip", "buyTheDip")]
+        public void ToCamelCase(string toConvert, string expected)
+        {
+            Assert.AreEqual(expected, toConvert.ToCamelCase());
+        }
+
+        [Test]
+        public void BatchAlphaResultPacket()
+        {
+            var btcusd = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX);
+            var insights = new List<Insight>
+            {
+                new Insight(DateTime.UtcNow, btcusd, Time.OneMillisecond, InsightType.Price, InsightDirection.Up, 1, 2, "sourceModel1"),
+                new Insight(DateTime.UtcNow, btcusd, Time.OneSecond, InsightType.Price, InsightDirection.Down, 1, 2, "sourceModel1")
+            };
+            var orderEvents = new List<OrderEvent>
+            {
+                new OrderEvent(1, btcusd, DateTime.UtcNow, OrderStatus.Submitted, OrderDirection.Buy, 0, 0, OrderFee.Zero, message: "OrderEvent1"),
+                new OrderEvent(1, btcusd, DateTime.UtcNow, OrderStatus.Filled, OrderDirection.Buy, 1, 1000, OrderFee.Zero, message: "OrderEvent2")
+            };
+            var orders = new List<Order> { new MarketOrder(btcusd, 1000, DateTime.UtcNow, "ExpensiveOrder") { Id = 1 } };
+
+            var packet1 = new AlphaResultPacket("1", 1, insights: insights);
+            var packet2 = new AlphaResultPacket("1", 1, orders: orders);
+            var packet3 = new AlphaResultPacket("1", 1, orderEvents: orderEvents);
+
+            var result = new List<AlphaResultPacket> { packet1, packet2, packet3 }.Batch();
+
+            Assert.AreEqual(2, result.Insights.Count);
+            Assert.AreEqual(2, result.OrderEvents.Count);
+            Assert.AreEqual(1, result.Orders.Count);
+
+            Assert.IsTrue(result.Insights.SequenceEqual(insights));
+            Assert.IsTrue(result.OrderEvents.SequenceEqual(orderEvents));
+            Assert.IsTrue(result.Orders.SequenceEqual(orders));
+
+            Assert.IsNull(new List<AlphaResultPacket>().Batch());
+        }
+
+        [Test]
+        public void BatchAlphaResultPacketDuplicateOrder()
+        {
+            var btcusd = Symbol.Create("BTCUSD", SecurityType.Crypto, Market.GDAX);
+            var orders = new List<Order>
+            {
+                new MarketOrder(btcusd, 1000, DateTime.UtcNow, "ExpensiveOrder") { Id = 1 },
+                new MarketOrder(btcusd, 100, DateTime.UtcNow, "ExpensiveOrder") { Id = 2 },
+                new MarketOrder(btcusd, 2000, DateTime.UtcNow, "ExpensiveOrder") { Id = 1 },
+                new MarketOrder(btcusd, 10, DateTime.UtcNow, "ExpensiveOrder") { Id = 3 },
+                new MarketOrder(btcusd, 3000, DateTime.UtcNow, "ExpensiveOrder") { Id = 1 }
+            };
+            var orders2 = new List<Order>
+            {
+                new MarketOrder(btcusd, 200, DateTime.UtcNow, "ExpensiveOrder") { Id = 2 },
+                new MarketOrder(btcusd, 20, DateTime.UtcNow, "ExpensiveOrder") { Id = 3 }
+            };
+
+            var packet1 = new AlphaResultPacket("1", 1, orders: orders);
+            var packet2 = new AlphaResultPacket("1", 1, orders: orders2);
+
+            var result = new List<AlphaResultPacket> { packet1, packet2 }.Batch();
+
+            // we expect just 1 order instance per order id
+            Assert.AreEqual(3, result.Orders.Count);
+            Assert.IsTrue(result.Orders.Any(order => order.Id == 1 && order.Quantity == 3000));
+            Assert.IsTrue(result.Orders.Any(order => order.Id == 2 && order.Quantity == 200));
+            Assert.IsTrue(result.Orders.Any(order => order.Id == 3 && order.Quantity == 20));
+
+            var expected = new List<Order> { orders[4], orders2[0], orders2[1] };
+            Assert.IsTrue(result.Orders.SequenceEqual(expected));
+        }
+
         [Test]
         public void SeriesIsNotEmpty()
         {
@@ -380,6 +461,41 @@ namespace QuantConnect.Tests.Common.Util
             const string input = "12345678900.12";
             var value = input.ToInt64();
             Assert.AreEqual(12345678900, value);
+        }
+
+        [Test]
+        public void ToCsvDataParsesCorrectly()
+        {
+            var csv = "\"hello\",\"world\"".ToCsvData();
+            Assert.AreEqual(2, csv.Count);
+            Assert.AreEqual("\"hello\"", csv[0]);
+            Assert.AreEqual("\"world\"", csv[1]);
+
+            var csv2 = "1,2,3,4".ToCsvData();
+            Assert.AreEqual(4, csv2.Count);
+            Assert.AreEqual("1", csv2[0]);
+            Assert.AreEqual("2", csv2[1]);
+            Assert.AreEqual("3", csv2[2]);
+            Assert.AreEqual("4", csv2[3]);
+        }
+
+        [Test]
+        public void ToCsvDataParsesEmptyFinalValue()
+        {
+            var line = "\"hello\",world,";
+            var csv = line.ToCsvData();
+
+            Assert.AreEqual(3, csv.Count);
+            Assert.AreEqual("\"hello\"", csv[0]);
+            Assert.AreEqual("hello", csv[0].Trim('"'));
+            Assert.AreEqual("world", csv[1]);
+            Assert.AreEqual(string.Empty, csv[2]);
+        }
+
+        [Test]
+        public void ToCsvDataParsesEmptyValue()
+        {
+            Assert.AreEqual(string.Empty, string.Empty.ToCsvData()[0]);
         }
 
         [Test]
@@ -983,6 +1099,23 @@ actualDictionary.update({'IBM': 5})
 
             value = decimal.MinValue + 1;
             Assert.DoesNotThrow(() => value.TruncateTo3DecimalPlaces());
+        }
+
+        [Test]
+        public void DateRulesToFunc()
+        {
+            var dateRules = new DateRules(new SecurityManager(
+                new TimeKeeper(new DateTime(2015, 1, 1), DateTimeZone.Utc)), DateTimeZone.Utc);
+            var first = new DateTime(2015, 1, 10);
+            var second = new DateTime(2015, 1, 30);
+            var dateRule = dateRules.On(first, second);
+            var func = dateRule.ToFunc();
+
+            Assert.AreEqual(first, func(new DateTime(2015, 1, 1)));
+            Assert.AreEqual(first, func(new DateTime(2015, 1, 5)));
+            Assert.AreEqual(second, func(first));
+            Assert.AreEqual(Time.EndOfTime, func(second));
+            Assert.AreEqual(Time.EndOfTime, func(second));
         }
 
         private PyObject ConvertToPyObject(object value)

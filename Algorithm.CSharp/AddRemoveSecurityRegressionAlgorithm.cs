@@ -74,8 +74,8 @@ namespace QuantConnect.Algorithm.CSharp
             }
             else if (Time.DayOfWeek == DayOfWeek.Thursday)
             {
-                RemoveSecurity(_bac);
                 RemoveSecurity(_aig);
+                RemoveSecurity(_bac);
                 lastAction = Time;
             }
         }
@@ -112,44 +112,45 @@ namespace QuantConnect.Algorithm.CSharp
         public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "5"},
-            {"Average Win", "0.49%"},
+            {"Average Win", "0.47%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "305.340%"},
+            {"Compounding Annual Return", "293.067%"},
             {"Drawdown", "1.400%"},
             {"Expectancy", "0"},
-            {"Net Profit", "1.805%"},
-            {"Sharpe Ratio", "7.192"},
-            {"Probabilistic Sharpe Ratio", "80.373%"},
+            {"Net Profit", "1.765%"},
+            {"Sharpe Ratio", "13.11"},
+            {"Probabilistic Sharpe Ratio", "80.231%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "100%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "0.389"},
-            {"Beta", "0.706"},
-            {"Annual Standard Deviation", "0.158"},
+            {"Alpha", "0.705"},
+            {"Beta", "0.7"},
+            {"Annual Standard Deviation", "0.157"},
             {"Annual Variance", "0.025"},
-            {"Information Ratio", "1.074"},
+            {"Information Ratio", "1.76"},
             {"Tracking Error", "0.072"},
-            {"Treynor Ratio", "1.613"},
-            {"Total Fees", "$26.40"},
+            {"Treynor Ratio", "2.933"},
+            {"Total Fees", "$26.39"},
             {"Fitness Score", "0.374"},
-            {"Kelly Criterion Estimate", "45.587"},
-            {"Kelly Criterion Probability Value", "0.468"},
+            {"Kelly Criterion Estimate", "0"},
+            {"Kelly Criterion Probability Value", "0"},
             {"Sortino Ratio", "79228162514264337593543950335"},
-            {"Return Over Maximum Drawdown", "403.932"},
+            {"Return Over Maximum Drawdown", "373.973"},
             {"Portfolio Turnover", "0.374"},
-            {"Total Insights Generated", "5"},
-            {"Total Insights Closed", "2"},
-            {"Total Insights Analysis Completed", "2"},
-            {"Long Insight Count", "3"},
+            {"Total Insights Generated", "0"},
+            {"Total Insights Closed", "0"},
+            {"Total Insights Analysis Completed", "0"},
+            {"Long Insight Count", "0"},
             {"Short Insight Count", "0"},
             {"Long/Short Ratio", "100%"},
-            {"Estimated Monthly Alpha Value", "$24522.5969"},
-            {"Total Accumulated Estimated Alpha Value", "$3950.8628"},
-            {"Mean Population Estimated Insight Value", "$1975.4314"},
-            {"Mean Population Direction", "100%"},
+            {"Estimated Monthly Alpha Value", "$0"},
+            {"Total Accumulated Estimated Alpha Value", "$0"},
+            {"Mean Population Estimated Insight Value", "$0"},
+            {"Mean Population Direction", "0%"},
             {"Mean Population Magnitude", "0%"},
-            {"Rolling Averaged Population Direction", "100%"},
-            {"Rolling Averaged Population Magnitude", "0%"}
+            {"Rolling Averaged Population Direction", "0%"},
+            {"Rolling Averaged Population Magnitude", "0%"},
+            {"OrderListHash", "1779055144"}
         };
     }
 }

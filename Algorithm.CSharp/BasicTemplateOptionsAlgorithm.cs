@@ -35,8 +35,7 @@ namespace QuantConnect.Algorithm.CSharp
     public class BasicTemplateOptionsAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
         private const string UnderlyingTicker = "GOOG";
-        public readonly Symbol Underlying = QuantConnect.Symbol.Create(UnderlyingTicker, SecurityType.Equity, Market.USA);
-        public readonly Symbol OptionSymbol = QuantConnect.Symbol.Create(UnderlyingTicker, SecurityType.Option, Market.USA);
+        public Symbol OptionSymbol;
 
         public override void Initialize()
         {
@@ -46,10 +45,14 @@ namespace QuantConnect.Algorithm.CSharp
 
             var equity = AddEquity(UnderlyingTicker);
             var option = AddOption(UnderlyingTicker);
+            OptionSymbol = option.Symbol;
 
             // set our strike/expiry filter for this option chain
             option.SetFilter(u => u.Strikes(-2, +2)
-                                   .Expiration(TimeSpan.Zero, TimeSpan.FromDays(180)));
+                                   // Expiration method accepts TimeSpan objects or integer for days.
+                                   // The following statements yield the same filtering criteria
+                                   .Expiration(0, 180));
+                                   // .Expiration(TimeSpan.Zero, TimeSpan.FromDays(180)));
 
             // use the underlying equity as the benchmark
             SetBenchmark(equity.Symbol);
@@ -134,10 +137,10 @@ namespace QuantConnect.Algorithm.CSharp
             {"Sortino Ratio", "0"},
             {"Return Over Maximum Drawdown", "0"},
             {"Portfolio Turnover", "0"},
-            {"Total Insights Generated", "2"},
-            {"Total Insights Closed", "1"},
-            {"Total Insights Analysis Completed", "1"},
-            {"Long Insight Count", "1"},
+            {"Total Insights Generated", "0"},
+            {"Total Insights Closed", "0"},
+            {"Total Insights Analysis Completed", "0"},
+            {"Long Insight Count", "0"},
             {"Short Insight Count", "0"},
             {"Long/Short Ratio", "100%"},
             {"Estimated Monthly Alpha Value", "$0"},
@@ -146,7 +149,8 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Direction", "0%"},
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
-            {"Rolling Averaged Population Magnitude", "0%"}
+            {"Rolling Averaged Population Magnitude", "0%"},
+            {"OrderListHash", "1130102123"}
         };
     }
 }
