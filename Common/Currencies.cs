@@ -128,9 +128,6 @@ namespace QuantConnect
             "USDHKD",
             "USDSGD",
 
-            "BTCUSD",
-            "LTCUSD",
-            "ETHUSD",
 
             "AUDCAD",
             "AUDCHF",

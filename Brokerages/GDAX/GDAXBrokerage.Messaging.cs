@@ -85,7 +85,6 @@ namespace QuantConnect.Brokerages.GDAX
             IPriceProvider priceProvider)
             : base(wssUrl, websocket, restClient, apiKey, apiSecret, Market.GDAX, "GDAX")
         {
-            throw new Exception("GDAX currently under maintenance and will be back online Monday 23rd October 2017");
             FillSplit = new ConcurrentDictionary<long, GDAXFill>();
             _passPhrase = passPhrase;
             _algorithm = algorithm;
@@ -177,7 +176,6 @@ namespace QuantConnect.Brokerages.GDAX
 
                 if (raw.Type == "heartbeat")
                 {
-                    Log.Trace("GDAXBrokerage.OnMessage.heartbeat()");
                     return;
                 }
                 else if (raw.Type == "snapshot")
