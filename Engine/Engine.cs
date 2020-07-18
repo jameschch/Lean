@@ -103,6 +103,7 @@ namespace QuantConnect.Lean.Engine
 
                 IBrokerage brokerage = null;
                 DataManager dataManager = null;
+                IDataCacheProvider historyDataCacheProvider = null;
                 var synchronizer = _liveMode ? new LiveSynchronizer() : new Synchronizer();
                 try
                 {
@@ -123,6 +124,9 @@ namespace QuantConnect.Lean.Engine
 
                     // initialize the object store
                     AlgorithmHandlers.ObjectStore.Initialize(algorithm.Name, job.UserId, job.ProjectId, job.UserToken, job.Controls);
+
+                    // initialize the data permission manager
+                    AlgorithmHandlers.DataPermissionsManager.Initialize(job);
 
                     // notify the user of any errors w/ object store persistence
                     AlgorithmHandlers.ObjectStore.ErrorRaised += (sender, args) => algorithm.Debug($"ObjectStore Persistence Error: {args.Error.Message}");
@@ -146,12 +150,14 @@ namespace QuantConnect.Lean.Engine
                     dataManager = new DataManager(AlgorithmHandlers.DataFeed,
                         new UniverseSelection(
                             algorithm,
-                            securityService),
+                            securityService,
+                            AlgorithmHandlers.DataPermissionsManager),
                         algorithm,
                         algorithm.TimeKeeper,
                         marketHoursDatabase,
                         _liveMode,
-                        registeredTypesProvider);
+                        registeredTypesProvider,
+                        AlgorithmHandlers.DataPermissionsManager);
 
                     AlgorithmHandlers.Results.SetDataManager(dataManager);
                     algorithm.SubscriptionManager.SetDataManager(dataManager);
@@ -167,7 +173,8 @@ namespace QuantConnect.Lean.Engine
                         AlgorithmHandlers.FactorFileProvider,
                         AlgorithmHandlers.DataProvider,
                         dataManager,
-                        (IDataFeedTimeProvider) synchronizer);
+                        (IDataFeedTimeProvider) synchronizer,
+                        AlgorithmHandlers.DataPermissionsManager.DataChannelProvider);
 
                     // set the order processor on the transaction manager (needs to be done before initializing BrokerageHistoryProvider)
                     algorithm.Transactions.SetOrderProcessor(AlgorithmHandlers.Transactions);
@@ -179,7 +186,7 @@ namespace QuantConnect.Lean.Engine
                         (historyProvider as BrokerageHistoryProvider).SetBrokerage(brokerage);
                     }
 
-                    var historyDataCacheProvider = new ZipDataCacheProvider(AlgorithmHandlers.DataProvider, isDataEphemeral:_liveMode);
+                    historyDataCacheProvider = new ZipDataCacheProvider(AlgorithmHandlers.DataProvider, isDataEphemeral:_liveMode);
                     historyProvider.Initialize(
                         new HistoryProviderInitializeParameters(
                             job,
@@ -198,7 +205,8 @@ namespace QuantConnect.Lean.Engine
                                 }
                             },
                             // disable parallel history requests for live trading
-                            parallelHistoryRequestsEnabled: !_liveMode
+                            parallelHistoryRequestsEnabled: !_liveMode,
+                            dataPermissionManager: AlgorithmHandlers.DataPermissionsManager
                         )
                     );
 
@@ -273,7 +281,7 @@ namespace QuantConnect.Lean.Engine
                     SystemHandlers.LeanManager.OnAlgorithmStart();
 
                     //-> Reset the backtest stopwatch; we're now running the algorithm.
-                    var startTime = DateTime.Now;
+                    var startTime = DateTime.UtcNow;
 
                     //Set algorithm as locked; set it to live mode if we're trading live, and set it to locked for no further updates.
                     algorithm.SetAlgorithmId(job.AlgorithmId);
@@ -371,7 +379,7 @@ namespace QuantConnect.Lean.Engine
                         if (!_liveMode)
                         {
                             //Diagnostics Completed, Send Result Packet:
-                            var totalSeconds = (DateTime.Now - startTime).TotalSeconds;
+                            var totalSeconds = (DateTime.UtcNow - startTime).TotalSeconds;
                             var dataPoints = algorithmManager.DataPoints + algorithm.HistoryProvider.DataPointCount;
                             var kps = dataPoints / (double) 1000 / totalSeconds;
                             AlgorithmHandlers.Results.DebugMessage($"Algorithm Id:({job.AlgorithmId}) completed in {totalSeconds:F2} seconds at {kps:F0}k data points per second. Processing total of {dataPoints:N0} data points.");
@@ -424,6 +432,8 @@ namespace QuantConnect.Lean.Engine
                     Log.Trace("Engine.Run(): Disposing of setup handler...");
                     AlgorithmHandlers.Setup.Dispose();
                 }
+
+                historyDataCacheProvider.DisposeSafely();
                 Log.Trace("Engine.Main(): Analysis Completed and Results Posted.");
             }
             catch (Exception err)

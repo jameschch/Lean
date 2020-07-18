@@ -15,7 +15,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>QuantConnect</RootNamespace>
     <AssemblyName>QuantConnect.Common</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>
@@ -107,13 +107,16 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="CloneExtensions, Version=1.3.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\CloneExtensions.1.3.0\lib\net45\CloneExtensions.dll</HintPath>
+      <HintPath>..\packages\CloneExtensions.1.3.0\lib\net461\CloneExtensions.dll</HintPath>
     </Reference>
     <Reference Include="DotNetZip, Version=1.13.3.0, Culture=neutral, PublicKeyToken=6583c7c814667745, processorArchitecture=MSIL">
       <HintPath>..\packages\DotNetZip.1.13.3\lib\net40\DotNetZip.dll</HintPath>
     </Reference>
     <Reference Include="Fasterflect">
       <HintPath>..\packages\fasterflect.2.1.3\lib\net40\Fasterflect.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=1.2.0.246, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <HintPath>..\packages\SharpZipLib.1.2.0\lib\net45\ICSharpCode.SharpZipLib.dll</HintPath>
     </Reference>
     <Reference Include="MathNet.Numerics, Version=3.19.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\MathNet.Numerics.3.19.0\lib\net40\MathNet.Numerics.dll</HintPath>
@@ -124,11 +127,8 @@
     <Reference Include="NodaTime, Version=1.3.0.0, Culture=neutral, PublicKeyToken=4226afe0d9b296d1, processorArchitecture=MSIL">
       <HintPath>..\packages\NodaTime.1.3.4\lib\net35-Client\NodaTime.dll</HintPath>
     </Reference>
-    <Reference Include="QLNet, Version=1.9.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\QLNet.1.9.2\lib\net45\QLNet.dll</HintPath>
-    </Reference>
-    <Reference Include="StringInterpolationBridge, Version=0.9.1.0, Culture=neutral, PublicKeyToken=761dcf67ba0bf74d, processorArchitecture=MSIL">
-      <HintPath>..\packages\StringInterpolationBridgeStrong.0.9.1\lib\net40\StringInterpolationBridge.dll</HintPath>
+    <Reference Include="QLNet, Version=1.11.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\QLNet.1.11.3\lib\net452\QLNet.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
@@ -257,6 +257,7 @@
     <Compile Include="Data\Custom\Benzinga\BenzingaNews.cs" />
     <Compile Include="Data\Custom\FxcmVolume.cs" />
     <Compile Include="Data\Custom\NullData.cs" />
+    <Compile Include="Data\Custom\Robintrack\RobintrackHoldings.cs" />
     <Compile Include="Data\Custom\SEC\ISECReport.cs" />
     <Compile Include="Data\Custom\SEC\SECReportBusinessAddress.cs" />
     <Compile Include="Data\Custom\SEC\SECReportCompanyData.cs" />
@@ -291,7 +292,6 @@
     <Compile Include="Data\Custom\Estimize\EstimizeConsensus.cs" />
     <Compile Include="Data\Custom\Estimize\EstimizeEstimate.cs" />
     <Compile Include="Data\Custom\Estimize\EstimizeRelease.cs" />
-    <Compile Include="Data\Custom\PsychSignal\PsychSignalSentiment.cs" />
     <Compile Include="Data\Custom\USEnergy\USEnergy.cs" />
     <Compile Include="Data\Custom\USEnergy\USEnergyAPI.cs" />
     <Compile Include="Data\Custom\USEnergy\USEnergy.Category.cs" />
@@ -305,6 +305,7 @@
     <Compile Include="Data\Custom\SmartInsider\SmartInsiderIntention.cs" />
     <Compile Include="Data\Custom\SmartInsider\SmartInsiderTransaction.cs" />
     <Compile Include="Data\IndexedBasedData.cs" />
+    <Compile Include="Data\UniverseSelection\UniversePythonWrapper.cs" />
     <Compile Include="ExtendedDictionary.cs" />
     <Compile Include="Data\SubscriptionDataConfigExtensions.cs" />
     <Compile Include="Data\UniverseSelection\ConstituentsUniverse.cs" />
@@ -315,6 +316,8 @@
     <Compile Include="Indicators\IIndicatorWarmUpPeriodProvider.cs" />
     <Compile Include="Interfaces\IAccountCurrencyProvider.cs" />
     <Compile Include="Interfaces\IAlgorithmSubscriptionManager.cs" />
+    <Compile Include="Interfaces\IDataChannelProvider.cs" />
+    <Compile Include="Interfaces\IDataPermissionManager.cs" />
     <Compile Include="Interfaces\IExtendedDictionary.cs" />
     <Compile Include="Interfaces\IObjectStore.cs" />
     <Compile Include="Interfaces\IBrokerageCashSynchronizer.cs" />
@@ -813,6 +816,7 @@
     <Compile Include="Util\PythonUtil.cs" />
     <Compile Include="Util\RateGate.cs" />
     <Compile Include="Util\RateLimit\TokenBucket.cs" />
+    <Compile Include="Util\ReferenceWrapper.cs" />
     <Compile Include="Util\SecurityExtensions.cs" />
     <Compile Include="Util\SecurityIdentifierJsonConverter.cs" />
     <Compile Include="Util\SeriesJsonConverter.cs" />

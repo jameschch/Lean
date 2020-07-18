@@ -15,6 +15,7 @@
 */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -47,8 +48,8 @@ namespace QuantConnect.Lean.Engine.Results
         private DateTime _nextUpdate;
         private DateTime _nextS3Update;
         private string _errorMessage;
-        private double _daysProcessed;
-        private double _daysProcessedFrontier;
+        private int _daysProcessed;
+        private int _daysProcessedFrontier;
         private readonly HashSet<string> _chartSeriesExceededDataPoints;
 
         //Processing Time:
@@ -206,8 +207,7 @@ namespace QuantConnect.Lean.Engine.Results
                 var summary = GenerateStatisticsResults(performanceCharts).Summary;
                 GetAlgorithmRuntimeStatistics(summary, runtimeStatistics);
 
-                //Profit Loss Changes:
-                var progress = Convert.ToDecimal(_daysProcessed / _jobDays);
+                var progress = (decimal)_daysProcessed / _jobDays;
                 if (progress > 0.999m) progress = 0.999m;
 
                 //1. Cloud Upload -> Upload the whole packet to S3  Immediately:
@@ -321,7 +321,7 @@ namespace QuantConnect.Lean.Engine.Results
                     SaveResults(key, results);
 
                     // Store Order Events in a separate file
-                    StoreOrderEvents(Algorithm.UtcTime, result.Results.OrderEvents);
+                    StoreOrderEvents(Algorithm?.UtcTime ?? DateTime.UtcNow, result.Results.OrderEvents);
                 }
                 else
                 {
@@ -341,30 +341,37 @@ namespace QuantConnect.Lean.Engine.Results
         {
             try
             {
-                //Convert local dictionary:
-                var charts = new Dictionary<string, Chart>(Charts);
-                var orders = new Dictionary<int, Order>(TransactionHandler.Orders);
-                var profitLoss = new SortedDictionary<DateTime, decimal>(Algorithm.Transactions.TransactionRecord);
-                var statisticsResults = GenerateStatisticsResults(charts, profitLoss);
-                var runtime = GetAlgorithmRuntimeStatistics(statisticsResults.Summary);
-
-                FinalStatistics = statisticsResults.Summary;
-
-                // clear the trades collection before placing inside the backtest result
-                foreach (var ap in statisticsResults.RollingPerformances.Values)
+                BacktestResultPacket result;
+                // could happen if algorithm failed to init
+                if (Algorithm != null)
                 {
-                    ap.ClosedTrades.Clear();
+                    //Convert local dictionary:
+                    var charts = new Dictionary<string, Chart>(Charts);
+                    var orders = new Dictionary<int, Order>(TransactionHandler.Orders);
+                    var profitLoss = new SortedDictionary<DateTime, decimal>(Algorithm.Transactions.TransactionRecord);
+                    var statisticsResults = GenerateStatisticsResults(charts, profitLoss);
+                    var runtime = GetAlgorithmRuntimeStatistics(statisticsResults.Summary);
+
+                    FinalStatistics = statisticsResults.Summary;
+
+                    // clear the trades collection before placing inside the backtest result
+                    foreach (var ap in statisticsResults.RollingPerformances.Values)
+                    {
+                        ap.ClosedTrades.Clear();
+                    }
+                    var orderEvents = TransactionHandler.OrderEvents.ToList();
+                    //Create a result packet to send to the browser.
+                    result = new BacktestResultPacket(_job,
+                        new BacktestResult(new BacktestResultParameters(charts, orders, profitLoss, statisticsResults.Summary, runtime, statisticsResults.RollingPerformances, orderEvents, statisticsResults.TotalPerformance, AlphaRuntimeStatistics)),
+                        Algorithm.EndDate, Algorithm.StartDate);
                 }
-                var orderEvents = TransactionHandler.OrderEvents.ToList();
-                //Create a result packet to send to the browser.
-                var result = new BacktestResultPacket(_job,
-                    new BacktestResult(new BacktestResultParameters(charts, orders, profitLoss, statisticsResults.Summary, runtime, statisticsResults.RollingPerformances, orderEvents, statisticsResults.TotalPerformance, AlphaRuntimeStatistics)),
-                    Algorithm.EndDate, Algorithm.StartDate)
+                else
                 {
-                    ProcessingTime = (DateTime.UtcNow - StartTime).TotalSeconds,
-                    DateFinished = DateTime.Now,
-                    Progress = 1
-                };
+                    result = BacktestResultPacket.CreateEmpty(_job);
+                }
+                result.ProcessingTime = (DateTime.UtcNow - StartTime).TotalSeconds;
+                result.DateFinished = DateTime.Now;
+                result.Progress = 1;
 
                 //Place result into storage.
                 StoreResult(result);
@@ -560,8 +567,14 @@ namespace QuantConnect.Lean.Engine.Results
         {
             base.SampleEquity(time, value);
 
-            //Recalculate the days processed:
-            _daysProcessed = (time - Algorithm.StartDate).TotalDays;
+            try
+            {
+                //Recalculate the days processed. We use 'int' so it's thread safe
+                _daysProcessed = (int) (time - Algorithm.StartDate).TotalDays;
+            }
+            catch (OverflowException)
+            {
+            }
         }
 
         /// <summary>
@@ -630,12 +643,14 @@ namespace QuantConnect.Lean.Engine.Results
             // Only process the logs once
             if (!ExitTriggered)
             {
+                Log.Trace("BacktestingResultHandler.Exit(): starting...");
                 List<LogEntry> copy;
                 lock (LogStore)
                 {
                     copy = LogStore.ToList();
                 }
                 ProcessSynchronousEvents(true);
+                Log.Trace("BacktestingResultHandler.Exit(): Saving logs...");
                 var logLocation = SaveLogs(_algorithmId, copy);
                 SystemDebugMessage("Your log was successfully created and can be retrieved from: " + logLocation);
 

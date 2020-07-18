@@ -14,7 +14,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>QuantConnect.Algorithm.CSharp</RootNamespace>
     <AssemblyName>QuantConnect.Algorithm.CSharp</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <LangVersion>6</LangVersion>
     <TargetFrameworkProfile />
@@ -45,22 +45,22 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Accord, Version=3.8.2.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <HintPath>..\packages\Accord.3.8.2-alpha\lib\net45\Accord.dll</HintPath>
+      <HintPath>..\packages\Accord.3.8.2-alpha\lib\net462\Accord.dll</HintPath>
     </Reference>
-    <Reference Include="Accord.Fuzzy, Version=3.6.0.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <HintPath>..\packages\Accord.Fuzzy.3.6.0\lib\net45\Accord.Fuzzy.dll</HintPath>
+    <Reference Include="Accord.Fuzzy, Version=3.8.2.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
+      <HintPath>..\packages\Accord.Fuzzy.3.8.2-alpha\lib\net462\Accord.Fuzzy.dll</HintPath>
     </Reference>
     <Reference Include="Accord.MachineLearning, Version=3.8.2.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <HintPath>..\packages\Accord.MachineLearning.3.8.2-alpha\lib\net45\Accord.MachineLearning.dll</HintPath>
+      <HintPath>..\packages\Accord.MachineLearning.3.8.2-alpha\lib\net462\Accord.MachineLearning.dll</HintPath>
     </Reference>
     <Reference Include="Accord.Math, Version=3.8.2.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <HintPath>..\packages\Accord.Math.3.8.2-alpha\lib\net45\Accord.Math.dll</HintPath>
+      <HintPath>..\packages\Accord.Math.3.8.2-alpha\lib\net462\Accord.Math.dll</HintPath>
     </Reference>
     <Reference Include="Accord.Math.Core, Version=3.8.2.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <HintPath>..\packages\Accord.Math.3.8.2-alpha\lib\net45\Accord.Math.Core.dll</HintPath>
+      <HintPath>..\packages\Accord.Math.3.8.2-alpha\lib\net462\Accord.Math.Core.dll</HintPath>
     </Reference>
     <Reference Include="Accord.Statistics, Version=3.8.2.0, Culture=neutral, PublicKeyToken=fa1a88e29555ccf7, processorArchitecture=MSIL">
-      <HintPath>..\packages\Accord.Statistics.3.8.2-alpha\lib\net45\Accord.Statistics.dll</HintPath>
+      <HintPath>..\packages\Accord.Statistics.3.8.2-alpha\lib\net462\Accord.Statistics.dll</HintPath>
     </Reference>
     <Reference Include="DynamicInterop, Version=0.7.4.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\DynamicInterop.0.7.4\lib\net40\DynamicInterop.dll</HintPath>
@@ -74,19 +74,22 @@
     <Reference Include="NodaTime, Version=1.3.0.0, Culture=neutral, PublicKeyToken=4226afe0d9b296d1, processorArchitecture=MSIL">
       <HintPath>..\packages\NodaTime.1.3.4\lib\net35-Client\NodaTime.dll</HintPath>
     </Reference>
+    <Reference Include="Polly, Version=7.0.0.0, Culture=neutral, PublicKeyToken=c8a3ffc3f8f825cc, processorArchitecture=MSIL">
+      <HintPath>..\packages\Polly.7.2.1\lib\net461\Polly.dll</HintPath>
+    </Reference>
     <Reference Include="RDotNet, Version=1.6.5.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.dll</HintPath>
     </Reference>
     <Reference Include="RDotNet.NativeLibrary, Version=1.6.5.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\R.NET.Community.1.6.5\lib\net40\RDotNet.NativeLibrary.dll</HintPath>
     </Reference>
-    <Reference Include="StringInterpolationBridge, Version=0.9.1.0, Culture=neutral, PublicKeyToken=761dcf67ba0bf74d, processorArchitecture=MSIL">
-      <HintPath>..\packages\StringInterpolationBridgeStrong.0.9.1\lib\net40\StringInterpolationBridge.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net461\System.ValueTuple.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -151,16 +154,21 @@
     <Compile Include="Alphas\TriangleExchangeRateArbitrageAlpha.cs" />
     <Compile Include="Alphas\TripleLeveragedETFPairVolatilityDecayAlpha.cs" />
     <Compile Include="Alphas\VixDualThrustAlpha.cs" />
+    <Compile Include="AltData\RobintrackHoldingsAlgorithm.cs" />
     <Compile Include="AltData\CachedAlternativeDataAlgorithm.cs" />
     <Compile Include="AltData\BenzingaNewsAlgorithm.cs" />
     <Compile Include="AltData\SECReport8KAlgorithm.cs" />
     <Compile Include="AltData\SmartInsiderTransactionAlgorithm.cs" />
     <Compile Include="AltData\USTreasuryYieldCurveRateAlgorithm.cs" />
-    <Compile Include="AltData\PsychSignalSentimentAlgorithm.cs" />
     <Compile Include="AltData\TradingEconomicsAlgorithm.cs" />
     <Compile Include="AltData\TiingoNewsAlgorithm.cs" />
     <Compile Include="AutomaticIndicatorWarmupDataTypeRegressionAlgorithm.cs" />
     <Compile Include="AutomaticIndicatorWarmupRegressionAlgorithm.cs" />
+    <Compile Include="ExtendedMarketTradingRegressionAlgorithm.cs" />
+    <Compile Include="CoarseTiingoNewsUniverseSelectionAlgorithm.cs" />
+    <Compile Include="DelistedFutureLiquidateRegressionAlgorithm.cs" />
+    <Compile Include="EmaCrossFuturesFrontMonthAlgorithm.cs" />
+    <Compile Include="OpenInterestFuturesRegressionAlgorithm.cs" />
     <Compile Include="CustomPartialFillModelAlgorithm.cs" />
     <Compile Include="EquityTradeAndQuotesRegressionAlgorithm.cs" />
     <Compile Include="BasicTemplateConstituentUniverseAlgorithm.cs" />
@@ -244,7 +252,6 @@
     <Compile Include="StopLossOnOrderEventRegressionAlgorithm.cs" />
     <Compile Include="TotalPortfolioValueRegressionAlgorithm.cs" />
     <Compile Include="TradingEconomicsCalendarIndicatorAlgorithm.cs" />
-    <Compile Include="PsychSignalSentimentRegressionAlgorithm.cs" />
     <Compile Include="TrailingStopRiskFrameworkAlgorithm.cs" />
     <Compile Include="BasicTemplateFuturesFrameworkAlgorithm.cs" />
     <Compile Include="BasicTemplateOptionsFrameworkAlgorithm.cs" />

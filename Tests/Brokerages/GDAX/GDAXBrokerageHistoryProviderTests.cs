@@ -22,6 +22,7 @@ using QuantConnect.Brokerages.GDAX;
 using QuantConnect.Configuration;
 using QuantConnect.Data;
 using QuantConnect.Data.Market;
+using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Lean.Engine.HistoricalData;
 using QuantConnect.Logging;
 using QuantConnect.Securities;
@@ -36,7 +37,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
         public void GetsHistory(Symbol symbol, Resolution resolution, TickType tickType, TimeSpan period, bool shouldBeEmpty)
         {
             var restClient = new RestClient("https://api.pro.coinbase.com");
-            var webSocketClient = new WebSocketWrapper();
+            var webSocketClient = new WebSocketClientWrapper();
 
             var brokerage = new GDAXBrokerage(
                 Config.Get("gdax-url", "wss://ws-feed.pro.coinbase.com"), webSocketClient, restClient,
@@ -44,7 +45,7 @@ namespace QuantConnect.Tests.Brokerages.GDAX
 
             var historyProvider = new BrokerageHistoryProvider();
             historyProvider.SetBrokerage(brokerage);
-            historyProvider.Initialize(new HistoryProviderInitializeParameters(null, null, null, null, null, null, null, false));
+            historyProvider.Initialize(new HistoryProviderInitializeParameters(null, null, null, null, null, null, null, false, null));
 
             var now = DateTime.UtcNow;
 

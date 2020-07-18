@@ -57,6 +57,20 @@ namespace QuantConnect
             = new Dictionary<IntPtr, PythonActivator>();
 
         /// <summary>
+        /// Extension method to get security price is 0 messages for users
+        /// </summary>
+        /// <remarks>The value of this method is normalization</remarks>
+        public static string GetZeroPriceMessage(this Symbol symbol)
+        {
+            return $"{symbol}: The security does not have an accurate price as it has not yet received a bar of data. " +
+                   "Before placing a trade (or using SetHoldings) warm up your algorithm with SetWarmup, or use slice.Contains(symbol)" +
+                   " to confirm the Slice object has price before using the data. Data does not necessarily all arrive at the same" +
+                   " time so your algorithm should confirm the data is ready before using it. In live trading this can mean you do" +
+                   " not have an active subscription to the asset class you're trying to trade. If using custom data make sure you've" +
+                   " set the 'Value' property.";
+        }
+
+        /// <summary>
         /// Converts the provided string into camel case notation
         /// </summary>
         public static string ToCamelCase(this string value)
@@ -693,6 +707,16 @@ namespace QuantConnect
             var lo = (int)value;
             var mid = (int)(value >> 32);
             return new decimal(lo, mid, 0, isNegative, (byte)(hasDecimals ? decimalPlaces : 0));
+        }
+
+        /// <summary>
+        /// Extension method for string to decimal conversion where string can represent a number with exponent xe-y
+        /// </summary>
+        /// <param name="str">String to be converted to decimal value</param>
+        /// <returns>Decimal value of the string</returns>
+        public static decimal ToDecimalAllowExponent(this string str)
+        {
+            return decimal.Parse(str, NumberStyles.AllowExponent | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -1356,6 +1380,50 @@ namespace QuantConnect
         }
 
         /// <summary>
+        /// Asserts the specified <paramref name="securityType"/> value is valid
+        /// </summary>
+        /// <remarks>This method provides faster performance than <see cref="Enum.IsDefined"/> which uses reflection</remarks>
+        /// <param name="securityType">The SecurityType value</param>
+        /// <returns>True if valid security type value</returns>
+        public static bool IsValid(this SecurityType securityType)
+        {
+            switch (securityType)
+            {
+                case SecurityType.Base:
+                case SecurityType.Equity:
+                case SecurityType.Option:
+                case SecurityType.Commodity:
+                case SecurityType.Forex:
+                case SecurityType.Future:
+                case SecurityType.Cfd:
+                case SecurityType.Crypto:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Converts the specified <paramref name="optionRight"/> value to its corresponding string representation
+        /// </summary>
+        /// <remarks>This method provides faster performance than enum <see cref="ToString"/></remarks>
+        /// <param name="optionRight">The optionRight value</param>
+        /// <returns>A string representation of the specified OptionRight value</returns>
+        public static string ToStringPerformance(this OptionRight optionRight)
+        {
+            switch (optionRight)
+            {
+                case OptionRight.Call:
+                    return "Call";
+                case OptionRight.Put:
+                    return "Put";
+                default:
+                    // just in case
+                    return optionRight.ToString();
+            }
+        }
+
+        /// <summary>
         /// Converts the specified <paramref name="securityType"/> value to its corresponding lower-case string representation
         /// </summary>
         /// <remarks>This method provides faster performance than <see cref="ToLower"/></remarks>
@@ -1547,8 +1615,9 @@ namespace QuantConnect
         /// <typeparam name="T">Target type of the resulting managed object</typeparam>
         /// <param name="pyObject">PyObject to be converted</param>
         /// <param name="result">Managed object </param>
+        /// <param name="allowPythonDerivative">True will convert python subclasses of T</param>
         /// <returns>True if successful conversion</returns>
-        public static bool TryConvert<T>(this PyObject pyObject, out T result)
+        public static bool TryConvert<T>(this PyObject pyObject, out T result, bool allowPythonDerivative = false)
         {
             result = default(T);
             var type = typeof(T);
@@ -1589,10 +1658,10 @@ namespace QuantConnect
 
                     // If the PyObject type and the managed object names are the same,
                     // pyObject is a C# object wrapped in PyObject, in this case return true
-                    // Otherwise, pyObject is a python object that subclass a C# class.
+                    // Otherwise, pyObject is a python object that subclass a C# class, only return true if 'allowPythonDerivative'
                     var name = (((dynamic) pythonType).__name__ as PyObject).GetAndDispose<string>();
                     pythonType.Dispose();
-                    return name == result.GetType().Name;
+                    return allowPythonDerivative || name == result.GetType().Name;
                 }
                 catch
                 {

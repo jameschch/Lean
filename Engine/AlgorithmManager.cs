@@ -83,7 +83,7 @@ namespace QuantConnect.Lean.Engine
         /// </summary>
         /// <param name="liveMode">True if we're running in live mode, false for backtest mode</param>
         /// <param name="job">Provided by LEAN when creating a new algo manager. This is the job
-        /// that the algo manager is about to execute. Jupyter and other consumers can provide the
+        /// that the algo manager is about to execute. Research and other consumers can provide the
         /// default value of null</param>
         public AlgorithmManager(bool liveMode, AlgorithmNodePacket job = null)
         {
@@ -713,9 +713,10 @@ namespace QuantConnect.Lean.Engine
         {
             lock (_lock)
             {
-                //We don't want anyone elseto set our internal state to "Running".
+                //We don't want anyone else to set our internal state to "Running".
                 //This is controlled by the algorithm private variable only.
-                if (state != AlgorithmStatus.Running)
+                //Algorithm could be null after it's initialized and they call Run on us
+                if (state != AlgorithmStatus.Running && _algorithm != null)
                 {
                     _algorithm.Status = state;
                 }
@@ -1207,7 +1208,7 @@ namespace QuantConnect.Lean.Engine
             if (controls == null)
             {
                 // this will only be null when the AlgorithmManager is being initialized outside of LEAN
-                // for example, in unit tests that don't provide a job package as well as from Jupyter
+                // for example, in unit tests that don't provide a job package as well as from Research
                 // in each of the above cases, it seems best to not enforce the leaky bucket restrictions
                 return TokenBucket.Null;
             }

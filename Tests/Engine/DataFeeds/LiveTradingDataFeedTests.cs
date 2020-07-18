@@ -25,7 +25,7 @@ using NUnit.Framework;
 using QuantConnect.Algorithm;
 using QuantConnect.Data;
 using QuantConnect.Data.Auxiliary;
-using QuantConnect.Data.Custom.PsychSignal;
+using QuantConnect.Data.Custom.Benzinga;
 using QuantConnect.Data.Custom.Tiingo;
 using QuantConnect.Data.Fundamental;
 using QuantConnect.Data.Market;
@@ -55,7 +55,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
         private static readonly Dictionary<Type, BaseData> _instances = new Dictionary<Type, BaseData>
         {
             {typeof(BaseData), typeof(TradeBar).GetBaseDataInstance() },
-            {typeof(PsychSignalSentiment), typeof(PsychSignalSentiment).GetBaseDataInstance() },
+            {typeof(BenzingaNews), typeof(BenzingaNews).GetBaseDataInstance() },
             {typeof(TiingoNews), typeof(TiingoNews).GetBaseDataInstance() },
         };
 
@@ -1029,6 +1029,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var feed = new TestableLiveTradingDataFeed();
             var marketHoursDatabase = MarketHoursDatabase.FromDataFolder();
             var symbolPropertiesDataBase = SymbolPropertiesDatabase.FromDataFolder();
+
             var securityService = new SecurityService(
                 algorithm.Portfolio.CashBook,
                 marketHoursDatabase,
@@ -1037,13 +1038,15 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 RegisteredSecurityDataTypesProvider.Null,
                 new SecurityCacheProvider(algorithm.Portfolio));
             algorithm.Securities.SetSecurityService(securityService);
+            var dataPermissionManager = new DataPermissionManager();
             var dataManager = new DataManager(feed,
-                new UniverseSelection(algorithm, securityService),
+                new UniverseSelection(algorithm, securityService, dataPermissionManager),
                 algorithm,
                 algorithm.TimeKeeper,
                 marketHoursDatabase,
                 true,
-                RegisteredSecurityDataTypesProvider.Null);
+                RegisteredSecurityDataTypesProvider.Null,
+                dataPermissionManager);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
             var synchronizer = new TestableLiveSynchronizer();
             synchronizer.Initialize(algorithm, dataManager);
@@ -1060,7 +1063,8 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 new LocalDiskFactorFileProvider(mapFileProvider),
                 fileProvider,
                 dataManager,
-                synchronizer);
+                synchronizer,
+                new TestDataChannelProvider());
 
             var unhandledExceptionWasThrown = false;
             try
@@ -1293,20 +1297,22 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var symbolPropertiesDataBase = SymbolPropertiesDatabase.FromDataFolder();
             var securityService = new SecurityService(_algorithm.Portfolio.CashBook, marketHoursDatabase, symbolPropertiesDataBase, _algorithm, RegisteredSecurityDataTypesProvider.Null, new SecurityCacheProvider(_algorithm.Portfolio));
             _algorithm.Securities.SetSecurityService(securityService);
+            var dataPermissionManager = new DataPermissionManager();
             _dataManager = new DataManager(feed,
-                new UniverseSelection(_algorithm, securityService),
+                new UniverseSelection(_algorithm, securityService, dataPermissionManager),
                 _algorithm,
                 _algorithm.TimeKeeper,
                 marketHoursDatabase,
                 true,
-                RegisteredSecurityDataTypesProvider.Null);
+                RegisteredSecurityDataTypesProvider.Null,
+                dataPermissionManager);
             _algorithm.SubscriptionManager.SetDataManager(_dataManager);
             _algorithm.AddSecurities(resolution, equities, forex, crypto);
             _synchronizer = new TestableLiveSynchronizer(_manualTimeProvider);
             _synchronizer.Initialize(_algorithm, _dataManager);
 
             feed.Initialize(_algorithm, job, resultHandler, mapFileProvider,
-                new LocalDiskFactorFileProvider(mapFileProvider), fileProvider, _dataManager, _synchronizer);
+                new LocalDiskFactorFileProvider(mapFileProvider), fileProvider, _dataManager, _synchronizer, new TestDataChannelProvider());
 
             _algorithm.PostInitialize();
             Thread.Sleep(150); // small handicap for the data to be pumped so TimeSlices have data of all subscriptions
@@ -1451,9 +1457,9 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             new TestCaseData(Symbols.SPY_C_192_Feb19_2016, Resolution.Tick, 1, (7 - 1) * 2, 0, 0, 0, 0, false, _instances[typeof(BaseData)]),
 
             // Custom data not supported
-            new TestCaseData(Symbol.CreateBase(typeof(PsychSignalSentiment), Symbols.AAPL, Market.USA), Resolution.Hour, 1, 0, 0, 0, 0, 24 * 2, true, _instances[typeof(PsychSignalSentiment)]),
-            new TestCaseData(Symbol.CreateBase(typeof(PsychSignalSentiment), Symbols.AAPL, Market.USA), Resolution.Minute, 1, 0, 0, 0, 0, 60 * 2, true, _instances[typeof(PsychSignalSentiment)]),
-            new TestCaseData(Symbol.CreateBase(typeof(PsychSignalSentiment), Symbols.AAPL, Market.USA), Resolution.Tick, 1, 0, 0, 0, 0, 24, true, _instances[typeof(PsychSignalSentiment)]),
+            new TestCaseData(Symbol.CreateBase(typeof(BenzingaNews), Symbols.AAPL, Market.USA), Resolution.Hour, 1, 0, 0, 0, 0, 24 * 2, true, _instances[typeof(BenzingaNews)]),
+            new TestCaseData(Symbol.CreateBase(typeof(BenzingaNews), Symbols.AAPL, Market.USA), Resolution.Minute, 1, 0, 0, 0, 0, 60 * 2, true, _instances[typeof(BenzingaNews)]),
+            new TestCaseData(Symbol.CreateBase(typeof(BenzingaNews), Symbols.AAPL, Market.USA), Resolution.Tick, 1, 0, 0, 0, 0, 24, true, _instances[typeof(BenzingaNews)]),
 
             // Custom data streamed
             new TestCaseData(Symbol.CreateBase(typeof(TiingoNews), Symbols.AAPL, Market.USA), Resolution.Hour, 1, 0, 0, 0, 0, 24 * 2, false, _instances[typeof(TiingoNews)]),
@@ -1612,13 +1618,15 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 RegisteredSecurityDataTypesProvider.Null,
                 new SecurityCacheProvider(algorithm.Portfolio));
             algorithm.Securities.SetSecurityService(securityService);
+            var dataPermissionManager = new DataPermissionManager();
             var dataManager = new DataManager(feed,
-                new UniverseSelection(algorithm, securityService),
+                new UniverseSelection(algorithm, securityService, dataPermissionManager),
                 algorithm,
                 algorithm.TimeKeeper,
                 marketHoursDatabase,
                 true,
-                RegisteredSecurityDataTypesProvider.Null);
+                RegisteredSecurityDataTypesProvider.Null,
+                dataPermissionManager);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
             algorithm.SetLiveMode(true);
 
@@ -1666,7 +1674,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var mapFileProvider = new LocalDiskMapFileProvider();
             feed.Initialize(algorithm, new LiveNodePacket(), new BacktestingResultHandler(),
                 mapFileProvider, new LocalDiskFactorFileProvider(mapFileProvider), new DefaultDataProvider(),
-                dataManager, synchronizer);
+                dataManager, synchronizer, new TestDataChannelProvider());
 
             dataQueueStarted.WaitOne();
             var cancellationTokenSource = new CancellationTokenSource();
@@ -1995,7 +2003,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 },
 
                 // LookupSymbols
-                (lookupName, secType, securityCurrency, securityExchange) =>
+                (lookupName, secType, includeExpired, securityCurrency, securityExchange) =>
                 {
                     lookupCount++;
 
@@ -2063,13 +2071,15 @@ namespace QuantConnect.Tests.Engine.DataFeeds
                 RegisteredSecurityDataTypesProvider.Null,
                 new SecurityCacheProvider(algorithm.Portfolio));
             algorithm.Securities.SetSecurityService(securityService);
+            var dataPermissionManager = new DataPermissionManager();
             var dataManager = new DataManager(feed,
-                new UniverseSelection(algorithm, securityService),
+                new UniverseSelection(algorithm, securityService, dataPermissionManager),
                 algorithm,
                 algorithm.TimeKeeper,
                 marketHoursDatabase,
                 true,
-                RegisteredSecurityDataTypesProvider.Null);
+                RegisteredSecurityDataTypesProvider.Null,
+                dataPermissionManager);
             algorithm.SubscriptionManager.SetDataManager(dataManager);
             algorithm.SetLiveMode(true);
 
@@ -2103,7 +2113,7 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             var mapFileProvider = new LocalDiskMapFileProvider();
             feed.Initialize(algorithm, new LiveNodePacket(), new BacktestingResultHandler(),
                 mapFileProvider, new LocalDiskFactorFileProvider(mapFileProvider), new DefaultDataProvider(),
-                dataManager, synchronizer);
+                dataManager, synchronizer, new TestDataChannelProvider());
 
             var cancellationTokenSource = new CancellationTokenSource();
 
@@ -2278,10 +2288,6 @@ namespace QuantConnect.Tests.Engine.DataFeeds
             return DataQueueHandler;
         }
 
-        protected override IDataChannelProvider GetDataChannelProvider()
-        {
-            return new TestDataChannelProvider();
-        }
         public bool UpdateRealTimePrice(
             Subscription subscription,
             TimeZoneOffsetProvider timeZoneOffsetProvider,

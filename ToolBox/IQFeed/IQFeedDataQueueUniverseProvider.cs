@@ -28,6 +28,7 @@ using Newtonsoft.Json;
 using System.Net;
 using QuantConnect.Lean.Engine.DataFeeds;
 using QuantConnect.Securities;
+using QuantConnect.Util;
 
 namespace QuantConnect.ToolBox.IQFeed
 {
@@ -35,7 +36,7 @@ namespace QuantConnect.ToolBox.IQFeed
     /// Class implements several interfaces to support IQFeed symbol mapping to LEAN and symbol lookup
     /// Refer to IQFeed symbols guide for more info: http://www.iqfeed.net/symbolguide/index.cfm?symbolguide=guide
     /// </summary>
-    public class IQFeedDataQueueUniverseProvider : IDataQueueUniverseProvider, ISymbolMapper
+    public class IQFeedDataQueueUniverseProvider : IDataQueueUniverseProvider, ISymbolMapper, IDisposable
     {
         // IQFeed CSV file column nomenclature
         private const int columnSymbol = 0;
@@ -123,10 +124,11 @@ namespace QuantConnect.ToolBox.IQFeed
         /// </summary>
         /// <param name="lookupName">String representing the name to lookup</param>
         /// <param name="securityType">Expected security type of the returned symbols (if any)</param>
+        /// <param name="includeExpired">Include expired contracts</param>
         /// <param name="securityCurrency">Expected security currency(if any)</param>
         /// <param name="securityExchange">Expected security exchange name(if any)</param>
         /// <returns></returns>
-        public IEnumerable<Symbol> LookupSymbols(string lookupName, SecurityType securityType, string securityCurrency = null, string securityExchange = null)
+        public IEnumerable<Symbol> LookupSymbols(string lookupName, SecurityType securityType, bool includeExpired, string securityCurrency = null, string securityExchange = null)
         {
             Func<Symbol, string> lookupFunc;
 
@@ -691,6 +693,14 @@ namespace QuantConnect.ToolBox.IQFeed
         {
             return _symbols.Where(kpv => kpv.Key.SecurityType == SecurityType.Future && kpv.Key.ID.Symbol == subscribeSymbol.ID.Symbol)
                 .Select(kpv => kpv.Value);
+        }
+
+        /// <summary>
+        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// </summary>
+        public void Dispose()
+        {
+            _dataCacheProvider.DisposeSafely();
         }
     }
 }
